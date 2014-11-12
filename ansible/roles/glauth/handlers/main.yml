@@ -1,0 +1,7 @@
+---
+- name: restart nscd
+  sudo: true
+  service: name=nscd state=restarted
+- name: restart sshd
+  sudo: true
+  service: name=ssh state=restarted

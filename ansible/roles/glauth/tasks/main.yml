@@ -1,0 +1,56 @@
+---
+- name: install packages needed for glauth
+  sudo: true
+  apt: pkg={{item}} state=installed
+  with_items:
+  - ldap-auth-client
+  - nscd
+# - ldap-utils
+# - netcat
+
+- name: configure nsswitch passwd
+  sudo: true
+  lineinfile: 'dest=/etc/nsswitch.conf state=present backrefs=yes regexp="^passwd:\s+compat" line="passwd: files ldap"'
+  notify: restart nscd
+- name: configure nsswitch group
+  sudo: true
+  lineinfile: 'dest=/etc/nsswitch.conf state=present backrefs=yes regexp="^group:\s+compat" line="group: files ldap"'
+  notify: restart nscd
+- name: configure nsswitch shadow
+  sudo: true
+  lineinfile: 'dest=/etc/nsswitch.conf state=present backrefs=yes regexp="^shadow:\s+compat" line="shadow: files ldap"'
+  notify: restart nscd
+- name: configure pam common-session
+  sudo: true
+  lineinfile: 'dest=/etc/pam.d/common-session state=present regexp="^session\s+required\s+pam_mkhomedir.so" line="session required pam_mkhomedir.so"'
+  notify: restart nscd
+- name: configure pam common-session-noninteractive
+  sudo: true
+  lineinfile: 'dest=/etc/pam.d/common-session-noninteractive state=present regexp="^session\s+required\s+pam_mkhomedir.so" line="session required pam_mkhomedir.so"'
+  notify: restart nscd
+- name: copy over ldap.conf file
+  sudo: true
+  template: src=ldap.conf dest=/etc/ldap.conf mode=0600
+  notify: restart nscd
+- name: copy over mkdhomedir pam config file
+  sudo: true
+  copy: src=mkhomedir dest=/usr/share/pam-configs/my_mkhomedir mode=0600
+- name: download goklp command
+  sudo: true
+  get_url: url=https://github.com/AppliedTrust/goklp/releases/download/1.4/goklp dest=/usr/local/sbin/goklp mode=0755 owner=root
+- name: copy over goklp config
+  sudo: true
+  template: src=goklp.ini dest=/usr/local/sbin/goklp.ini mode=0600 owner=root
+#- name: disable ssh password auth
+#  sudo: true
+#  lineinfile: dest=/etc/ssh/sshd_config state=present regexp="^PasswordAuthentication" line="PasswordAuthentication no"
+#  notify: restart sshd
+- name: configure ssh AuthorizedKeysCommand for glauth
+  sudo: true
+  lineinfile: dest=/etc/ssh/sshd_config state=present regexp="^AuthorizedKeysCommand\s+" line="AuthorizedKeysCommand /usr/local/sbin/goklp"
+  notify: restart sshd
+- name: configure ssh AuthorizedKeysCommandUser for glauth
+  sudo: true
+  lineinfile: dest=/etc/ssh/sshd_config state=present regexp="^AuthorizedKeysCommandUser\s+" line="AuthorizedKeysCommandUser root"
+  notify: restart sshd
+

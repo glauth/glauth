@@ -1,0 +1,6 @@
+---
+glauth_ldap_uri: ldap://localhost:389
+glauth_bind_dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+glauth_base_dn: dc=glauth,dc=com
+glauth_bind_pw: mysecret
+glauth_timeout_secs: 5

@@ -1,0 +1,47 @@
+
+.jumbotron {
+  color: #c0392b;
+  background-color: #ecf0f1;
+}
+
+#statspanel {
+  color: #34495e;
+}
+
+#statspanel .metric {
+  color: #3498db;
+}
+
+#stats {
+  color: #9b59b6;
+  padding: 8px;
+}
+#servers {
+  color: #9b59b6;
+  padding: 8px;
+}
+
+h2 {
+ color: #2980b9;
+}
+
+#tail th {
+  color: #7f8c8d;
+}
+#tail td {
+  padding: 4px;
+  color: #34495e;
+  font-size: 18px;
+}
+
+#tail td.op {
+  color: #8e44ad;
+  font-weight: bold;
+}
+#tail td.op.bind {
+  color: #16a085;
+}
+#tail td.op.search {
+  color: #1abc9c;
+}
+

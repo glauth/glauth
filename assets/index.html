@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>GLAuth Status</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" href="assets/glauth.css">
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+
+  <body role="document">
+
+    <div class="container theme-showcase" role="main">
+
+      <!-- Main jumbotron for a primary marketing message or call to action -->
+      <div class="jumbotron">
+          <div id="statspanel" class="panel panel-default pull-right">
+          </div>
+        <h1>GLAuth</h1>
+        <p>This tool is in development - not quite ready for production!</p>
+
+      </div>
+
+      <div class="row">
+        <div class="col-xs-12 col-sm-6">
+          <h2>stats</h2>
+          <div id="stats" class="jumbotron">
+          </div>
+        </div>
+
+        <div class="col-xs-12 col-sm-6">
+          <h2>backend servers</h2>
+          <div id="servers" class="jumbotron">
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /container -->
+
+    <script id="statspanel-template" type="text/x-handlebars-template">
+        <div class="panel-body">
+            <span class="metric">proxy.version:</span> {{proxy.version}}<br>
+        </div>
+    </script>
+
+    <script id="stats-template" type="text/x-handlebars-template">
+      <span class="metric">proxy_frontend.bind_reqs:</span> {{proxy_frontend.bind_reqs}}<br>
+      <span class="metric">proxy_frontend.bind_successes:</span> {{proxy_frontend.bind_successes}}<br>
+      <span class="metric">proxy_frontend.bind_errors:</span> {{proxy_frontend.bind_errors}}<br>
+      <span class="metric">proxy_frontend.search_reqs:</span> {{proxy_frontend.search_reqs}}<br>
+      <span class="metric">proxy_frontend.search_successes:</span> {{proxy_frontend.search_successes}}<br>
+      <span class="metric">proxy_frontend.search_errors:</span> {{proxy_frontend.search_errors}}<br>
+      <span class="metric">proxy_frontend.closes:</span> {{proxy_frontend.closes}}<br>
+    </script>
+
+    <script id="servers-template" type="text/x-handlebars-template">
+      {{#each proxy_backend.servers}}
+        <span class="metric">{{Scheme}}://{{Hostname}}:{{Port}}</span> {{Ping}} {{Status}} <br>
+      {{/each}}
+    </script>
+
+    <script id="tail-template" type="text/x-handlebars-template">
+      <tbody>
+        {{#each this}}
+        <tr class="">
+            <td class="op {{Op}}">{{Op}}</td>
+            <td class="op {{Op}}">{{BindDN}}</td>
+            <td class="op {{Op}}">{{SearchReq.Filter}}</td>
+            <td class="">{{ResultCode}}</td>
+            <td class="">{{SearchResults}}</td>
+            <td class="">{{ClientIP}}</td>
+            <td class="">{{dateRelative When}}</td>
+        </tr>
+        {{/each}}
+      <tbody>
+    </script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.3/moment-with-locales.min.js"></script>
+    <script src="assets/glauth.js"></script>
+  </body>
+</html>

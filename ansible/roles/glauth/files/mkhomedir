@@ -1,0 +1,6 @@
+Name: activate mkhomedir
+Default: yes
+Priority: 900
+Session-Type: Additional
+Session: required pam_mkhomedir.so
+
