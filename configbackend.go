@@ -21,7 +21,7 @@ func newConfigHandler(cfg *config) Backend {
 }
 
 //
-func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode uint64, err error) {
+func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	log.Debug("Bind request as %s from %s", bindDN, conn.RemoteAddr().String())
@@ -108,13 +108,13 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
-	filterType, err := ldap.GetFilterType(searchReq.Filter)
+	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
 	if err != nil {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter)
 	}
-	switch filterType {
+	switch filterEntity {
 	default:
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterType, searchReq.Filter)
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
 	case "posixgroup":
 		for _, g := range h.cfg.Groups {
 			attrs := []*ldap.EntryAttribute{}
@@ -155,7 +155,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 }
 
 //
-func (h configHandler) Close(conn net.Conn) error {
+func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	stats_frontend.Add("closes", 1)
 	return nil
 }

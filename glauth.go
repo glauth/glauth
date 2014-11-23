@@ -4,17 +4,14 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/BurntSushi/toml"
-	"github.com/nmcclain/ldap"
 	"github.com/docopt/docopt-go"
+	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
 	"launchpad.net/goamz/aws"
 	"launchpad.net/goamz/s3"
 	"os"
 	"strings"
 )
-
-//import "github.com/kr/pretty"
-//log.Critical(": %# v", pretty.Formatter(string(tomlData)))
 
 var version = "0.1"
 
@@ -35,8 +32,6 @@ Options:
   -h, --help                Show this screen.
   --version                 Show version.
 `
-
-// ldapsearch -LLL -H ldaps://localhost:3389 -D cn=ned,ou=seals,o=ate,c=opsbot -w mysecret -x -b 'o=ate,c=opsbot' 'cn=ned' cn
 
 // exposed expvar variables
 var stats_frontend = expvar.NewMap("proxy_frontend")

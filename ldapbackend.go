@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/nmcclain/ldap"
 	"github.com/kr/pretty"
+	"github.com/nmcclain/ldap"
 	"net"
 	"net/url"
 	"strconv"
@@ -65,7 +65,7 @@ func newLdapHandler(cfg *config) Backend {
 }
 
 //
-func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode uint64, err error) {
+func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	log.Debug("Bind request as %s from %s", bindDN, conn.RemoteAddr().String())
 	stats_frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
@@ -118,14 +118,14 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 		e := err.(*ldap.Error)
 		log.Debug("Search Err: %# v", pretty.Formatter(err))
 		stats_frontend.Add("search_errors", 1)
-		ssr.ResultCode = uint64(e.ResultCode)
+		ssr.ResultCode = ldap.LDAPResultCode(e.ResultCode)
 		return ssr, err
 	}
 	stats_frontend.Add("search_successes", 1)
 	log.Debug("AP: Search OK: %s -> num of entries = %d\n", search.Filter, len(ssr.Entries))
 	return ssr, nil
 }
-func (h ldapHandler) Close(conn net.Conn) error {
+func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()
 	defer h.lock.Unlock()
