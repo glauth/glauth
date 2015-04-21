@@ -1,22 +1,21 @@
-# GLAuth: LDAP authentication for hackers
+# GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
 * Lightweight alternative to OpenLDAP and Active Directory.
+* Store your user directory in S3 or MySQL, or proxy to existing LDAP servers.
 
-Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!):
+Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
-### Quickstart for Ubuntu 14.04:
-This quickstart is a great way to try out GLAuth in a non-production environment.  The client configuration has only been tested on Ubuntu 14.04, even though the GLAuth server should work on any modern Linux distribution.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
+### Quickstart
+This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
 
 1. Install GLAuth on a test server
   1. Clone the repo: `git clone https://github.com/nmcclain/glauth`
   2. Start the GLAuth server: `cd glauth; sudo bin/glauth32 -c sample-simple.cfg`
-2. Configure the server to authenticate against GLAuth
-  1. Run the Ansible playbook: `cd ansible ; sudo ansible-playbook -i hosts glauth.yml`
-  2. Try SSH'ing to the server as: **hackers** / **dogood**
-  3. Test things out from the command line: `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+2. Test with traditional LDAP tools
+  1. `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
 
 ### Usage:
 ```
@@ -68,17 +67,11 @@ In order to use S3, you must set your AWS credentials.  Either:
 
 More configuration options are documented here: https://github.com/nmcclain/foo/blob/master/sample-simple.cfg
 
-### Client configuration:
-**We will be providing a cross-platform Ansible role to configure Linux clients - come back soon!**
-
-* Ubuntu: https://help.ubuntu.com/community/LDAPClientAuthentication
-* RedHat/CentOS: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/ch-Configuring_Authentication.html#configuring-ldap-auth
-
 ### OpenSSH keys:
-GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/nmcclain/goklp
+GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
 
 ### Backends:
-For advanced users, GLAuth supports pluggable backends.  Currently, it can use an existing LDAP infrastructure.  In the future, we hope to have backends that support Mongo, SQL, and other datastores.
+For advanced users, GLAuth supports pluggable backends.  Currently, it can use a local file, S3 or an existing LDAP infrastructure.  In the future, we hope to have backends that support Mongo, SQL, and other datastores.
 ```toml
 [backend]
   datastore = "ldap"
