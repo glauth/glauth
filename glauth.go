@@ -73,6 +73,7 @@ type configUser struct {
 	PassSHA256   string
 	PrimaryGroup int
 	SSHKeys      []string
+	Disabled     bool
 	UnixID       int
 }
 type configGroup struct {
