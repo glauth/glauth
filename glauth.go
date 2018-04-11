@@ -77,6 +77,8 @@ type configUser struct {
 	UnixID       int
 	Mail         string
 	LoginShell   string
+	GivenName    string
+	SN           string
 }
 type configGroup struct {
 	Name   string
