@@ -76,6 +76,7 @@ type configUser struct {
 	Disabled     bool
 	UnixID       int
 	Mail         string
+	LoginShell   string
 }
 type configGroup struct {
 	Name   string
