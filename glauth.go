@@ -75,6 +75,7 @@ type configUser struct {
 	SSHKeys      []string
 	Disabled     bool
 	UnixID       int
+	Mail         string
 }
 type configGroup struct {
 	Name   string

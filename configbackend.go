@@ -141,6 +141,10 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
 			}
 
+			if len(u.Mail) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"mail", []string{u.Mail}})
+			}
+
 			attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixAccount"}})
 			attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{"/home/" + u.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{"/bin/bash"}})
