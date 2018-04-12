@@ -79,6 +79,7 @@ type configUser struct {
 	LoginShell   string
 	GivenName    string
 	SN           string
+	Homedir      string
 }
 type configGroup struct {
 	Name   string
