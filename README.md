@@ -67,6 +67,43 @@ In order to use S3, you must set your AWS credentials.  Either:
 
 More configuration options are documented here: https://github.com/nmcclain/glauth/blob/master/sample-simple.cfg
 
+### Required Fields
+ * Name
+   * The user's username
+ * ou
+   * ID of the user's primary group
+ * uidbumber
+   * The user's unix user id
+ * sshPublicKey
+   * Specify an array of public keys
+
+### Optional Fields
+ * givenname
+   * First name
+   * Example: John
+   * default = blank
+ * sn
+   * Last name
+   * Example: Doe
+   * default = blank
+ * disabled
+   * Specify if account is active.
+   * Set to 'true' (without quotes) to make the LDAP entry add 'AccountStatus = inactive'
+   * default = false (active)
+ * mail
+   * Specify an email
+   * example: jdoe@example.com
+   * default = blank
+ * loginshell
+   * Specify a different login shell for the user
+   * Example: /bin/sh, or /sbin/nologin
+   * default = /bin/bash
+ * homedirectory
+   * Specify an overridden home directory for the user
+   * Example: /home/itadmin
+   * default = /home/[username]
+
+
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
 

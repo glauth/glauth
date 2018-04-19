@@ -132,12 +132,43 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs := []*ldap.EntryAttribute{}
 			attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{u.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{u.Name}})
+
+			if len(u.GivenName) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"givenName", []string{u.GivenName}})
+			}
+
+			if len(u.SN) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"sn", []string{u.SN}})
+			}
+
+
 			attrs = append(attrs, &ldap.EntryAttribute{"ou", []string{h.getGroupName(u.PrimaryGroup)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"uidNumber", []string{fmt.Sprintf("%d", u.UnixID)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
+
+			if (u.Disabled) {
+				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"inactive"}})
+			} else {
+				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
+			}
+
+			if len(u.Mail) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"mail", []string{u.Mail}})
+			}
+
 			attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixAccount"}})
-			attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{"/home/" + u.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{"/bin/bash"}})
+
+			if len(u.LoginShell) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{u.LoginShell}})
+			} else {
+				attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{"/bin/bash"}})
+			}
+
+			if len(u.Homedir) > 0 {
+				attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{u.Homedir}})
+			} else {
+				attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{"/home/" + u.Name}})
+			}
+
 			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gecos", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", u.PrimaryGroup)}})

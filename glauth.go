@@ -73,7 +73,13 @@ type configUser struct {
 	PassSHA256   string
 	PrimaryGroup int
 	SSHKeys      []string
+	Disabled     bool
 	UnixID       int
+	Mail         string
+	LoginShell   string
+	GivenName    string
+	SN           string
+	Homedir      string
 }
 type configGroup struct {
 	Name   string
