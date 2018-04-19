@@ -65,7 +65,7 @@ In order to use S3, you must set your AWS credentials.  Either:
 1. set the -K and -S command-line flags  **OR**
 2. set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
 
-More configuration options are documented here: https://github.com/nmcclain/foo/blob/master/sample-simple.cfg
+More configuration options are documented here: https://github.com/nmcclain/glauth/blob/master/sample-simple.cfg
 
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
