@@ -1,0 +1,20 @@
+FROM frolvlad/alpine-glibc:latest
+MAINTAINER Ben Yanke <ben@benyanke.com>
+
+RUN apk add --update git \
+    && mkdir /data /app \
+    && cd /tmp \
+    && git clone https://github.com/nmcclain/glauth /tmp/glauth \
+    && cp /tmp/glauth/bin/glauth64 /app/glauth64 \
+    && mkdir /app/config \
+    && cp /tmp/glauth/sample-simple.cfg /app/config/config.cfg \
+    && cp /tmp/glauth/sample-simple.cfg /tmp/config.backup.cfg \
+    && rm -Rf /tmp/glauth
+
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+EXPOSE 389 5555
+
+VOLUME [ "/app/config" ]
+CMD [ "/bin/sh", "/app/start.sh" ]
