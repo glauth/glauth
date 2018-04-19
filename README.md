@@ -9,7 +9,7 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
 ### Contributing
-Please base all PRs on (dev)[https://github.com/nmcclain/glauth/tree/dev], not master.
+Please base all PRs on [dev](https://github.com/nmcclain/glauth/tree/dev), not master.
 
 ### Quickstart
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
