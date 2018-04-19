@@ -3,8 +3,8 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
-* Lightweight alternative to OpenLDAP and Active Directory.
-* Store your user directory in S3 or MySQL, or proxy to existing LDAP servers.
+* Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
+* Store your user directory in a local file, S3 or proxy to existing LDAP servers.
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
