@@ -22,12 +22,6 @@ RUN go get -d ./...
 RUN go build -o /app/glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
 
 #################
-# Test Step
-#################
-
-# TBD
-
-#################
 # Run Step
 #################
 
