@@ -3,45 +3,45 @@
 #################
 
 FROM golang:latest as build
-
 MAINTAINER Ben Yanke <ben@benyanke.com>
 
+# Setup work env
 RUN mkdir /app /tmp/gocode
 ADD . /app/
 WORKDIR /app
 
-# Required Envs for GO
+# Required envs for GO
 ENV GOPATH=/tmp/gocode
+ENV GOOS=linux
+ENV GOARCH=amd64
 
 # Install deps
 RUN go get -d ./...
 
 # Build
-# RUN rm -f /app/bin/glauth64 && GOOS=linux GOARCH=amd64 go build -o /app/bin/glauth64 glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
-RUN GOOS=linux GOARCH=amd64 go build -o /app/bin/glauth64 glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
-
-# RUN for GOOS in darwin linux; do
-#   for GOARCH in 386 amd64; do
-#     go build -v -o /app/bin/glauth-$GOOS-$GOARCH
-#   done
-# done
-
-
+RUN go build -o /app/glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
 
 #################
 # Test Step
 #################
 
-FROM golang:alpine as run
+# TBD
 
+#################
+# Run Step
+#################
+
+FROM golang:latest as run
 MAINTAINER Ben Yanke <ben@benyanke.com>
 
-RUN apk --no-cache add ca-certificates
+# Copies a sample config to be used if a volume isn't mounted with user's config
+ADD sample-simple.cfg /app/config/config.cfg
 
-ADD sample-simple.cfg /app/sample-simple.cfg
-WORKDIR /app
+# Copy binary from build container
+COPY --from=build /app/glauth /app/glauth
 
-COPY --from=build /app/bin/glauth64 /app/glauth64
+# Expose web and LDAP ports
+EXPOSE 389 5555
 
-# CMD /app/glauth64 -c /app/sample-simple.cfg
-CMD ["/app/glauth64", "-c", "/app/sample-simple.cfg"]
+# To use your own config, mount /app/config, and place config.cfg in mounted volume
+CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
