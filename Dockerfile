@@ -40,8 +40,13 @@ ADD sample-simple.cfg /app/config/config.cfg
 # Copy binary from build container
 COPY --from=build /app/glauth /app/glauth
 
+# Copy docker specific scripts from build container
+COPY --from=build /app/docker/start.sh /app/docker/
+COPY --from=build /app/docker/default-config.cfg /app/docker/
+
 # Expose web and LDAP ports
 EXPOSE 389 5555
 
 # To use your own config, mount /app/config, and place config.cfg in mounted volume
-CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
+# CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
+CMD ["/bin/bash", "/app/docker/start.sh"]
