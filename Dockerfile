@@ -49,8 +49,5 @@ RUN chmod +x /usr/local/bin/dumb-init
 # Expose web and LDAP ports
 EXPOSE 389 5555
 
-# To use your own config, mount /app/config, and place config.cfg in mounted volume
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
-
-# CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
 CMD ["/bin/sh", "/app/docker/start.sh"]
