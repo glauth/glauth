@@ -2,13 +2,17 @@
 # Build Step
 #################
 
-FROM golang:latest as build
+FROM golang:alpine as build
+# FROM golang:latest as build
 MAINTAINER Ben Yanke <ben@benyanke.com>
 
 # Setup work env
 RUN mkdir /app /tmp/gocode
 ADD . /app/
 WORKDIR /app
+
+# Only needed for alpine builds
+RUN apk add --no-cache git bzr
 
 # Required envs for GO
 ENV GOPATH=/tmp/gocode
@@ -25,7 +29,8 @@ RUN go build -o /app/glauth glauth.go bindata.go ldapbackend.go webapi.go config
 # Run Step
 #################
 
-FROM golang:latest as run
+# FROM golang:latest as run
+FROM golang:alpine as run
 MAINTAINER Ben Yanke <ben@benyanke.com>
 
 # Copies a sample config to be used if a volume isn't mounted with user's config
@@ -48,5 +53,6 @@ EXPOSE 389 5555
 # To use your own config, mount /app/config, and place config.cfg in mounted volume
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
 
-# CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
-CMD ["/bin/bash", "/app/docker/start.sh"]
+CMD ["/app/glauth", "-c", "/app/config/config.cfg"]
+# CMD ["/bin/bash", "/app/docker/start.sh"]
+# CMD ["/bin/sh", "/app/docker/start.sh"]
