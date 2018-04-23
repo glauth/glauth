@@ -1,10 +1,4 @@
 # GLAuth: LDAP authentication server for developers
-
-# NOTE: 
-This branch is for experimenting with docker builds and deploys.
-Using (this)[https://blog.codeship.com/building-minimal-docker-containers-for-go-applications/] as a guide.
-
-# NORMAL README:
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
 * Centrally manage accounts across your infrastructure
