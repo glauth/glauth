@@ -1,5 +1,0 @@
----
-- name: deploy glauth.yml
-  hosts: localhost
-  roles:
-    - glauth
