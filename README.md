@@ -2,6 +2,15 @@
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
+[![Travis Build - Master](https://api.travis-ci.org/glauth/glauth.svg?branch=master)](https://travis-ci.org/glauth/glauth)
+
+[![](https://img.shields.io/docker/stars/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![](https://img.shields.io/docker/stars/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![](https://img.shields.io/docker/automated/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+
+
+
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
 * Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
