@@ -141,11 +141,10 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 				attrs = append(attrs, &ldap.EntryAttribute{"sn", []string{u.SN}})
 			}
 
-
 			attrs = append(attrs, &ldap.EntryAttribute{"ou", []string{h.getGroupName(u.PrimaryGroup)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"uidNumber", []string{fmt.Sprintf("%d", u.UnixID)}})
 
-			if (u.Disabled) {
+			if u.Disabled {
 				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"inactive"}})
 			} else {
 				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
