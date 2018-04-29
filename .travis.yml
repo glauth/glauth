@@ -48,17 +48,17 @@ script:
   - gocyclo -over 19 $GO_FILES               # forbid code with huge functions
   - golint -set_exit_status $(go list ./...) # one last linter
 
- # Unit tests
- # - tbd - use 'go test' here when we have unit tests written. example command below.
- # - go test -race -coverprofile=coverage.txt -covermode=atomic
+  # Unit tests
+  # - tbd - use 'go test' here when we have unit tests written. example command below.
+  # - go test -race -coverprofile=coverage.txt -covermode=atomic
 
- # Full compile test
- - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  # Full compile test
+  - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
 
- # Integration test with compiled binary
- # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
- # - ./glauth -c "docker/default-config.cfg"
+  # Integration test with compiled binary
+  # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
+  # - ./glauth -c "docker/default-config.cfg"
 
 
- after_script:
+after_script:
   - bash <(curl -s https://codecov.io/bash)
