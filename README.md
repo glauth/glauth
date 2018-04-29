@@ -15,6 +15,8 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 [![Contributors](https://img.shields.io/github/contributors/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/contributors)
 [![License](https://img.shields.io/github/license/glauth/glauth.svg)](https://github.com/glauth/glauth/blob/master/LICENSE)
 
+[![Maintainability](https://api.codeclimate.com/v1/badges/99009e406f203b7aa148/maintainability)](https://codeclimate.com/github/glauth/glauth/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/99009e406f203b7aa148/test_coverage)](https://codeclimate.com/github/glauth/glauth/test_coverage)
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
