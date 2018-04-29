@@ -8,11 +8,10 @@ go:
  - 1.7.x
  - 1.8.x
  - 1.9.x
- - 1.10.x
+ - 1.10.x    
  - release     # current release
  - tip         # next release
  - master      # next release after that
-
 
 matrix:
 
@@ -37,7 +36,7 @@ before_script:
 
 
  # Fetch dependencies
- - go get -t ./...
+  - go get -t ./...
 
 
 script:
