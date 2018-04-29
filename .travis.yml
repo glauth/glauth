@@ -55,7 +55,7 @@ script:
 
   # Integration test with compiled binary
   # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
-  # - ./glauth -c "docker/default-config.cfg"
+  - scripts/travis/integration-test.sh "glauth" "docker/default-config.cfg"
 
 
 # after_success:
