@@ -1,13 +1,38 @@
 language: go
 
 go: 
- - 1.3.3
- - 1.4.2
- - 1.5.1
+ - 1.2.x
+ - 1.3.x
+ - 1.4.x
+ - 1.5.x
+ - 1.6.x
+ - 1.7.x
+ - 1.8.x
+ - 1.9.x
+ - 1.10.x
  - release
  - tip
+ - master
+
+
+before_install:
+ # Fetch dependencies
+ - go get -t ./...
+
 
 script:
- - go get -t ./...
+
+ # Unit tests
+ # - tbd - use 'go test' here when we have unit tests written. example command below.
+ # - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+ # Full compile test
  - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
- - ./glauth -c "docker/default-config.cfg"
+
+ # Integration test with compiled binary
+ # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
+ # - ./glauth -c "docker/default-config.cfg"
+
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
