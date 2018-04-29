@@ -5,18 +5,14 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 [![Travis Build - Master](https://img.shields.io/travis/glauth/glauth.svg)](https://travis-ci.org/glauth/glauth)
 
 [![](https://img.shields.io/docker/stars/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
-[![](https://img.shields.io/docker/stars/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
-[![](https://img.shields.io/docker/automated/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
 [![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
 [![DockerHub Image Size](https://img.shields.io/imagelayers/image-size/glauth/glauth/latest.svg)](https://hub.docker.com/r/glauth/glauth/)
 
 [![Last Commit](https://img.shields.io/github/last-commit/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/commit-activity)
 [![Release Downloads](https://img.shields.io/github/downloads/glauth/glauth/total.svg)](https://github.com/glauth/glauth/releases)
-[![Contributors](https://img.shields.io/github/contributors/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/contributors)
-[![License](https://img.shields.io/github/license/glauth/glauth.svg)](https://github.com/glauth/glauth/blob/master/LICENSE)
 
-[![Maintainability](https://api.codeclimate.com/v1/badges/99009e406f203b7aa148/maintainability)](https://codeclimate.com/github/glauth/glauth/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/99009e406f203b7aa148/test_coverage)](https://codeclimate.com/github/glauth/glauth/test_coverage)
+[![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
+[![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
