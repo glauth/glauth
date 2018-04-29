@@ -49,8 +49,9 @@ script:
   # - golint -set_exit_status $(go list ./...) # one last linter
 
   # Unit tests
-  # - tbd - use 'go test' here when we have unit tests written. example command below.
+  # - tbd - use 'go test' here when we have unit tests written. example command below. This will generate output for codecov
   # - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
 
   # Full compile test
   - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
@@ -60,5 +61,5 @@ script:
   # - ./glauth -c "docker/default-config.cfg"
 
 
-after_script:
+after_success:
   - bash <(curl -s https://codecov.io/bash)
