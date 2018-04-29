@@ -32,7 +32,7 @@ before_script:
 
 
 # Fetch dependencies
-  - go get -t ./...
+  - go get -t -v ./...
 
 
 script:
