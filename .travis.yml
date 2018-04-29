@@ -51,7 +51,7 @@ script:
 
   # Unit tests
   # - tbd - use 'go test' here when we have unit tests written. example command below. This will generate output for codecov
-  # - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
 
   # Full compile test
   - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
