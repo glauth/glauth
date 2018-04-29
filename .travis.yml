@@ -25,8 +25,6 @@ before_script:
 
 
 script:
-  - env
-
   - diff -u <(echo -n) <(gofmt -d ./)         # Fail if a .go file hasn't been formatted with 'go fmt'
   # - go test -v -race ./...                   # Run all the tests with the race detector enabled
   # - go vet ./...                             # go vet is the official Go static analyzer
