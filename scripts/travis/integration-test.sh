@@ -2,7 +2,7 @@
 
 sudo apt-get -qq update && sudo apt-get -qq install -y ldap-utils &&
 
-"$1" -c "$2" &
+$TRAVIS_BUILD_DIR/glauth -c "$TRAVIS_BUILD_DIR/$1" &
 glauthPid="$!"
 
 echo "Running at $glauthPid"
