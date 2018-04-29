@@ -4,7 +4,7 @@ go:
  - 1.3.x       # Test an old version, to be sure it works
  - 1.9.x       # last version
  - 1.10.x      # current version
- - tip         # next release
+# - tip         # next release
  - master      # next release after that
 
 # Speed up git clones
@@ -15,7 +15,6 @@ matrix:
   # It's ok if our code fails on unstable development versions of Go.
   allow_failures:
     - go: master
-    - go: tip
 
   # Don't wait for tip tests to finish. Mark the test run green if the
   # tests pass on the stable versions of Go.
