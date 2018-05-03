@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/pquerna/otp/totp"
+	"github.com/GeertJohan/yubigo"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -11,12 +13,13 @@ import (
 
 type configHandler struct {
 	cfg *config
+	yubikeyAuth *yubigo.YubiAuth
 }
 
-func newConfigHandler(cfg *config) Backend {
+func newConfigHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
 	handler := configHandler{
 		cfg: cfg,
-	}
+		yubikeyAuth: yubikeyAuth }
 	return handler
 }
 
@@ -73,6 +76,43 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	// validate group membership
 	if user.PrimaryGroup != group.UnixID {
 		log.Warning(fmt.Sprintf("Bind Error: User %s primary group is not %s.", userName, groupName))
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
+
+	validotp := false
+
+	if len(user.Yubikey) == 0 && len(user.OTPSecret) == 0 {
+		validotp = true
+	}
+
+
+	if len(user.Yubikey) > 0 && h.yubikeyAuth != nil {
+		if len(bindSimplePw) > 44 {
+			otp := bindSimplePw[len(bindSimplePw)-44:]
+			yubikeyid := otp[0:12]
+			bindSimplePw = bindSimplePw[:len(bindSimplePw)-44]
+
+			if (user.Yubikey == yubikeyid) {
+				_, ok, _ := h.yubikeyAuth.Verify(otp)
+
+				if ok {
+					validotp = true
+				}
+			}
+		}
+	}
+
+	if len(user.OTPSecret) > 0 && !validotp {
+		if len(bindSimplePw) > 6 {
+			otp := bindSimplePw[len(bindSimplePw)-6:]
+			bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
+
+			validotp = totp.Validate(otp, user.OTPSecret)
+		}	
+	}
+
+	if !validotp {
+		log.Warning(fmt.Sprintf("Bind Error: invalid token as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
