@@ -1,21 +1,36 @@
+
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
+[![Travis Build - Master](https://img.shields.io/travis/glauth/glauth.svg)](https://travis-ci.org/glauth/glauth)
+[![Last Commit](https://img.shields.io/github/last-commit/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/commit-activity)
+
+[![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![DockerHub Image Size](https://img.shields.io/imagelayers/image-size/glauth/glauth/latest.svg)](https://hub.docker.com/r/glauth/glauth/)
+
+[![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
+[![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
+
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
-* Lightweight alternative to OpenLDAP and Active Directory.
-* Store your user directory in S3 or MySQL, or proxy to existing LDAP servers.
+* Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
+* Store your user directory in a local file, S3 or proxy to existing LDAP servers.
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
+
+### Contributing
+Please base all PRs on [dev](https://github.com/nmcclain/glauth/tree/dev), not master.
 
 ### Quickstart
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
 
-1. Install GLAuth on a test server
-  1. Clone the repo: `git clone https://github.com/nmcclain/glauth`
-  2. Start the GLAuth server: `cd glauth; sudo bin/glauth32 -c sample-simple.cfg`
-2. Test with traditional LDAP tools
-  1. `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+1. Download a precompiled binary from the [releases](https://github.com/glauth/glauth/releases) page.
+2. Download the [example config file](https://github.com/glauth/glauth/blob/master/sample-simple.cfg).
+3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
+   - `sudo ./glauth64 -c sample-simple.cfg`
+4. Test with traditional LDAP tools
+   - For example: `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+
 
 ### Usage:
 ```
