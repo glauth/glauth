@@ -84,6 +84,7 @@ type configUser struct {
 type configGroup struct {
 	Name   string
 	UnixID int
+	IncludeGroups []int
 }
 type config struct {
 	API                configAPI
