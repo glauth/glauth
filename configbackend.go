@@ -1,25 +1,25 @@
 package main
 
 import (
-	"github.com/pquerna/otp/totp"
-	"github.com/GeertJohan/yubigo"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/GeertJohan/yubigo"
 	"github.com/nmcclain/ldap"
+	"github.com/pquerna/otp/totp"
 	"net"
 	"strings"
 )
 
 type configHandler struct {
-	cfg *config
+	cfg         *config
 	yubikeyAuth *yubigo.YubiAuth
 }
 
 func newConfigHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
 	handler := configHandler{
-		cfg: cfg,
-		yubikeyAuth: yubikeyAuth }
+		cfg:         cfg,
+		yubikeyAuth: yubikeyAuth}
 	return handler
 }
 
@@ -85,14 +85,13 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		validotp = true
 	}
 
-
 	if len(user.Yubikey) > 0 && h.yubikeyAuth != nil {
 		if len(bindSimplePw) > 44 {
 			otp := bindSimplePw[len(bindSimplePw)-44:]
 			yubikeyid := otp[0:12]
 			bindSimplePw = bindSimplePw[:len(bindSimplePw)-44]
 
-			if (user.Yubikey == yubikeyid) {
+			if user.Yubikey == yubikeyid {
 				_, ok, _ := h.yubikeyAuth.Verify(otp)
 
 				if ok {
@@ -108,7 +107,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 			bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
 
 			validotp = totp.Validate(otp, user.OTPSecret)
-		}	
+		}
 	}
 
 	if !validotp {

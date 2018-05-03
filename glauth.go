@@ -3,8 +3,8 @@ package main
 import (
 	"expvar"
 	"fmt"
-	"github.com/GeertJohan/yubigo"
 	"github.com/BurntSushi/toml"
+	"github.com/GeertJohan/yubigo"
 	"github.com/docopt/docopt-go"
 	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
@@ -74,8 +74,8 @@ type configUser struct {
 	PassSHA256   string
 	PrimaryGroup int
 	SSHKeys      []string
-	OTPSecret	 string
-	Yubikey		 string
+	OTPSecret    string
+	Yubikey      string
 	Disabled     bool
 	UnixID       int
 	Mail         string
@@ -92,8 +92,8 @@ type config struct {
 	API                configAPI
 	Backend            configBackend
 	Debug              bool
-	YubikeyClientID	   string
-	YubikeySecret	   string
+	YubikeyClientID    string
+	YubikeySecret      string
 	Frontend           configFrontend
 	Groups             []configGroup
 	Syslog             bool
@@ -133,7 +133,7 @@ func main() {
 		yubiAuth, err = yubigo.NewYubiAuth(cfg.YubikeyClientID, cfg.YubikeySecret)
 
 		if err != nil {
-			log.Fatalf("Yubikey Auth failed");
+			log.Fatalf("Yubikey Auth failed")
 		}
 	}
 
