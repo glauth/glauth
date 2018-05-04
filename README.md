@@ -102,10 +102,35 @@ More configuration options are documented here: https://github.com/nmcclain/glau
    * Specify an overridden home directory for the user
    * Example: /home/itadmin
    * default = /home/[username]
+ * otpsecret
+   * Specify OTP secret used to validate OTP passcode
+   * Example: 4W6YXGBIJASNVDY1
+   * default = blank
+ * yubikey
+   * Specify Yubikey ID for maching Yubikey OTP against the user
+   * Example: cccjgjgkhcbb
+   * default = blank
 
 
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
+
+### OTP Tokens
+GLAuth can be configured to accept OTP tokens as appended to a users password. Support is added for both TOTP tokens and Yubikey OTP tokens.
+
+#### TOTP configuration
+To enable TOTP authentication on a user, you can use a tool [like this](https://stefansundin.github.io/2fa-qr/) to generate a QR code, which can be scanned and used with the [Google Authenticator](https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en) app. To enable TOTP authentication, configure the `otpsecret` for the user with the TOTP secret.
+
+#### Yubikey configuration
+For Yubikey OTP token authentication, first [configure your Yubikey](https://www.yubico.com/products/services-software/personalization-tools/yubikey-otp/). After this, make sure to [request a `Client ID` and `Secret key` pair](https://upgrade.yubico.com/getapikey/). 
+
+Now configure the the `yubikeyclientid` and `yubikeysecret` fields in the general section in the configuration file.
+
+To enable Yubikey OTP authentication for a user, you must specify their Yubikey ID on the users `yubikey` field. The Yubikey ID is the first 12 characters of the Yubikey OTP, as explained in the below chart.
+
+![Yubikey OTP](https://developers.yubico.com/OTP/otp_details.png)
+
+When a user has been configured with either one of the OTP options, the OTP authentication is required for the user. If both are configured, either one will work.
 
 ### Backends:
 For advanced users, GLAuth supports pluggable backends.  Currently, it can use a local file, S3 or an existing LDAP infrastructure.  In the future, we hope to have backends that support Mongo, SQL, and other datastores.
