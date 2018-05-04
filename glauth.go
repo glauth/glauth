@@ -52,12 +52,17 @@ type configBackend struct {
 	Insecure  bool     // For LDAP backend only
 	Servers   []string // For LDAP backend only
 }
+type configTLS struct {
+	Enabled bool
+	Listen  string
+	Cert    string
+	Key     string
+}
 type configFrontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
-	Cert           string
-	Key            string
 	Listen         string
-	TLS            bool
+	TLSExclusive   bool
+	TLS            configTLS
 }
 type configAPI struct {
 	Cert        string
@@ -139,18 +144,33 @@ func main() {
 	s.SearchFunc("", handler)
 	s.CloseFunc("", handler)
 
-	// start the frontend server
-	if cfg.Frontend.TLS {
-		log.Notice(fmt.Sprintf("Frontend LDAPS server listening on %s", cfg.Frontend.Listen))
-		if err := s.ListenAndServeTLS(cfg.Frontend.Listen, cfg.Frontend.Cert, cfg.Frontend.Key); err != nil {
+	starttls := func() {
+		log.Notice(fmt.Sprintf("Frontend LDAPS server listening on %s", cfg.Frontend.TLS.Listen))
+		if err := s.ListenAndServeTLS(cfg.Frontend.TLS.Listen, cfg.Frontend.TLS.Cert, cfg.Frontend.TLS.Key); err != nil {
 			log.Fatalf("LDAP Server Failed: %s", err.Error())
 		}
-	} else {
+	}
+
+	start := func() {
 		log.Notice(fmt.Sprintf("Frontend LDAP server listening on %s", cfg.Frontend.Listen))
 		if err := s.ListenAndServe(cfg.Frontend.Listen); err != nil {
 			log.Fatalf("LDAP Server Failed: %s", err.Error())
 		}
 	}
+
+	if cfg.Frontend.TLS.Enabled {
+		if cfg.Frontend.TLSExclusive {
+			starttls()
+		} else {
+			go starttls()
+			start()
+		}
+	} else {
+		start()
+	}
+
+	// start the frontend server
+
 	log.Critical("AP exit")
 }
 
@@ -158,7 +178,8 @@ func main() {
 func doConfig() (*config, error) {
 	cfg := config{}
 	// setup defaults
-	cfg.Frontend.TLS = true
+	cfg.Frontend.TLS.Enabled = true
+	cfg.Frontend.TLSExclusive = true
 
 	// parse the command-line args
 	args, err := docopt.Parse(usage, nil, true, version, false)
@@ -206,6 +227,23 @@ func doConfig() (*config, error) {
 		logging.SetLevel(logging.DEBUG, programName)
 		log.Debug("Debugging enabled")
 	}
+
+	if cfg.Frontend.TLS.Enabled {
+		if len(cfg.Frontend.TLS.Cert) == 0 || len(cfg.Frontend.TLS.Key) == 0 {
+			return &cfg, fmt.Errorf("TLS was enabled but no certificate or key were specified - Please disable TLS or specify 'cert' and 'key'")
+		}
+
+		if len(cfg.Frontend.TLS.Listen) == 0 && len(cfg.Frontend.Listen) > 0 {
+			if cfg.Frontend.TLSExclusive {
+				cfg.Frontend.TLS.Listen = cfg.Frontend.Listen
+			} else {
+				return &cfg, fmt.Errorf("No TLS 'listen' was specified - Please enable 'tlsexclusive' or specify a seperate 'listen' for TLS")
+			}
+		} else if len(cfg.Frontend.TLS.Listen) == 0 {
+			return &cfg, fmt.Errorf("Could not start server - Please specify 'listen'")
+		}
+	}
+
 	switch cfg.Backend.Datastore {
 	case "":
 		cfg.Backend.Datastore = "config"

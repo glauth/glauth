@@ -3,3 +3,6 @@ glauth.cfg
 
 # Ignore the built binary during testing
 glauth
+
+# Ignore generated certs in this folder
+certs/
