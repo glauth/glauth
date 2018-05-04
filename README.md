@@ -119,7 +119,7 @@ GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as
 GLAuth can be configured to accept OTP tokens as appended to a users password. Support is added for both TOTP tokens and Yubikey OTP tokens.
 
 #### TOTP configuration
-To enable TOTP authentication on a user, you can use a tool [like this](https://stefansundin.github.io/2fa-qr/) to generate a QR code, which can be scanned and used with the [Google Authenticator](https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en) app. To enable TOTP authentication, configure the `otpsecret` for the user with the TOTP secret.
+To enable TOTP authentication on a user, you can use a tool [like this](https://freeotp.github.io/qrcode.html) to generate a QR code (pick 'Timeout' and optionally let it generate a random secret for you), which can be scanned and used with the [Google Authenticator](https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en) app. To enable TOTP authentication, configure the `otpsecret` for the user with the TOTP secret.
 
 #### Yubikey configuration
 For Yubikey OTP token authentication, first [configure your Yubikey](https://www.yubico.com/products/services-software/personalization-tools/yubikey-otp/). After this, make sure to [request a `Client ID` and `Secret key` pair](https://upgrade.yubico.com/getapikey/). 
