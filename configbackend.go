@@ -280,7 +280,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 		for _, j := range h.cfg.Groups {
 			for _, includegroupid := range j.IncludeGroups {
 				if includegroupid == gid && j.UnixID != gid {
-					g = append(g, h.getGroupDNs([]int{ j.UnixID })...)
+					g = append(g, h.getGroupDNs([]int{j.UnixID})...)
 				}
 			}
 		}
