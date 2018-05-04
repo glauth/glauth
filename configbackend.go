@@ -206,7 +206,7 @@ func (h configHandler) getGroupMembers(gid int) []string {
 			}
 		}
 	}
-	
+
 	m := []string{}
 	for k, _ := range members {
 		m = append(m, k)
