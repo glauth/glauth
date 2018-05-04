@@ -42,8 +42,7 @@ script:
   - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
 
   # Integration test with compiled binary
-  # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
-  - scripts/travis/integration-test.sh "travis/test-config.cfg"
+  - scripts/travis/integration-test.sh "scripts/travis/test-config.cfg"
 
 
 # after_success:
