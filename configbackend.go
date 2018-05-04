@@ -207,19 +207,23 @@ func (h configHandler) getGroupMembers(gid int) []string {
 		}
 	}
 
-	m := []string{}
-	for k, _ := range members {
-		m = append(m, k)
-	}
-
 	for _, g := range h.cfg.Groups {
 		if gid == g.UnixID {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					m = append(m, h.getGroupMembers(includegroupid)...)
+					includegroupmembers := h.getGroupMembers(includegroupid)
+
+					for _, includegroupmember := range includegroupmembers {
+						members[includegroupmember] = true
+					}
 				}
 			}
 		}
+	}
+
+	m := []string{}
+	for k, _ := range members {
+		m = append(m, k)
 	}
 
 	return m
@@ -240,21 +244,25 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 		}
 	}
 
-	m := []string{}
-	for k, _ := range members {
-		m = append(m, k)
-	}
-
 	for _, g := range h.cfg.Groups {
 		if gid == g.UnixID {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
 					log.Warning(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
-					m = append(m, h.getGroupMemberIDs(includegroupid)...)
+					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
+
+					for _, includegroupmemberid := range includegroupmemberids {
+						members[includegroupmemberid] = true
+					}
 				}
 			}
 		}
+	}
+
+	m := []string{}
+	for k, _ := range members {
+		m = append(m, k)
 	}
 
 	return m
@@ -269,21 +277,22 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 				dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.cfg.Backend.BaseDN)
 				groups[dn] = true
 			}
-		}
-	}
-	g := []string{}
-	for k, _ := range groups {
-		g = append(g, k)
-	}
 
-	for _, gid := range gids {
-		for _, j := range h.cfg.Groups {
-			for _, includegroupid := range j.IncludeGroups {
-				if includegroupid == gid && j.UnixID != gid {
-					g = append(g, h.getGroupDNs([]int{j.UnixID})...)
+			for _, includegroupid := range g.IncludeGroups {
+				if includegroupid == gid && g.UnixID != gid {
+					includegroupdns := h.getGroupDNs([]int{g.UnixID})
+
+					for _, includegroupdn := range includegroupdns {
+						groups[includegroupdn] = true
+					}
 				}
 			}
 		}
+	}
+
+	g := []string{}
+	for k, _ := range groups {
+		g = append(g, k)
 	}
 
 	return g
