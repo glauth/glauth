@@ -171,7 +171,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gecos", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(u.OtherGroups)})
+			attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
 			if len(u.SSHKeys) > 0 {
 				attrs = append(attrs, &ldap.EntryAttribute{"sshPublicKey", u.SSHKeys})
 			}
@@ -275,6 +275,17 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	for k, _ := range groups {
 		g = append(g, k)
 	}
+
+	for _, gid := range gids {
+		for _, j := range h.cfg.Groups {
+			for _, includegroupid := range j.IncludeGroups {
+				if includegroupid == gid && j.UnixID != gid {
+					g = append(g, h.getGroupDNs([]int{ j.UnixID })...)
+				}
+			}
+		}
+	}
+
 	return g
 }
 
