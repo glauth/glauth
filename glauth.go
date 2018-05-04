@@ -7,8 +7,8 @@ import (
 	"github.com/docopt/docopt-go"
 	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
-	"launchpad.net/goamz/aws"
-	"launchpad.net/goamz/s3"
+	"gopkg.in/amz.v1/aws"
+	"gopkg.in/amz.v1/s3"
 	"os"
 	"strings"
 )
