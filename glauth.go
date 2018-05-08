@@ -3,14 +3,15 @@ package main
 import (
 	"expvar"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/docopt/docopt-go"
 	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
-	"os"
-	"strings"
 )
 
 var version = "0.1"
@@ -52,17 +53,22 @@ type configBackend struct {
 	Insecure  bool     // For LDAP backend only
 	Servers   []string // For LDAP backend only
 }
-type configTLS struct {
+type configFrontend struct {
+	AllowedBaseDNs []string // For LDAP backend only
+	Listen         string
+	Cert           string
+	Key            string
+	TLS            bool
+}
+type configLDAP struct {
+	Enabled bool
+	Listen  string
+}
+type configLDAPS struct {
 	Enabled bool
 	Listen  string
 	Cert    string
 	Key     string
-}
-type configFrontend struct {
-	AllowedBaseDNs []string // For LDAP backend only
-	Listen         string
-	TLSExclusive   bool
-	TLS            configTLS
 }
 type configAPI struct {
 	Cert        string
@@ -95,6 +101,8 @@ type config struct {
 	Backend            configBackend
 	Debug              bool
 	Frontend           configFrontend
+	LDAP               configLDAP
+	LDAPS              configLDAPS
 	Groups             []configGroup
 	Syslog             bool
 	Users              []configUser
@@ -144,42 +152,46 @@ func main() {
 	s.SearchFunc("", handler)
 	s.CloseFunc("", handler)
 
-	starttls := func() {
-		log.Notice(fmt.Sprintf("Frontend LDAPS server listening on %s", cfg.Frontend.TLS.Listen))
-		if err := s.ListenAndServeTLS(cfg.Frontend.TLS.Listen, cfg.Frontend.TLS.Cert, cfg.Frontend.TLS.Key); err != nil {
-			log.Fatalf("LDAP Server Failed: %s", err.Error())
-		}
-	}
+	if cfg.LDAP.Enabled {
+		// Dont block if also starting a LDAPS server afterwards
+		shouldBlock := !cfg.LDAPS.Enabled
 
-	start := func() {
-		log.Notice(fmt.Sprintf("Frontend LDAP server listening on %s", cfg.Frontend.Listen))
-		if err := s.ListenAndServe(cfg.Frontend.Listen); err != nil {
-			log.Fatalf("LDAP Server Failed: %s", err.Error())
-		}
-	}
-
-	if cfg.Frontend.TLS.Enabled {
-		if cfg.Frontend.TLSExclusive {
-			starttls()
+		if shouldBlock {
+			startLDAP(&cfg.LDAP, s)
 		} else {
-			go starttls()
-			start()
+			go startLDAP(&cfg.LDAP, s)
 		}
-	} else {
-		start()
 	}
 
-	// start the frontend server
+	if cfg.LDAPS.Enabled {
+		// Always block here
+		startLDAPS(&cfg.LDAPS, s)
+	}
 
 	log.Critical("AP exit")
+}
+
+func startLDAP(ldapConfig *configLDAP, server *ldap.Server) {
+	log.Notice(fmt.Sprintf("LDAP server listening on %s", ldapConfig.Listen))
+	if err := server.ListenAndServe(ldapConfig.Listen); err != nil {
+		log.Fatalf("LDAP Server Failed: %s", err.Error())
+	}
+}
+
+func startLDAPS(ldapsConfig *configLDAPS, server *ldap.Server) {
+	log.Notice(fmt.Sprintf("LDAPS server listening on %s", ldapsConfig.Listen))
+	if err := server.ListenAndServeTLS(ldapsConfig.Listen, ldapsConfig.Cert, ldapsConfig.Key); err != nil {
+		log.Fatalf("LDAP Server Failed: %s", err.Error())
+	}
 }
 
 // doConfig reads the cli flags and config file
 func doConfig() (*config, error) {
 	cfg := config{}
 	// setup defaults
-	cfg.Frontend.TLS.Enabled = true
-	cfg.Frontend.TLSExclusive = true
+	cfg.Frontend.TLS = true
+	cfg.LDAPS.Enabled = true
+	cfg.LDAP.Enabled = false
 
 	// parse the command-line args
 	args, err := docopt.Parse(usage, nil, true, version, false)
@@ -228,19 +240,41 @@ func doConfig() (*config, error) {
 		log.Debug("Debugging enabled")
 	}
 
-	if cfg.Frontend.TLS.Enabled {
-		if len(cfg.Frontend.TLS.Cert) == 0 || len(cfg.Frontend.TLS.Key) == 0 {
-			return &cfg, fmt.Errorf("TLS was enabled but no certificate or key were specified - Please disable TLS or specify 'cert' and 'key'")
+	// Backwards compatibility
+	cfg.LDAP.Enabled = cfg.LDAP.Enabled || !cfg.Frontend.TLS
+	cfg.LDAPS.Enabled = cfg.LDAPS.Enabled && cfg.Frontend.TLS
+
+	if len(cfg.LDAP.Listen) == 0 {
+		cfg.LDAP.Listen = cfg.Frontend.Listen
+	}
+
+	if len(cfg.LDAPS.Listen) == 0 {
+		cfg.LDAPS.Listen = cfg.Frontend.Listen
+	}
+
+	if len(cfg.LDAPS.Cert) == 0 {
+		cfg.LDAPS.Cert = cfg.Frontend.Cert
+	}
+
+	if len(cfg.LDAPS.Key) == 0 {
+		cfg.LDAPS.Key = cfg.Frontend.Key
+	}
+
+	if cfg.LDAPS.Enabled {
+		// LDAPS enabled - verify requirements (cert, key, listen)
+		if len(cfg.LDAPS.Cert) == 0 || len(cfg.LDAPS.Key) == 0 {
+			return &cfg, fmt.Errorf("LDAPS was enabled but no certificate or key were specified: please disable LDAPS or use the 'cert' and 'key' options")
 		}
 
-		if len(cfg.Frontend.TLS.Listen) == 0 && len(cfg.Frontend.Listen) > 0 {
-			if cfg.Frontend.TLSExclusive {
-				cfg.Frontend.TLS.Listen = cfg.Frontend.Listen
-			} else {
-				return &cfg, fmt.Errorf("No TLS 'listen' was specified - Please enable 'tlsexclusive' or specify a seperate 'listen' for TLS")
-			}
-		} else if len(cfg.Frontend.TLS.Listen) == 0 {
-			return &cfg, fmt.Errorf("Could not start server - Please specify 'listen'")
+		if len(cfg.LDAPS.Listen) == 0 {
+			return &cfg, fmt.Errorf("No LDAPS bind address was specified: please disable LDAPS or use the 'listen' option")
+		}
+	}
+
+	if cfg.LDAP.Enabled {
+		// LDAP enabled - verify listen
+		if len(cfg.LDAP.Listen) == 0 {
+			return &cfg, fmt.Errorf("No LDAP bind address was specified: please disable LDAP or use the 'listen' option")
 		}
 	}
 
