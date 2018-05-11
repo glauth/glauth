@@ -3,3 +3,5 @@ glauth.cfg
 
 # Ignore the built binary during testing
 glauth
+
+bin
