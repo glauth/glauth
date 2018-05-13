@@ -27,6 +27,8 @@ function snapshotTest() {
   goodResults="$TRAVIS_BUILD_DIR/scripts/travis/good-results"
   testResults="$TRAVIS_BUILD_DIR/scripts/travis/test-results"
 
+  mkdir "$testResults"
+
   # Run tests here
   ldapsearch -LLL \
     -H ldap://localhost:3893 \
