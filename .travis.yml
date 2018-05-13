@@ -14,10 +14,11 @@ git:
 # flunk the build and immediately stop. It's sorta like having
 # set -e enabled in bash. 
 before_script:
-  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/) # All the .go files, excluding vendor/
-  #- go get github.com/golang/lint/golint                        # Linter
-  #- go get honnef.co/go/tools/cmd/megacheck                     # Badass static analyzer/linter
-  # - go get github.com/fzipp/gocyclo
+  - sudo apt-get -qq update && sudo apt-get install -y ldap-utils   # need this for integration tests
+  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)     # All the .go files, excluding vendor/
+  #- go get github.com/golang/lint/golint                           # Linter
+  #- go get honnef.co/go/tools/cmd/megacheck                        # Badass static analyzer/linter
+  # - go get github.com/fzipp/gocyclo                               # Not sure what this is
 
 
 # Fetch dependencies
