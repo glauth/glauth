@@ -15,6 +15,7 @@ git:
 # set -e enabled in bash. 
 before_script:
   - sudo apt-get -qq update && sudo apt-get install -y ldap-utils   # need this for integration tests
+  - go get github.com/jteeuwen/go-bindata
   - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)     # All the .go files, excluding vendor/
   #- go get github.com/golang/lint/golint                           # Linter
   #- go get honnef.co/go/tools/cmd/megacheck                        # Badass static analyzer/linter
