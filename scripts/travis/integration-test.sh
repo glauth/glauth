@@ -70,6 +70,7 @@ echo "";
 
 # Kill saved PID when done
 # However - throw the fail flag if the process isn't there (ie, exited prematurely)
+echo "Killing glauth"
 kill "$glauthPid" || FAIL="1"
 
 if [[ "$FAIL" = "0" ]] ; then
