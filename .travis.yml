@@ -40,7 +40,8 @@ script:
   # - go test -race -coverprofile=coverage.txt -covermode=atomic
 
   # Full compile test
-  - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  # - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  - make all
 
   # Integration test with compiled binary
   - scripts/travis/integration-test.sh "scripts/travis/test-config.cfg"
