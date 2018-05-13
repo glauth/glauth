@@ -8,7 +8,6 @@ fi
 
 # Start in background, capture PID
 $TRAVIS_BUILD_DIR/bin/glauth64 -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
-# $TRAVIS_BUILD_DIR/bin/glauth64 -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &
 glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"
