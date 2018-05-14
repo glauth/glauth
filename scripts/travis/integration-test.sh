@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export CLEANUP="$1"
+
+# This script requires that "$TRAVIS_BUILD_DIR" is set to the repo root
 
 # Ensure ldap utils are installed (for example - when running this outside of travis)
 if [[ ! `which ldapsearch` ]]; then
@@ -7,13 +10,21 @@ if [[ ! `which ldapsearch` ]]; then
 fi
 
 # Start in background, capture PID
-$TRAVIS_BUILD_DIR/bin/glauth64 -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
+"$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
 glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"
 
 # Sleep a second, to ensure it comes online successfully
 sleep 1;
+
+# Check if process is still running before continuing
+ps aux | grep -v "grep" | grep "$glauthPid" &> /dev/null || FAIL="1"
+
+if [[ "$FAIL" = "1" ]] ; then
+  echo "Integration test FAILED - process did not remain running > 1 second"
+  exit 255;
+fi
 
 
 FAIL="0"
@@ -38,6 +49,10 @@ function snapshotTest() {
 
     THISFAIL="0"
     diff -u "$goodResults/$2" "$testResults/$2" || THISFAIL="1"
+
+    if [[ "$CLEANUP" = "cleanup" ]] ; then
+      rm -rf "$testResults"
+    fi
 
   if [[ "$THISFAIL" = "0" ]] ; then
     echo "  - PASS : '$2'";
