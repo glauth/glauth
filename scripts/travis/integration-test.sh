@@ -15,14 +15,14 @@ glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"
 
-# Sleep a second, to ensure it comes online successfully
-sleep 1;
+# Sleep 2 sec, to ensure it comes online successfully and stays up
+sleep 2;
 
 # Check if process is still running before continuing
 ps aux | grep -v "grep" | grep "$glauthPid" &> /dev/null || FAIL="1"
 
 if [[ "$FAIL" = "1" ]] ; then
-  echo "Integration test FAILED - process did not remain running > 1 second"
+  echo "Integration test FAILED - process did not remain running > 2 sec"
   exit 255;
 fi
 
