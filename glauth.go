@@ -13,7 +13,12 @@ import (
 	"strings"
 )
 
+// Set with buildtime vars
 var version = "1.0.1"
+var buildtime = "20180514.175846"
+
+// Add conditional info here
+var versionstr = "GLauth v" + version + "\nBuild time: " + buildtime
 
 const programName = "glauth"
 
@@ -161,7 +166,7 @@ func doConfig() (*config, error) {
 	cfg.Frontend.TLS = true
 
 	// parse the command-line args
-	args, err := docopt.Parse(usage, nil, true, version, false)
+	args, err := docopt.Parse(usage, nil, true, versionstr, false)
 	if err != nil {
 		return &cfg, err
 	}
