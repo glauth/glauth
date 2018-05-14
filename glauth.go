@@ -16,9 +16,17 @@ import (
 // Set with buildtime vars
 var version = "1.0.1"
 var buildtime = "20180514.175846"
+var GitCommit string
 
 // Add conditional info here
-var versionstr = "GLauth v" + version + "\nBuild time: " + buildtime
+
+// TODO:
+// 1) Check if git directory is clean or not (IE - is the commit has the actual code)
+// 2) Check if tag is set, if so, use it for vnum - if not, omit it
+// 3) Add build time from env var in makefile
+// 4) Add travisci build number, if exists
+
+var versionstr = "GLauth v" + version + "\nBuild time: " + buildtime + "\nGit commit: " + GitCommit
 
 const programName = "glauth"
 
