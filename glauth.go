@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-var version = "0.1"
+var version = "1.0.1"
 
 const programName = "glauth"
 

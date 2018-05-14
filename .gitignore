@@ -6,3 +6,8 @@ glauth
 
 # Ignore generated certs in this folder
 certs/
+
+# Built binaries
+bin
+
+.*.swp

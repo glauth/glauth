@@ -1,7 +1,6 @@
 language: go
 
 go: 
- - 1.3.x       # Test an old version, to be sure it works
  - 1.9.x       # last version
  - 1.10.x      # current version
 
@@ -14,10 +13,12 @@ git:
 # flunk the build and immediately stop. It's sorta like having
 # set -e enabled in bash. 
 before_script:
-  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/) # All the .go files, excluding vendor/
-  #- go get github.com/golang/lint/golint                        # Linter
-  #- go get honnef.co/go/tools/cmd/megacheck                     # Badass static analyzer/linter
-  # - go get github.com/fzipp/gocyclo
+  - sudo apt-get -qq update && sudo apt-get install -y ldap-utils   # need this for integration tests
+  - sudo apt-get -qq update && sudo apt-get install -y go-bindata   # need this for makefile
+  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)     # All the .go files, excluding vendor/
+  #- go get github.com/golang/lint/golint                           # Linter
+  #- go get honnef.co/go/tools/cmd/megacheck                        # Badass static analyzer/linter
+  # - go get github.com/fzipp/gocyclo                               # Not sure what this is
 
 
 # Fetch dependencies
@@ -39,10 +40,11 @@ script:
   # - go test -race -coverprofile=coverage.txt -covermode=atomic
 
   # Full compile test
-  - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  # - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  - make all
 
   # Integration test with compiled binary
-  - scripts/travis/integration-test.sh "scripts/travis/test-config.cfg"
+  - scripts/travis/integration-test.sh
 
 
 # after_success:
