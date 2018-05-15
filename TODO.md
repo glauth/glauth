@@ -1,7 +1,7 @@
 # Todo before merging this branch
 
- * Handle git tags
- * Handle travis pipeline#
+ * Handle git tags - done: retrieves the last tag of the current branch
+ * Handle travis pipeline
  * Hide or change version number if not a final tag - in other words, handle release vs nonrelease builds
    * I believe this will resolve it:
    * git tag -l --points-at HEAD

@@ -14,10 +14,12 @@ import (
 )
 
 // Set with buildtime vars
-var version = "1.0.1"
+var LastGitTag string
 var BuildTime string
 var GitCommit string
 var GitClean string
+var GitBranch string
+var GitTagIsCommit string
 
 // Add conditional info here
 
@@ -119,9 +121,13 @@ func getVersionString() string {
 
 	// Don't include the commit hash in the build if the git working directory isn't clean
 	if GitClean == "1" {
-		versionstr = "GLauth v" + version + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+		if GitTagIsCommit == "1" {
+			versionstr = "GLauth " + LastGitTag + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+		} else {
+			versionstr = "GLauth - non-release build based on: " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+		}
 	} else {
-		versionstr = "GLauth v" + version + "\nBuild time: " + BuildTime
+		versionstr = "GLauth - non-release build based on: " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime
 	}
 
 	return versionstr
@@ -141,7 +147,7 @@ func main() {
 	}
 
 	// stats
-	stats_general.Set("version", stringer(version))
+	stats_general.Set("version", stringer(LastGitTag))
 
 	// web API
 	if cfg.API.Enabled {
