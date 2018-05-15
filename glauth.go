@@ -15,8 +15,9 @@ import (
 
 // Set with buildtime vars
 var version = "1.0.1"
-var buildtime = "20180514.175846"
+var BuildTime string
 var GitCommit string
+var GitClean string
 
 // Add conditional info here
 
@@ -25,8 +26,6 @@ var GitCommit string
 // 2) Check if tag is set, if so, use it for vnum - if not, omit it
 // 3) Add build time from env var in makefile
 // 4) Add travisci build number, if exists
-
-var versionstr = "GLauth v" + version + "\nBuild time: " + buildtime + "\nGit commit: " + GitCommit
 
 const programName = "glauth"
 
@@ -114,6 +113,21 @@ type config struct {
 
 var log = logging.MustGetLogger(programName)
 
+func getVersionString() string {
+
+	var versionstr string
+
+	// Don't include the commit hash in the build if the git working directory isn't clean
+	if GitClean == "1" {
+		versionstr = "GLauth v" + version + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+	} else {
+		versionstr = "GLauth v" + version + "\nBuild time: " + BuildTime
+	}
+
+	return versionstr
+
+}
+
 func main() {
 	stderr := initLogging()
 	log.Debug("AP start")
@@ -174,7 +188,7 @@ func doConfig() (*config, error) {
 	cfg.Frontend.TLS = true
 
 	// parse the command-line args
-	args, err := docopt.Parse(usage, nil, true, versionstr, false)
+	args, err := docopt.Parse(usage, nil, true, getVersionString(), false)
 	if err != nil {
 		return &cfg, err
 	}
