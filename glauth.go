@@ -124,10 +124,10 @@ func getVersionString() string {
 		if GitTagIsCommit == "1" {
 			versionstr = "GLauth " + LastGitTag + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
 		} else {
-			versionstr = "GLauth - non-release build based on: " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+			versionstr = "GLauth - non-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
 		}
 	} else {
-		versionstr = "GLauth - non-release build based on: " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime
+		versionstr = "GLauth - non-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime
 	}
 
 	return versionstr
