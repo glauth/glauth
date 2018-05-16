@@ -25,6 +25,7 @@ Note - makefile uses git data to inject build-time variables. For best results, 
 *make all* - run build binaries for platforms
 *make fast* - run build for only linux 64 bit
 *make run* - wrapper for the 'go run' command, setting up the needed tooling
+*make test* - run the integration test on linux64 binary
 
 ### Usage:
 ```
