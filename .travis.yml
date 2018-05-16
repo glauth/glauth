@@ -44,7 +44,8 @@ script:
   - make all
 
   # Integration test with compiled binary
-  - scripts/travis/integration-test.sh
+  - make test
+  # - scripts/travis/integration-test.sh
 
 
 # after_success:
