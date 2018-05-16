@@ -122,12 +122,18 @@ func getVersionString() string {
 	// Don't include the commit hash in the build if the git working directory isn't clean
 	if GitClean == "1" {
 		if GitTagIsCommit == "1" {
-			versionstr = "GLauth " + LastGitTag + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+			versionstr = "GLauth " + LastGitTag + "\n\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+		} else if len(LastGitTag) > 1 {
+			versionstr = "GLauth\n\nNon-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
 		} else {
-			versionstr = "GLauth - non-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
+			versionstr = "GLauth\n\nNon-release build, built from branch " + GitBranch + "\nBuild time: " + BuildTime + "\nGit commit: " + GitCommit
 		}
 	} else {
-		versionstr = "GLauth - non-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime
+		if len(LastGitTag) > 1 {
+			versionstr = "GLauth\n\nNon-release build based on " + LastGitTag + ", built from branch " + GitBranch + "\nBuild time: " + BuildTime
+		} else {
+			versionstr = "GLauth\n\nNon-release build, built from branch " + GitBranch + "\nBuild time: " + BuildTime
+		}
 	}
 
 	return versionstr

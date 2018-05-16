@@ -17,6 +17,15 @@ This quickstart is a great way to try out GLAuth in a non-production environment
 2. Test with traditional LDAP tools
   1. `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
 
+
+### Make Commands
+
+Note - makefile uses git data to inject build-time variables. For best results, run in the context of the git repo.
+
+*make all* - run build binaries for platforms
+*make fast* - run build for only linux 64 bit
+*make run* - wrapper for the 'go run' command, setting up the needed tooling
+
 ### Usage:
 ```
 glauth: securely expose your LDAP for external auth
