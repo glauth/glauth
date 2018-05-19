@@ -1,42 +1,31 @@
 language: go
 
 go: 
- - 1.3.x       # Test an old version, to be sure it works
  - 1.9.x       # last version
  - 1.10.x      # current version
-# - tip         # next release
- - master      # next release after that
 
 # Speed up git clones
 git:
   depth: 1
-
-matrix:
-  # It's ok if our code fails on unstable development versions of Go.
-  allow_failures:
-    - go: master
-
-  # Don't wait for tip tests to finish. Mark the test run green if the
-  # tests pass on the stable versions of Go.
-  fast_finish: true
 
 
 # Anything in before_script that returns a nonzero exit code will
 # flunk the build and immediately stop. It's sorta like having
 # set -e enabled in bash. 
 before_script:
-  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/) # All the .go files, excluding vendor/
-  #- go get github.com/golang/lint/golint                        # Linter
-  #- go get honnef.co/go/tools/cmd/megacheck                     # Badass static analyzer/linter
-  # - go get github.com/fzipp/gocyclo
+  - sudo apt-get -qq update && sudo apt-get install -y ldap-utils   # need this for integration tests
+  - sudo apt-get -qq update && sudo apt-get install -y go-bindata   # need this for makefile
+  - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)     # All the .go files, excluding vendor/
+  #- go get github.com/golang/lint/golint                           # Linter
+  #- go get honnef.co/go/tools/cmd/megacheck                        # Badass static analyzer/linter
+  # - go get github.com/fzipp/gocyclo                               # Not sure what this is
 
 
 # Fetch dependencies
-  - go get -t ./...
+  - go get -t -v ./...
 
 
 script:
-
   - diff -u <(echo -n) <(gofmt -d ./)         # Fail if a .go file hasn't been formatted with 'go fmt'
   # - go test -v -race ./...                   # Run all the tests with the race detector enabled
   # - go vet ./...                             # go vet is the official Go static analyzer
@@ -51,11 +40,11 @@ script:
   # - go test -race -coverprofile=coverage.txt -covermode=atomic
 
   # Full compile test
-  - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  # - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+  - make all
 
   # Integration test with compiled binary
-  # Need to extract this out into a shell script so that we can make LDAP queries then kill the daemon
-  # - ./glauth -c "docker/default-config.cfg"
+  - scripts/travis/integration-test.sh
 
 
 # after_success:

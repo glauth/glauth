@@ -39,12 +39,11 @@ ADD sample-simple.cfg /app/config/config.cfg
 COPY --from=build /app/glauth /app/glauth
 
 # Copy docker specific scripts from build container
-COPY --from=build /app/docker/start.sh /app/docker/
-COPY --from=build /app/docker/default-config.cfg /app/docker/
+COPY --from=build /app/scripts/docker/start.sh /app/docker/
+COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
 
 # Install init
-RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64
-RUN chmod +x /usr/local/bin/dumb-init
+RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64 && chmod +x /usr/local/bin/dumb-init
 
 # Expose web and LDAP ports
 EXPOSE 389 5555
