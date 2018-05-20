@@ -2,12 +2,24 @@
 
 export CLEANUP="$1"
 
+# Get the git working directory base if travis build dir isn't set
+if [[ "$TRAVIS_BUILD_DIR" == "" ]] ; then
+  export TRAVIS_BUILD_DIR="$(git rev-parse --show-toplevel)"
+fi
+
 # This script requires that "$TRAVIS_BUILD_DIR" is set to the repo root
 
 # Ensure ldap utils are installed (for example - when running this outside of travis)
 if [[ ! `which ldapsearch` ]]; then
 	sudo apt-get -qq update && sudo apt-get -qq install -y ldap-utils || exit 1;
 fi
+
+# Display version string
+echo "";
+echo ""
+echo "Version string of tested binary:"
+"$TRAVIS_BUILD_DIR/bin/glauth64" --version
+echo ""
 
 # Start in background, capture PID
 "$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
