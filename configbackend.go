@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/nmcclain/ldap"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -268,7 +269,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 	return m
 }
 
-//
+// Converts an array of GUIDs into an array of DNs
 func (h configHandler) getGroupDNs(gids []int) []string {
 	groups := make(map[string]bool)
 	for _, gid := range gids {
@@ -294,6 +295,8 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	for k, _ := range groups {
 		g = append(g, k)
 	}
+
+	sort.Strings(g)
 
 	return g
 }

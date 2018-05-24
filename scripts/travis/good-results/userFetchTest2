@@ -10,4 +10,6 @@ homeDirectory: /home/serviceuser
 description: serviceuser via LDAP
 gecos: serviceuser via LDAP
 gidNumber: 5502
+memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 
