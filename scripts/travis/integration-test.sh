@@ -107,7 +107,7 @@ snapshotTest "cn=janedoe" userFetchNonexistentUser1
 
 # List all posixgroups
 snapshotTest "objectClass=posixgroup" posixGroupList0
-# snapshotTest "objectClass=posixaccount" posixAccountList0
+snapshotTest "objectClass=posixaccount" posixAccountList0
 
 
 echo "";
