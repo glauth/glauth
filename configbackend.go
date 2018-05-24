@@ -227,6 +227,8 @@ func (h configHandler) getGroupMembers(gid int) []string {
 		m = append(m, k)
 	}
 
+	sort.Strings(m)
+
 	return m
 }
 
@@ -265,6 +267,8 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 	for k, _ := range members {
 		m = append(m, k)
 	}
+
+	sort.Strings(m)
 
 	return m
 }
