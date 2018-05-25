@@ -3,3 +3,8 @@ glauth.cfg
 
 # Ignore the built binary during testing
 glauth
+
+# Built binaries
+bin
+
+.*.swp
