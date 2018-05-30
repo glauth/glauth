@@ -21,14 +21,6 @@ var GitClean string
 var GitBranch string
 var GitTagIsCommit string
 
-// Add conditional info here
-
-// TODO:
-// 1) Check if git directory is clean or not (IE - is the commit has the actual code)
-// 2) Check if tag is set, if so, use it for vnum - if not, omit it
-// 3) Add build time from env var in makefile
-// 4) Add travisci build number, if exists
-
 const programName = "glauth"
 
 var usage = `glauth: securely expose your LDAP for external auth
@@ -115,6 +107,9 @@ type config struct {
 
 var log = logging.MustGetLogger(programName)
 
+// Reads builtime vars and returns a full string containing info about
+// the currently running version of the software. Primarily used by the
+// --version flag at runtime.
 func getVersionString() string {
 
 	var versionstr string

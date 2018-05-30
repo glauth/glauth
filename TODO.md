@@ -2,4 +2,3 @@
 
  * Cleanup logic - currently there's a messy nested if statement set. Instead, break out into individual ones, and simply concat the version string
  * Add note somewhere (docs?) about how non linux64/32 binaries are not fully tested
- * Perhaps look at mac testing on travis for releases? This might be overkill
