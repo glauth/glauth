@@ -39,14 +39,16 @@ binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 # Setup commands to always run
 setup: bindata format
 
-
+#####################
 # Subcommands
+#####################
+
 # Run integration test
 runtest:
 	./scripts/travis/integration-test.sh
 
 bindata:
-	go-bindata -pkg=main assets && gofmt -w .
+	go-bindata -pkg=main assets && gofmt -w bindata.go
 
 format:
 	go fmt
