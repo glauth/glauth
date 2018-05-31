@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/nmcclain/ldap"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -171,7 +172,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gecos", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(u.OtherGroups)})
+			attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
 			if len(u.SSHKeys) > 0 {
 				attrs = append(attrs, &ldap.EntryAttribute{"sshPublicKey", u.SSHKeys})
 			}
@@ -206,10 +207,28 @@ func (h configHandler) getGroupMembers(gid int) []string {
 			}
 		}
 	}
+
+	for _, g := range h.cfg.Groups {
+		if gid == g.UnixID {
+			for _, includegroupid := range g.IncludeGroups {
+				if includegroupid != gid {
+					includegroupmembers := h.getGroupMembers(includegroupid)
+
+					for _, includegroupmember := range includegroupmembers {
+						members[includegroupmember] = true
+					}
+				}
+			}
+		}
+	}
+
 	m := []string{}
 	for k, _ := range members {
 		m = append(m, k)
 	}
+
+	sort.Strings(m)
+
 	return m
 }
 
@@ -227,14 +246,34 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 			}
 		}
 	}
+
+	for _, g := range h.cfg.Groups {
+		if gid == g.UnixID {
+			for _, includegroupid := range g.IncludeGroups {
+				if includegroupid == gid {
+					log.Warning(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+				} else {
+					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
+
+					for _, includegroupmemberid := range includegroupmemberids {
+						members[includegroupmemberid] = true
+					}
+				}
+			}
+		}
+	}
+
 	m := []string{}
 	for k, _ := range members {
 		m = append(m, k)
 	}
+
+	sort.Strings(m)
+
 	return m
 }
 
-//
+// Converts an array of GUIDs into an array of DNs
 func (h configHandler) getGroupDNs(gids []int) []string {
 	groups := make(map[string]bool)
 	for _, gid := range gids {
@@ -243,12 +282,26 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 				dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.cfg.Backend.BaseDN)
 				groups[dn] = true
 			}
+
+			for _, includegroupid := range g.IncludeGroups {
+				if includegroupid == gid && g.UnixID != gid {
+					includegroupdns := h.getGroupDNs([]int{g.UnixID})
+
+					for _, includegroupdn := range includegroupdns {
+						groups[includegroupdn] = true
+					}
+				}
+			}
 		}
 	}
+
 	g := []string{}
 	for k, _ := range groups {
 		g = append(g, k)
 	}
+
+	sort.Strings(g)
+
 	return g
 }
 

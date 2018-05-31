@@ -52,15 +52,30 @@ function snapshotTest() {
   mkdir "$testResults" &> /dev/null
 
   # Run tests here
+  ldapCmd="ldapsearch -LLL \
+    -H ldap://localhost:3893 \
+    -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com \
+    -w mysecret \
+    -x -bdc=glauth,dc=com \
+    $1";
+
+    # Run the ldap command, pipe to file
+    # "$ldapCmd" &> "$testResults/$2"
+
+    # Useful for debugging - output the command run
+    # echo "$ldapCmd";
+
   ldapsearch -LLL \
     -H ldap://localhost:3893 \
     -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com \
     -w mysecret \
     -x -bdc=glauth,dc=com \
-    "$1" > "$testResults/$2"
+    $1 > "$testResults/$2"
+
 
     THISFAIL="0"
     diff -u "$goodResults/$2" "$testResults/$2" || THISFAIL="1"
+
 
     if [[ "$CLEANUP" = "cleanup" ]] ; then
       rm -rf "$testResults"
@@ -71,7 +86,6 @@ function snapshotTest() {
   else
     echo "  - FAIL : '$2'";
     FAIL="1"
-    exit 255;
   fi
 
 }
@@ -90,6 +104,11 @@ snapshotTest "cn=serviceuser" userFetchTest2
 # Test result of fetching nonexistent users
 snapshotTest "cn=fakeuser" userFetchNonexistentUser0
 snapshotTest "cn=janedoe" userFetchNonexistentUser1
+
+# List all posixgroups
+snapshotTest "objectClass=posixgroup" posixGroupList0
+snapshotTest "objectClass=posixaccount" posixAccountList0
+
 
 echo "";
 echo "";
