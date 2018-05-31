@@ -117,20 +117,22 @@ func getVersionString() string {
 
 	versionstr = "GLauth"
 
-	if GitClean == "1" && GitTagIsCommit == "1" {
-		// If a release, use the tag
+	// Notate the git context of the build
+	switch {
+	// If a release, use the tag
+	case GitClean == "1" && GitTagIsCommit == "1":
 		versionstr += " " + LastGitTag + "\n\n"
 
-	} else if len(GitBranch) > 1 && len(LastGitTag) > 1 {
-		// If this branch had a tag before, mention the branch and the tag to give a rough idea of the base version
+	// If this branch had a tag before, mention the branch and the tag to give a rough idea of the base version
+	case len(GitBranch) > 1 && len(LastGitTag) > 1:
 		versionstr += "\nNon-release build from branch " + GitBranch + ", based on tag " + LastGitTag + "\n\n"
 
-	} else if len(GitBranch) > 1 {
-		// If no previous tag specified, just mention the branch
+	// If no previous tag specified, just mention the branch
+	case len(GitBranch) > 1:
 		versionstr += "\nNon-release build from branch " + GitBranch + "\n\n"
 
-	} else {
-		// Fallback message, if all else fails
+	// Fallback message, if all else fails
+	default:
 		versionstr += "\nNon-release build\n\n"
 	}
 
