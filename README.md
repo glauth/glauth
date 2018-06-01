@@ -17,6 +17,16 @@ This quickstart is a great way to try out GLAuth in a non-production environment
 2. Test with traditional LDAP tools
   1. `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
 
+
+### Make Commands
+
+Note - makefile uses git data to inject build-time variables. For best results, run in the context of the git repo.
+
+*make all* - run build binaries for platforms
+*make fast* - run build for only linux 64 bit
+*make run* - wrapper for the 'go run' command, setting up the needed tooling
+*make test* - run the integration test on linux64 binary
+
 ### Usage:
 ```
 glauth: securely expose your LDAP for external auth
@@ -125,3 +135,8 @@ You'll need go-bindata to build GLAuth:
 ```unix
 go get github.com/jteeuwen/go-bindata/...
 ```
+
+# Other Architectures
+A small note about other architectures: while I expect the code is, for the most part, system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows. As such, all of the non-linux-64bit packages are provided as is. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.
+
+We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable with this.
