@@ -71,10 +71,7 @@ deploy:
 
   skip_cleanup: true
   on:
-    # repo: glauth/glauth
-    # branch: master
-    branch: dev
-    # tags: true
+    branch: master
+    tags: true
     condition: $TRAVIS_GO_VERSION = "1.10.1"
-    # go: '1.10'
 
