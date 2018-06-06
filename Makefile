@@ -45,7 +45,7 @@ setup: bindata format
 
 # Run integration test
 runtest:
-	./scripts/travis/integration-test.sh
+	./scripts/travis/integration-test.sh cleanup
 
 bindata:
 	go-bindata -pkg=main assets && gofmt -w bindata.go
