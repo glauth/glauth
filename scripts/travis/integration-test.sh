@@ -73,19 +73,30 @@ function snapshotTest() {
     $1 > "$testResults/$2"
 
 
-    THISFAIL="0"
-    diff -u "$goodResults/$2" "$testResults/$2" || THISFAIL="1"
+    # Handle the first-run case, saving the test results
+    if [ ! -f "$goodResults/$2" ]; then
+      echo "  - FIRST RUN - SAVING SNAPSHOT, RUN AGAIN TO PASS : '$2'";
+      # Copy the results to the goodResults dir, for future runs.
+      cp "$testResults/$2" "$goodResults/$2";
+
+      # NOTE: fail=1 must still be set, otherwise CI runs would succeed when they shouldn't
+      FAIL="1"
+    else
+
+      THISFAIL="0"
+      diff -u "$goodResults/$2" "$testResults/$2" || THISFAIL="1"
 
 
-    if [[ "$CLEANUP" = "cleanup" ]] ; then
-      rm -rf "$testResults"
+      if [[ "$CLEANUP" = "cleanup" ]] ; then
+        rm -rf "$testResults"
+      fi
+
+    if [[ "$THISFAIL" = "0" ]] ; then
+      echo "  - PASS : '$2'";
+    else
+      echo "  - FAIL : '$2'";
+      FAIL="1"
     fi
-
-  if [[ "$THISFAIL" = "0" ]] ; then
-    echo "  - PASS : '$2'";
-  else
-    echo "  - FAIL : '$2'";
-    FAIL="1"
   fi
 
 }
@@ -100,6 +111,7 @@ echo "";
 snapshotTest "cn=hackers" userFetchTest0
 snapshotTest "cn=johndoe" userFetchTest1
 snapshotTest "cn=serviceuser" userFetchTest2
+snapshotTest "cn=jamesdoe" userFetchTest3
 
 # Test result of fetching nonexistent users
 snapshotTest "cn=fakeuser" userFetchNonexistentUser0
