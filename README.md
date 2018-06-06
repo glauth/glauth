@@ -88,6 +88,10 @@ More configuration options are documented here: https://github.com/nmcclain/glau
    * Specify an array of public keys
 
 ### Optional Fields
+ * otherGroups
+   * Array of IDs of groups the user is a member of.
+   * Example: [5501, 5002]
+   * default = blank
  * givenname
    * First name
    * Example: John
