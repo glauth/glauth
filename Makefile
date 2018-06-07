@@ -50,7 +50,7 @@ runtest:
 
 
 bindata:
-	go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
+	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
 
 
 cleanup:
