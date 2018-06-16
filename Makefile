@@ -84,5 +84,6 @@ win32:
 win64:
 	GOOS=windows GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win64 ${BUILD_FILES} && cd bin && sha256sum glauth-win64 > glauth-win64.sha256
 
+
 verify:
 	cd bin && sha256sum *.sha256 -c && cd ../;

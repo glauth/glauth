@@ -32,8 +32,9 @@ before_script:
 script:
   - env                                       # Dump the env to make debugging easier
   - diff -u <(echo -n) <(gofmt -d ./)         # Fail if a .go file hasn't been formatted with 'go fmt'
+  # - go vet ./...        "                     # go vet is the official Go static analyzer
+
   # - go test -v -race ./...                   # Run all the tests with the race detector enabled
-  # - go vet ./...                             # go vet is the official Go static analyzer
   # - megacheck ./...                          # "go vet on steroids" + linter
   # - gocyclo -over 19 $GO_FILES               # forbid code with huge functions
   # - golint -set_exit_status $(go list ./...) # one last linter
