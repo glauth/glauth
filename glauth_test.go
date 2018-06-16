@@ -14,7 +14,7 @@ func TestGetVersionString(t *testing.T) {
 	GitCommit = "a9837f3112fc049fd1e9faca6f56d8be1bec91bd"
 	GitClean = "1"
 	GitBranch = "dev"
-	GitTagIsCommit ="0"
+	GitTagIsCommit = "0"
 
 	versionOutput := getVersionString()
 	if versionOutput != "7" {
