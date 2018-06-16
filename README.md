@@ -148,7 +148,10 @@ go get github.com/jteeuwen/go-bindata/...
 Support the ongoing development of GLAuth!
 
 **Paypal**
+
 [![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
 
+
 **Bitcoin Address**
+
 39z2Zkoc24LsuiqCQNFe7QrX4da3mzbGjK
