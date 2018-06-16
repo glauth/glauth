@@ -134,12 +134,6 @@ Any of the architectures above will work for production.  Just remember:
 
  * Always use legit SSL certs for production!
  
-### Building:
-You'll need go-bindata to build GLAuth: 
-```unix
-go get github.com/jteeuwen/go-bindata/...
-```
-
 # Other Architectures
 A small note about other architectures: while I expect the code is, for the most part, system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows. As such, all of the non-linux-64bit packages are provided as is. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.
 
