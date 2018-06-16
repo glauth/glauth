@@ -11,6 +11,8 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
 [![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
 
+[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
+
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
 * Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
@@ -140,3 +142,13 @@ You'll need go-bindata to build GLAuth:
 ```unix
 go get github.com/jteeuwen/go-bindata/...
 ```
+
+### Support
+
+Support the ongoing development of GLAuth!
+
+**Paypal**
+[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
+
+**Bitcoin Address**
+39z2Zkoc24LsuiqCQNFe7QrX4da3mzbGjK
