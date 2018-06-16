@@ -1,5 +1,7 @@
 language: go
 
+# USE THIS alongside makefile tag detection: $TRAVIS_TAG
+
 go: 
  - 1.9.x       # last version
  - 1.10.x      # current version
@@ -20,12 +22,15 @@ before_script:
   #- go get honnef.co/go/tools/cmd/megacheck                        # Badass static analyzer/linter
   # - go get github.com/fzipp/gocyclo                               # Not sure what this is
 
+# Run bindata for assets
+  - make bindata
 
 # Fetch dependencies
   - go get -t -v ./...
 
 
 script:
+  - env                                       # Dump the env to make debugging easier
   - diff -u <(echo -n) <(gofmt -d ./)         # Fail if a .go file hasn't been formatted with 'go fmt'
   - go vet ./...                              # go vet is the official Go static analyzer
   # - go test -v -race ./...                   # Run all the tests with the race detector enabled
@@ -43,9 +48,30 @@ script:
   # - go build -o ./glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
   - make all
 
+  # Output hashes to the build log
+  - cat bin/*.sha256
+
   # Integration test with compiled binary
-  - scripts/travis/integration-test.sh
+  - make test
 
 
 # after_success:
 #  - bash <(curl -s https://codecov.io/bash)
+
+deploy:
+  provider: releases
+  api_key:
+    secure: CsQb802CJJlum5suwo3Yvw1TkmX56O6TPrtJqMI0Qm6A878dhrZIjyVmfG3Iq9rtZvfFhK+Y3SIfPZp8BjV3cicc+X1Yh1VvMG12ukqHSruvGvLG49dtnq40P31u85Y4HdBk+W8YIsCQHEonsID9l+q2LbhuiC358UF+HNgzESEz6ZyTZz0AvAJzm1uyiUiPTHMFwqN7qQsookmLXf490rqp9YmFFqte+o3/JwoYXc3pE/rBMJitPSJNGULzu2QofV5gJ0JxgPWlfF5DsHHEi1jhpBcTfiFzEvkdcl1SVme9MMNPue7j8u9+PLJ6uIdlnTeBcMPKgtzOg/kBqY4+3QzY4aPXjKm3+MF3Cau66+g3QC7dKenvYefapQYN7t1SSpiR9X3TLWZrBbw2ovMe3em+uMnIM08bemzj8DapRgKXmYKWnwTlA9KLf0Vl22255OzMGarkhx94cDvUHmEkNo7qBXqmUxPo0Fc5XJyD7JmUNgYoWj0/NjyN09VG22FL2FW44HR3eitq2wSFSMO/jsC2rLuCnyLHViP+O2YJu0T4Q3gdQUcdQmjT7y8ogH5Shn9t2wY4NRxI3MyXO7+fGEOj1DaD6CFQwcSwbJVpIzS6J8z7+rRrzE9QkXeCmwNNt5UkpR9lYmOEzpc00rTRimwjfmJn/nTXsIDiQg9iZJM=
+  file_glob: true 
+  file: bin/*
+  draft: true
+  name: "DRAFT RELEASE: $TRAVIS_TAG"
+  body: "Draft release, committed with message: $TRAVIS_COMMIT_MESSAGE"
+  body: "# Commit Details<br />$TRAVIS_COMMIT_MESSAGE<br /><br /># Note About Non-Linux 64bit Files<br /> While I expect the code is system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows.<br /><br />As such, the primary release platform is Linux 64 bit. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.<br /><br />We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable using them with this knowledge."
+
+  skip_cleanup: true
+  on:
+    branch: master
+    tags: true
+    condition: $TRAVIS_GO_VERSION = "1.10.1"
+
