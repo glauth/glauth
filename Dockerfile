@@ -17,7 +17,7 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 # Only needed for alpine builds
-RUN apk add --no-cache git bzr
+RUN apk add --no-cache git bzr make
 
 # Install deps
 RUN go get -d -v ./...
@@ -25,8 +25,8 @@ RUN go get -d -v ./...
 # Run go-bindata to embed data for API
 RUN go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
 
-# Build
-RUN go build -o /app/glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+# Build and copy final result
+RUN make linux64 && cp ./bin/glauth64 /app/glauth
 
 #################
 # Run Step

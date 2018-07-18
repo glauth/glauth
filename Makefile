@@ -22,16 +22,16 @@ BUILD_FILES=glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
 #####################
 
 # Build and run - used for development
-run: setup devrun
+run: setup devrun cleanup
 
 # Run the integration test on linux64 (eventually allow the binary to be set)
 test: runtest
 
 # Run build process for all binaries
-all: setup binaries verify
+all: setup binaries verify cleanup
 
 # Run build process for only linux64
-fast: setup linux64 verify
+fast: setup linux64 verify cleanup
 
 # list of binary formats to build
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
@@ -45,10 +45,16 @@ setup: bindata format
 
 # Run integration test
 runtest:
-	./scripts/travis/integration-test.sh
+	./scripts/travis/integration-test.sh cleanup
+
+
 
 bindata:
-	go-bindata -pkg=main assets && gofmt -w bindata.go
+	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
+
+
+cleanup:
+	rm bindata.go
 
 format:
 	go fmt
@@ -77,6 +83,7 @@ win32:
 
 win64:
 	GOOS=windows GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win64 ${BUILD_FILES} && cd bin && sha256sum glauth-win64 > glauth-win64.sha256
+
 
 verify:
 	cd bin && sha256sum *.sha256 -c && cd ../;

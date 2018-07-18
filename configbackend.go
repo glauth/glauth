@@ -25,12 +25,15 @@ func newConfigHandler(cfg *config) Backend {
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
-	log.Debug("Bind request as %s from %s", bindDN, conn.RemoteAddr().String())
+
+	log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+
 	stats_frontend.Add("bind_reqs", 1)
 
-	// parse the bindDN
+	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
 		log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.cfg.Backend.BaseDN))
+		// log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
@@ -55,7 +58,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 	if !found {
-		log.Warning(fmt.Sprintf("Bind Error: User %s not found.", user))
+		log.Warning(fmt.Sprintf("Bind Error: User %s not found.", userName))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the group
@@ -68,7 +71,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 	if !found {
-		log.Warning(fmt.Sprintf("Bind Error: Group %s not found.", group))
+		log.Warning(fmt.Sprintf("Bind Error: Group %s not found.", groupName))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// validate group membership
