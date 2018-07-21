@@ -1,0 +1,104 @@
+dn: cn=hackers,ou=superheros,dc=glauth,dc=com
+cn: hackers
+uid: hackers
+ou: superheros
+uidNumber: 5001
+accountStatus: active
+objectClass: posixAccount
+loginShell: /bin/bash
+homeDirectory: /home/hackers
+description: hackers via LDAP
+gecos: hackers via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+
+dn: cn=johndoe,ou=superheros,dc=glauth,dc=com
+cn: johndoe
+uid: johndoe
+givenName: John
+sn: Doe
+ou: superheros
+uidNumber: 5002
+accountStatus: active
+mail: jdoe@example.com
+objectClass: posixAccount
+loginShell: /bin/sh
+homeDirectory: /root
+description: johndoe via LDAP
+gecos: johndoe via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
+ w3AJwV34t2jzR+/tUNVeJ9XddKpYQektNHsFmY93lJw5QDSbeH/mAC4KPoUM47EriINKEelRbyG4h
+ C/ko/e2JWqEclPS9LP7GtqGmscXXo4JFkqnKw4TIRD52XI9n1syYM9Y8rJ88fjC/Lpn+01AB0paLV
+ IfppJU35t0Ho9doHAEfEvcQA6tcm7FLJUvklAxc8WUbdziczbRV40KzDroIkXAZRjX7vXXhh/p7XB
+ YnA0GO8oTa2VY4dTQSeDAUJSUxbzevbL0ll9Gi1uYaTDQyE5gbn2NfJSqq0OYA+3eyGtIVjFYZgi+
+ txSuhw== rsa-key-20160209
+
+dn: cn=jamesdoe,ou=superheros,dc=glauth,dc=com
+cn: jamesdoe
+uid: jamesdoe
+givenName: James
+sn: Doe
+ou: superheros
+uidNumber: 5003
+accountStatus: active
+mail: jdoe2@example.com
+objectClass: posixAccount
+loginShell: /bin/sh
+homeDirectory: /home/jamesdoe
+description: jamesdoe via LDAP
+gecos: jamesdoe via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
+memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
+ w3AJwV34t2jzR+/tUNVeJ9XddKpYQektNHsFmY93lJw5QDSbeH/mAC4KPoUM47EriINKEelRbyG4h
+ C/ko/e2JWqEclPS9LP7GtqGmscXXo4JFkqnKw4TIRD52XI9n1syYM9Y8rJ88fjC/Lpn+01AB0paLV
+ IfppJU35t0Ho9doHAEfEvcQA6tcm7FLJUvklAxc8WUbdziczbRV40KzDroIkXAZRjX7vXXhh/p7XB
+ YnA0GO8oTa2VY4dTQSeDAUJSUxbzevbL0ll9Gi1uYaTDQyE5gbn2NfJSqq0OYA+3eyGtIVjFYZgi+
+ txSuhw== rsa-key-20160209
+
+dn: cn=alexdoe,ou=superheros,dc=glauth,dc=com
+cn: alexdoe
+uid: alexdoe
+givenName: Alex
+sn: Doe
+ou: superheros
+uidNumber: 5004
+accountStatus: active
+mail: adoe@example.com
+objectClass: posixAccount
+loginShell: /bin/sh
+homeDirectory: /home/alexdoe
+description: alexdoe via LDAP
+gecos: alexdoe via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
+memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+
+dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+cn: serviceuser
+uid: serviceuser
+ou: svcaccts
+uidNumber: 5003
+accountStatus: active
+objectClass: posixAccount
+loginShell: /bin/bash
+homeDirectory: /home/serviceuser
+description: serviceuser via LDAP
+gecos: serviceuser via LDAP
+gidNumber: 5502
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com
+

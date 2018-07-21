@@ -1,0 +1,16 @@
+dn: cn=hackers,ou=superheros,dc=glauth,dc=com
+cn: hackers
+uid: hackers
+ou: superheros
+uidNumber: 5001
+accountStatus: active
+objectClass: posixAccount
+loginShell: /bin/bash
+homeDirectory: /home/hackers
+description: hackers via LDAP
+gecos: hackers via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+

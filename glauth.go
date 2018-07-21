@@ -4,6 +4,7 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/GeertJohan/yubigo"
 	"github.com/docopt/docopt-go"
 	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
@@ -13,7 +14,13 @@ import (
 	"strings"
 )
 
-var version = "1.0.1"
+// Set with buildtime vars
+var LastGitTag string
+var BuildTime string
+var GitCommit string
+var GitClean string
+var GitBranch string
+var GitTagIsCommit string
 
 const programName = "glauth"
 
@@ -73,6 +80,8 @@ type configUser struct {
 	PassSHA256   string
 	PrimaryGroup int
 	SSHKeys      []string
+	OTPSecret    string
+	Yubikey      string
 	Disabled     bool
 	UnixID       int
 	Mail         string
@@ -82,13 +91,16 @@ type configUser struct {
 	Homedir      string
 }
 type configGroup struct {
-	Name   string
-	UnixID int
+	Name          string
+	UnixID        int
+	IncludeGroups []int
 }
 type config struct {
 	API                configAPI
 	Backend            configBackend
 	Debug              bool
+	YubikeyClientID    string
+	YubikeySecret      string
 	Frontend           configFrontend
 	Groups             []configGroup
 	Syslog             bool
@@ -100,6 +112,48 @@ type config struct {
 }
 
 var log = logging.MustGetLogger(programName)
+
+// Reads builtime vars and returns a full string containing info about
+// the currently running version of the software. Primarily used by the
+// --version flag at runtime.
+func getVersionString() string {
+
+	var versionstr string
+
+	versionstr = "GLauth"
+
+	// Notate the git context of the build
+	switch {
+	// If a release, use the tag
+	case GitClean == "1" && GitTagIsCommit == "1":
+		versionstr += " " + LastGitTag + "\n\n"
+
+	// If this branch had a tag before, mention the branch and the tag to give a rough idea of the base version
+	case len(GitBranch) > 1 && len(LastGitTag) > 1:
+		versionstr += "\nNon-release build from branch " + GitBranch + ", based on tag " + LastGitTag + "\n\n"
+
+	// If no previous tag specified, just mention the branch
+	case len(GitBranch) > 1:
+		versionstr += "\nNon-release build from branch " + GitBranch + "\n\n"
+
+	// Fallback message, if all else fails
+	default:
+		versionstr += "\nNon-release build\n\n"
+	}
+
+	// Include build time
+	if len(BuildTime) > 1 {
+		versionstr += "Build time: " + BuildTime + "\n"
+	}
+
+	// Add commit hash
+	if GitClean == "1" && len(GitCommit) > 1 {
+		versionstr += "Commit: " + GitCommit + "\n"
+	}
+
+	return versionstr
+
+}
 
 func main() {
 	stderr := initLogging()
@@ -114,12 +168,22 @@ func main() {
 	}
 
 	// stats
-	stats_general.Set("version", stringer(version))
+	stats_general.Set("version", stringer(LastGitTag))
 
 	// web API
 	if cfg.API.Enabled {
 		log.Debug("Web API enabled")
 		go RunAPI(cfg)
+	}
+
+	yubiAuth := (*yubigo.YubiAuth)(nil)
+
+	if len(cfg.YubikeyClientID) > 0 && len(cfg.YubikeySecret) > 0 {
+		yubiAuth, err = yubigo.NewYubiAuth(cfg.YubikeyClientID, cfg.YubikeySecret)
+
+		if err != nil {
+			log.Fatalf("Yubikey Auth failed")
+		}
 	}
 
 	// configure the backend
@@ -130,7 +194,7 @@ func main() {
 	case "ldap":
 		handler = newLdapHandler(cfg)
 	case "config":
-		handler = newConfigHandler(cfg)
+		handler = newConfigHandler(cfg, yubiAuth)
 	default:
 		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap'.", cfg.Backend.Datastore)
 	}
@@ -161,7 +225,7 @@ func doConfig() (*config, error) {
 	cfg.Frontend.TLS = true
 
 	// parse the command-line args
-	args, err := docopt.Parse(usage, nil, true, version, false)
+	args, err := docopt.Parse(usage, nil, true, getVersionString(), false)
 	if err != nil {
 		return &cfg, err
 	}

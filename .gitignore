@@ -4,6 +4,12 @@ glauth.cfg
 # Ignore the built binary during testing
 glauth
 
+# Built binaries
 bin
 
+bindata.go
+
 .*.swp
+
+# Ignoring travis CLI tool logs
+*travis.log
