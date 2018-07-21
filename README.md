@@ -1,21 +1,38 @@
+
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
+[![Travis Build - Master](https://img.shields.io/travis/glauth/glauth.svg)](https://travis-ci.org/glauth/glauth)
+[![Last Commit](https://img.shields.io/github/last-commit/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/commit-activity)
+
+[![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![DockerHub Image Size](https://img.shields.io/imagelayers/image-size/glauth/glauth/latest.svg)](https://hub.docker.com/r/glauth/glauth/)
+
+[![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
+[![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
+
+[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
+
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
-* Lightweight alternative to OpenLDAP and Active Directory.
-* Store your user directory in S3 or MySQL, or proxy to existing LDAP servers.
+* Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
+* Store your user directory in a local file, S3 or proxy to existing LDAP servers.
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
+
+### Contributing
+Please base all PRs on [dev](https://github.com/nmcclain/glauth/tree/dev), not master.
 
 ### Quickstart
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
 
-1. Install GLAuth on a test server
-  1. Clone the repo: `git clone https://github.com/nmcclain/glauth`
-  2. Start the GLAuth server: `cd glauth; sudo bin/glauth32 -c sample-simple.cfg`
-2. Test with traditional LDAP tools
-  1. `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+1. Download a precompiled binary from the [releases](https://github.com/glauth/glauth/releases) page.
+2. Download the [example config file](https://github.com/glauth/glauth/blob/master/sample-simple.cfg).
+3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
+   - `sudo ./glauth64 -c sample-simple.cfg`
+4. Test with traditional LDAP tools
+   - For example: `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+
 
 
 ### Make Commands
@@ -166,3 +183,23 @@ Any of the architectures above will work for production.  Just remember:
 A small note about other architectures: while I expect the code is, for the most part, system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows. As such, all of the non-linux-64bit packages are provided as is. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.
 
 We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable with this.
+ 
+### Building:
+You'll need go-bindata to build GLAuth. Then use the Makefile.
+```unix
+go get github.com/jteeuwen/go-bindata/...
+make all
+```
+
+### Support
+
+Support the ongoing development of GLAuth!
+
+**Paypal**
+
+[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
+
+
+**Bitcoin Address**
+
+39z2Zkoc24LsuiqCQNFe7QrX4da3mzbGjK
