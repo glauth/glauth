@@ -49,7 +49,7 @@ COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
 RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64 && chmod +x /usr/local/bin/dumb-init
 
 # Expose web and LDAP ports
-EXPOSE 389 5555
+EXPOSE 389 5555 3893 636
 
 ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
 CMD ["/bin/sh", "/app/docker/start.sh"]
