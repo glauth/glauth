@@ -15,6 +15,8 @@ echo "";
 /app/glauth --version
 
 echo "";
+echo "Starting GLauth now.";
+echo "";
 
 # Run app
 /app/glauth -c /app/config/config.cfg
