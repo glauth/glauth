@@ -6,7 +6,7 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 [![Last Commit](https://img.shields.io/github/last-commit/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/commit-activity)
 
 [![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
-[![DockerHub Image Size](https://img.shields.io/imagelayers/image-size/glauth/glauth/latest.svg)](https://hub.docker.com/r/glauth/glauth/)
+[![DockerHub Image Size](https://img.shields.io/microbadger/image-size/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
 
 [![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
 [![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
