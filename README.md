@@ -1,4 +1,3 @@
-
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
@@ -40,8 +39,11 @@ This quickstart is a great way to try out GLAuth in a non-production environment
 Note - makefile uses git data to inject build-time variables. For best results, run in the context of the git repo.
 
 *make all* - run build binaries for platforms
+
 *make fast* - run build for only linux 64 bit
+
 *make run* - wrapper for the 'go run' command, setting up the needed tooling
+
 *make test* - run the integration test on linux64 binary
 
 ### Usage:
