@@ -15,18 +15,18 @@ git:
 # flunk the build and immediately stop. It's sorta like having
 # set -e enabled in bash. 
 before_script:
-  - sudo apt-get -qq update && sudo apt-get install -y ldap-utils oathtool  # need this for integration tests
-  - sudo apt-get -qq update && sudo apt-get install -y go-bindata           # need this for makefile
+  - travis_retry sudo apt-get -qq update && sudo apt-get install -y ldap-utils oathtool  # need this for integration tests
+  - travis_retry sudo apt-get -qq update && sudo apt-get install -y go-bindata           # need this for makefile
   - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)             # All the .go files, excluding vendor/
-  #- go get github.com/golang/lint/golint                                   # Linter
-  #- go get honnef.co/go/tools/cmd/megacheck                                # Badass static analyzer/linter
-  # - go get github.com/fzipp/gocyclo                                       # Not sure what this is
+  #- travis_retry go get github.com/golang/lint/golint                                   # Linter
+  #- travis_retry go get honnef.co/go/tools/cmd/megacheck                                # Badass static analyzer/linter
+  # - travis_retry go get github.com/fzipp/gocyclo                                       # Not sure what this is
 
 # Run bindata for assets
   - make bindata
 
 # Fetch dependencies
-  - go get -t -v ./...
+  - travis_retry go get -t -v ./...
 
 
 script:
