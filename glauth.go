@@ -189,9 +189,8 @@ func startLDAPS(ldapsConfig *configLDAPS, server *ldap.Server) {
 func doConfig() (*config, error) {
 	cfg := config{}
 	// setup defaults
-	cfg.Frontend.TLS = true
-	cfg.LDAPS.Enabled = true
 	cfg.LDAP.Enabled = false
+	cfg.LDAPS.Enabled = true
 
 	// parse the command-line args
 	args, err := docopt.Parse(usage, nil, true, version, false)
@@ -240,24 +239,34 @@ func doConfig() (*config, error) {
 		log.Debug("Debugging enabled")
 	}
 
-	// Backwards compatibility
-	cfg.LDAP.Enabled = cfg.LDAP.Enabled || !cfg.Frontend.TLS
-	cfg.LDAPS.Enabled = cfg.LDAPS.Enabled && cfg.Frontend.TLS
-
-	if len(cfg.LDAP.Listen) == 0 {
-		cfg.LDAP.Listen = cfg.Frontend.Listen
+	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
+		// Both old server-config and new - dont allow
+		return &cfg, fmt.Errorf("Both old and new server-config in use. Either use old format ([frontend]) or new format ([ldap], [ldaps])")
 	}
 
-	if len(cfg.LDAPS.Listen) == 0 {
-		cfg.LDAPS.Listen = cfg.Frontend.Listen
+	if len(cfg.Frontend.Listen) > 0 {
+		// We're going with old format - parse it into new
+		log.Warning("Using old server-config format - Please use [ldap] and [ldaps] sections instead of [frontend]")
+
+		cfg.LDAP.Enabled = !cfg.Frontend.TLS
+		cfg.LDAPS.Enabled = cfg.Frontend.TLS
+
+		if cfg.Frontend.TLS {
+			cfg.LDAPS.Listen = cfg.Frontend.Listen
+		} else {
+			cfg.LDAP.Listen = cfg.Frontend.Listen
+		}
+
+		if len(cfg.Frontend.Cert) > 0 {
+			cfg.LDAPS.Cert = cfg.Frontend.Cert
+		}
+		if len(cfg.Frontend.Key) > 0 {
+			cfg.LDAPS.Key = cfg.Frontend.Key
+		}
 	}
 
-	if len(cfg.LDAPS.Cert) == 0 {
-		cfg.LDAPS.Cert = cfg.Frontend.Cert
-	}
-
-	if len(cfg.LDAPS.Key) == 0 {
-		cfg.LDAPS.Key = cfg.Frontend.Key
+	if !cfg.LDAP.Enabled && !cfg.LDAPS.Enabled {
+		return &cfg, fmt.Errorf("No server configuration found: please provide either LDAP or LDAPS configuration")
 	}
 
 	if cfg.LDAPS.Enabled {
