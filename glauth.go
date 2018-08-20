@@ -54,10 +54,13 @@ type Backend interface {
 
 // config file
 type configBackend struct {
-	BaseDN    string
-	Datastore string
-	Insecure  bool     // For LDAP backend only
-	Servers   []string // For LDAP backend only
+	BaseDN     string
+	Datastore  string
+	Insecure   bool     // For LDAP backend only
+	Servers    []string // For LDAP backend only
+	NameAttr   string
+	GroupAttr  string
+	SSHKeyAttr string
 }
 type configFrontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
@@ -223,6 +226,9 @@ func doConfig() (*config, error) {
 	cfg := config{}
 	// setup defaults
 	cfg.Frontend.TLS = true
+	cfg.Backend.NameAttr = "cn"
+	cfg.Backend.GroupAttr = "ou"
+	cfg.Backend.SSHKeyAttr = "sshPublicKey"
 
 	// parse the command-line args
 	args, err := docopt.Parse(usage, nil, true, getVersionString(), false)
