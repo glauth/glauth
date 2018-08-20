@@ -2,6 +2,8 @@
 
 export CLEANUP="$1"
 
+## Main Methods
+
 # Get the git working directory base if travis build dir isn't set
 if [[ "$TRAVIS_BUILD_DIR" == "" ]] ; then
   export TRAVIS_BUILD_DIR="$(git rev-parse --show-toplevel)"
@@ -41,6 +43,32 @@ fi
 
 FAIL="0"
 
+# Used for OTP testing
+# Arguments:
+#    $1 - Full Bind DN
+#    $2 - Full Bind PW
+#    $3 - query to run
+#    $4 - test name
+function bindTest() {
+  ldapsearch -LLL \
+    -H ldap://localhost:3893 \
+    -D "$1" \
+    -w "$2" \
+    -x -bdc=glauth,dc=com \
+    "$3" > /dev/null
+
+  exitCode="$?"
+
+  if [[ "$exitCode" = "0" ]] ; then
+    echo "  - PASS : 2FA test '$4'";
+  else
+    echo "  - FAIL : 2FA test '$4'";
+    FAIL="1"
+  fi
+
+
+}
+
 # Arguments:
 #    $1 - query
 #    $2 - name of snapshot
@@ -76,6 +104,7 @@ function snapshotTest() {
     # Handle the first-run case, saving the test results
     if [ ! -f "$goodResults/$2" ]; then
       echo "  - FIRST RUN - SAVING SNAPSHOT, RUN AGAIN TO PASS : '$2'";
+
       # Copy the results to the goodResults dir, for future runs.
       cp "$testResults/$2" "$goodResults/$2";
 
@@ -92,9 +121,9 @@ function snapshotTest() {
       fi
 
     if [[ "$THISFAIL" = "0" ]] ; then
-      echo "  - PASS : '$2'";
+      echo "  - PASS : snapshot '$2'";
     else
-      echo "  - FAIL : '$2'";
+      echo "  - FAIL : snapshot '$2'";
       FAIL="1"
     fi
   fi
@@ -107,11 +136,18 @@ echo "";
 echo "RUNNING TESTS:"
 echo "";
 
+#################
+## TEST RUNS
+#################
+
+## Query output tests
+
 # Regular single-user fetches
 snapshotTest "cn=hackers" userFetchTest0
 snapshotTest "cn=johndoe" userFetchTest1
 snapshotTest "cn=serviceuser" userFetchTest2
 snapshotTest "cn=jamesdoe" userFetchTest3
+snapshotTest "cn=alexdoe" userFetchTest4
 
 # Test result of fetching nonexistent users
 snapshotTest "cn=fakeuser" userFetchNonexistentUser0
@@ -121,6 +157,23 @@ snapshotTest "cn=janedoe" userFetchNonexistentUser1
 snapshotTest "objectClass=posixgroup" posixGroupList0
 snapshotTest "objectClass=posixaccount" posixAccountList0
 
+
+## 2FA Bind Test
+# Fetch the OTP for this moment
+otpCode="$(oathtool --totp -b -d 6 '3hnvnk4ycv44glzigd6s25j4dougs3rk')"
+
+pass="ThisAloneWontWork!"
+
+# Try to bind with it
+bindTest "cn=alexdoe,ou=superheros,dc=glauth,dc=com" \
+  "$pass$otpCode" \
+  "cn=alexdoe" \
+  "OtpAlexDoe"
+
+
+#############
+## Cleanup
+#############
 
 echo "";
 echo "";
