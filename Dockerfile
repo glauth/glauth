@@ -17,13 +17,16 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 # Only needed for alpine builds
-RUN apk add --no-cache git bzr
+RUN apk add --no-cache git bzr make
 
 # Install deps
 RUN go get -d -v ./...
 
-# Build
-RUN go build -o /app/glauth glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+# Run go-bindata to embed data for API
+RUN go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
+
+# Build and copy final result
+RUN make linux64 && cp ./bin/glauth64 /app/glauth
 
 #################
 # Run Step
@@ -39,12 +42,11 @@ ADD sample-simple.cfg /app/config/config.cfg
 COPY --from=build /app/glauth /app/glauth
 
 # Copy docker specific scripts from build container
-COPY --from=build /app/docker/start.sh /app/docker/
-COPY --from=build /app/docker/default-config.cfg /app/docker/
+COPY --from=build /app/scripts/docker/start.sh /app/docker/
+COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
 
 # Install init
-RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64
-RUN chmod +x /usr/local/bin/dumb-init
+RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64 && chmod +x /usr/local/bin/dumb-init
 
 # Expose web and LDAP ports
 EXPOSE 389 5555
