@@ -1,4 +1,5 @@
 dn: cn=hackers,ou=superheros,dc=glauth,dc=com
+uid: hackers
 cn: hackers
 uid: hackers
 ou: superheros
@@ -15,6 +16,7 @@ memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
 
 dn: cn=johndoe,ou=superheros,dc=glauth,dc=com
+uid: johndoe
 cn: johndoe
 uid: johndoe
 givenName: John
@@ -40,6 +42,7 @@ sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
  txSuhw== rsa-key-20160209
 
 dn: cn=jamesdoe,ou=superheros,dc=glauth,dc=com
+uid: jamesdoe
 cn: jamesdoe
 uid: jamesdoe
 givenName: James
@@ -67,6 +70,7 @@ sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
  txSuhw== rsa-key-20160209
 
 dn: cn=alexdoe,ou=superheros,dc=glauth,dc=com
+uid: alexdoe
 cn: alexdoe
 uid: alexdoe
 givenName: Alex
@@ -88,6 +92,7 @@ memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
 
 dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+uid: serviceuser
 cn: serviceuser
 uid: serviceuser
 ou: svcaccts

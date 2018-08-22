@@ -1,4 +1,5 @@
 dn: cn=johndoe,ou=superheros,dc=glauth,dc=com
+uid: johndoe
 cn: johndoe
 uid: johndoe
 givenName: John

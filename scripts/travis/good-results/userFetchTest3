@@ -1,4 +1,5 @@
 dn: cn=jamesdoe,ou=superheros,dc=glauth,dc=com
+uid: jamesdoe
 cn: jamesdoe
 uid: jamesdoe
 givenName: James

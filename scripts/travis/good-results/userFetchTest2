@@ -1,4 +1,5 @@
 dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+uid: serviceuser
 cn: serviceuser
 uid: serviceuser
 ou: svcaccts
