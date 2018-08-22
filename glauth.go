@@ -305,12 +305,12 @@ func doConfig() (*config, error) {
 
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
-		return &cfg, fmt.Errorf("Both old and new server-config in use. Either use old format ([frontend]) or new format ([ldap], [ldaps])")
+		return &cfg, fmt.Errorf("Both old and new server-config in use. Please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps]).")
 	}
 
 	if len(cfg.Frontend.Listen) > 0 {
 		// We're going with old format - parse it into new
-		log.Warning("Using old server-config format - Please use [ldap] and [ldaps] sections instead of [frontend]")
+		log.Warning("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
 
 		cfg.LDAP.Enabled = !cfg.Frontend.TLS
 		cfg.LDAPS.Enabled = cfg.Frontend.TLS
