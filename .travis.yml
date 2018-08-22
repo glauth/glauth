@@ -22,6 +22,7 @@ before_script:
   #- travis_retry go get honnef.co/go/tools/cmd/megacheck                                # Badass static analyzer/linter
   # - travis_retry go get github.com/fzipp/gocyclo                                       # Not sure what this is
 
+
 # Run bindata for assets
   - make bindata
 
