@@ -7,12 +7,14 @@ if [ ! -f /app/config/config.cfg ] ; then
   cp /app/docker/default-config.cfg /app/config/config.cfg || exit 1
  fi
 
+
 echo "";
 echo "Version and build information:";
 echo "";
 
 # Output version string to logs
 /app/glauth --version
+
 
 echo "";
 echo "Starting GLauth now.";
