@@ -7,8 +7,8 @@ accountStatus: active
 objectClass: posixAccount
 loginShell: /bin/bash
 homeDirectory: /home/hackers
-description: hackers via LDAP
-gecos: hackers via LDAP
+description: hackers
+gecos: hackers
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
