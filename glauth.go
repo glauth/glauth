@@ -256,7 +256,8 @@ func startLDAPS(ldapsConfig *configLDAPS, server *ldap.Server) {
 func doConfig() (*config, error) {
 	cfg := config{}
 	// setup defaults
-	cfg.Frontend.TLS = true
+	cfg.LDAP.Enabled = false
+	cfg.LDAPS.Enabled = true
 	cfg.Backend.NameFormat = "cn"
 	cfg.Backend.GroupFormat = "ou"
 	cfg.Backend.SSHKeyAttr = "sshPublicKey"
