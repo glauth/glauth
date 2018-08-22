@@ -4,6 +4,15 @@ export CLEANUP="$1"
 
 ## Main Methods
 
+
+# Dep check
+
+command -v oathtool ;
+if [[ "$?" = "1" ]] ; then
+  echo "Please install oathtool or add it to \$PATH before continuing."
+  exit 1;
+fi
+
 # Get the git working directory base if travis build dir isn't set
 if [[ "$TRAVIS_BUILD_DIR" == "" ]] ; then
   export TRAVIS_BUILD_DIR="$(git rev-parse --show-toplevel)"
