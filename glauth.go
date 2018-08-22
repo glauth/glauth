@@ -305,7 +305,7 @@ func doConfig() (*config, error) {
 
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
-		return &cfg, fmt.Errorf("Both old and new server-config in use. Please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps]).")
+		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
 	}
 
 	if len(cfg.Frontend.Listen) > 0 {
