@@ -37,7 +37,7 @@ fast: setup linux64 verify cleanup
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 
 # Setup commands to always run
-setup: bindata format
+setup: getdeps bindata format
 
 #####################
 # Subcommands
@@ -46,6 +46,10 @@ setup: bindata format
 # Run integration test
 runtest:
 	./scripts/travis/integration-test.sh cleanup
+
+# Get all dependencies
+getdeps:
+	go get -d ./...
 
 updatetest:
 	./scripts/travis/integration-test.sh
