@@ -191,6 +191,10 @@ go get github.com/jteeuwen/go-bindata/...
 make all
 ```
 
+## Stargazers over time
+
+[![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
+
 ### Support
 
 Support the ongoing development of GLAuth!
