@@ -120,8 +120,22 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	}
 
 	// finally, validate user's pw
+
+	// Generate a hash of the provided password
 	hash := sha256.New()
 	hash.Write([]byte(bindSimplePw))
+
+	// check app passwords first
+	for index, appPwSHA256 := range user.PassAppSHA256 {
+
+		if appPwSHA256 != hex.EncodeToString(hash.Sum(nil)) {
+			log.Info(fmt.Sprintf("Attempted to bind app pw %s - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
+		}
+
+	}
+
+	// then check main password
+
 	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
 		log.Warning(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil

@@ -180,6 +180,31 @@ bindTest "cn=alexdoe,ou=superheros,dc=glauth,dc=com" \
   "OtpAlexDoe"
 
 
+## App Password Bind Test
+
+# Test the main pw
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "dogood1" \
+  "cn=jackdoe" \
+  "AppPwJackDoe0"
+
+# App passwords
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw1" \
+  "cn=jackdoe" \
+  "AppPwJackDoe1"
+
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw2" \
+  "cn=jackdoe" \
+  "AppPwJackDoe2"
+
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw3" \
+  "cn=jackdoe" \
+  "AppPwJackDoe3"
+
+
 #############
 ## Cleanup
 #############
