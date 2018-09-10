@@ -131,10 +131,14 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	hashFull.Write([]byte(bindSimplePwFull))
 
 	// check app passwords first
-	for index, appPwSHA256 := range user.PassAppSHA256 {
+	for index, appPw := range user.PassAppSHA256 {
 
-		if appPwSHA256 != hex.EncodeToString(hash.Sum(nil)) {
-			log.Info(fmt.Sprintf("Attempted to bind app pw %s - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
+		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
+			log.Info(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
+		} else {
+			stats_frontend.Add("bind_successes", 1)
+			log.Debug("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
+			return ldap.LDAPResultSuccess, nil
 		}
 
 	}
@@ -147,6 +151,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		log.Warning(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
+
 	stats_frontend.Add("bind_successes", 1)
 	log.Debug("Bind success as %s from %s", bindDN, conn.RemoteAddr().String())
 	return ldap.LDAPResultSuccess, nil

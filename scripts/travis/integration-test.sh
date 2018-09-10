@@ -34,6 +34,9 @@ echo ""
 
 # Start in background, capture PID
 "$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
+
+# Use this instead to see glauth logs while running
+# "$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &
 glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"
@@ -179,7 +182,6 @@ bindTest "cn=alexdoe,ou=superheros,dc=glauth,dc=com" \
   "cn=alexdoe" \
   "OtpAlexDoe"
 
-
 ## App Password Bind Test
 
 # Test the main pw
@@ -188,7 +190,7 @@ bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "cn=jackdoe" \
   "AppPwJackDoe0"
 
-# App passwords
+# App passwords on user
 bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw1" \
   "cn=jackdoe" \
@@ -203,7 +205,6 @@ bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw3" \
   "cn=jackdoe" \
   "AppPwJackDoe3"
-
 
 #############
 ## Cleanup
