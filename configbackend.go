@@ -142,7 +142,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {
-		log.Warning(fmt.Sprintf("Bind Error: invalid token as %s from %s", bindDN, conn.RemoteAddr().String()))
+		log.Warning(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
