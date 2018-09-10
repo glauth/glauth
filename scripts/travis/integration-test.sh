@@ -206,6 +206,36 @@ bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "cn=jackdoe" \
   "AppPwJackDoe3"
 
+
+####
+# Test for a user who also uses OTP
+####
+otpCode="$(oathtool --totp -b -d 6 '3hnvnk4ycv44glzigd6s25j4dougs3rk')"
+
+pass="dogood1"
+
+# Test the main pw
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "$pass$OtpCode" \
+  "cn=jackdoe" \
+  "AppPwOtpDoe0"
+
+# App passwords on user
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw1" \
+  "cn=jackdoe" \
+  "AppPwOtpDoe1"
+
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw2" \
+  "cn=jackdoe" \
+  "AppPwOtpDoe2"
+
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw3" \
+  "cn=jackdoe" \
+  "AppPwOtpDoe3"
+
 #############
 ## Cleanup
 #############
