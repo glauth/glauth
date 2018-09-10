@@ -72,9 +72,9 @@ function bindTest() {
   exitCode="$?"
 
   if [[ "$exitCode" = "0" ]] ; then
-    echo "  - PASS : 2FA test '$4'";
+    echo "  - PASS : Bind test '$4'";
   else
-    echo "  - FAIL : 2FA test '$4'";
+    echo "  - FAIL : Bind test '$4'";
     FAIL="1"
   fi
 
