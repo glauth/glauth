@@ -107,7 +107,9 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	// Store the full bind password provided before possibly modifying
 	// in the otp check
-	bindSimplePwFull := bindSimplePw
+	// Generate a hash of the provided password
+	hashFull := sha256.New()
+	hashFull.Write([]byte(bindSimplePw))
 
 	// Test OTP if exists
 	if len(user.OTPSecret) > 0 && !validotp {
@@ -119,22 +121,13 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 
-	if !validotp {
-		log.Warning(fmt.Sprintf("Bind Error: invalid token as %s from %s", bindDN, conn.RemoteAddr().String()))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
 	// finally, validate user's pw
-
-	// Generate a hash of the provided password
-	hashFull := sha256.New()
-	hashFull.Write([]byte(bindSimplePwFull))
 
 	// check app passwords first
 	for index, appPw := range user.PassAppSHA256 {
 
 		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-			log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
+			log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s %s", index, bindDN, conn.RemoteAddr().String()))
 		} else {
 			stats_frontend.Add("bind_successes", 1)
 			log.Debug("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
@@ -147,6 +140,13 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	hash := sha256.New()
 	hash.Write([]byte(bindSimplePw))
 
+	// Then ensure the OTP is valid before checking
+	if !validotp {
+		log.Warning(fmt.Sprintf("Bind Error: invalid token as %s from %s", bindDN, conn.RemoteAddr().String()))
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
+
+	// Now, check the hash
 	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
 		log.Warning(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil
