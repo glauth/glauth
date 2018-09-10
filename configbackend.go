@@ -105,6 +105,11 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 
+	// Store the full bind password provided before possibly modifying
+	// in the otp check
+	bindSimplePwFull := bindSimplePw
+
+	// Test OTP if exists
 	if len(user.OTPSecret) > 0 && !validotp {
 		if len(bindSimplePw) > 6 {
 			otp := bindSimplePw[len(bindSimplePw)-6:]
@@ -122,8 +127,8 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	// finally, validate user's pw
 
 	// Generate a hash of the provided password
-	hash := sha256.New()
-	hash.Write([]byte(bindSimplePw))
+	hashFull := sha256.New()
+	hashFull.Write([]byte(bindSimplePwFull))
 
 	// check app passwords first
 	for index, appPwSHA256 := range user.PassAppSHA256 {
@@ -134,7 +139,9 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	}
 
-	// then check main password
+	// then check main password with the hash
+	hash := sha256.New()
+	hash.Write([]byte(bindSimplePw))
 
 	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
 		log.Warning(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
