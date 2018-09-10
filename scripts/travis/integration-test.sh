@@ -188,23 +188,23 @@ bindTest "cn=alexdoe,ou=superheros,dc=glauth,dc=com" \
 bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "dogood1" \
   "cn=jackdoe" \
-  "AppPwJackDoe0"
+  "AppPwNoOtp0"
 
 # App passwords on user
 bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw1" \
   "cn=jackdoe" \
-  "AppPwJackDoe1"
+  "AppPwNoOtp1"
 
 bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw2" \
   "cn=jackdoe" \
-  "AppPwJackDoe2"
+  "AppPwNoOtp2"
 
 bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw3" \
   "cn=jackdoe" \
-  "AppPwJackDoe3"
+  "AppPwNoOtp3"
 
 
 ####
@@ -216,25 +216,25 @@ pass="dogood1"
 
 # Test the main pw
 bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
-  "$pass$OtpCode" \
-  "cn=jackdoe" \
-  "AppPwOtpDoe0"
+  "$pass$otpCode" \
+  "cn=sarahdoe" \
+  "AppPwOtp0"
 
 # App passwords on user
 bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw1" \
-  "cn=jackdoe" \
-  "AppPwOtpDoe1"
+  "cn=sarahdoe" \
+  "AppPwOtp1"
 
 bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw2" \
-  "cn=jackdoe" \
-  "AppPwOtpDoe2"
+  "cn=sarahdoe" \
+  "AppPwOtp2"
 
 bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
   "TestAppPw3" \
-  "cn=jackdoe" \
-  "AppPwOtpDoe3"
+  "cn=sarahdoe" \
+  "AppPwOtp3"
 
 #############
 ## Cleanup
