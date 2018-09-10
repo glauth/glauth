@@ -127,7 +127,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	for index, appPw := range user.PassAppSHA256 {
 
 		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-			log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s %s", index, bindDN, conn.RemoteAddr().String()))
+			log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
 		} else {
 			stats_frontend.Add("bind_successes", 1)
 			log.Debug("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
