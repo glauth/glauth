@@ -34,6 +34,9 @@ echo ""
 
 # Start in background, capture PID
 "$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &> /dev/null &
+
+# Use this instead to see glauth logs while running
+# "$TRAVIS_BUILD_DIR/bin/glauth64" -c "$TRAVIS_BUILD_DIR/scripts/travis/test-config.cfg" &
 glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"
@@ -69,9 +72,9 @@ function bindTest() {
   exitCode="$?"
 
   if [[ "$exitCode" = "0" ]] ; then
-    echo "  - PASS : 2FA test '$4'";
+    echo "  - PASS : Bind test '$4'";
   else
-    echo "  - FAIL : 2FA test '$4'";
+    echo "  - FAIL : Bind test '$4'";
     FAIL="1"
   fi
 
@@ -179,6 +182,59 @@ bindTest "cn=alexdoe,ou=superheros,dc=glauth,dc=com" \
   "cn=alexdoe" \
   "OtpAlexDoe"
 
+## App Password Bind Test
+
+# Test the main pw
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "dogood1" \
+  "cn=jackdoe" \
+  "AppPwNoOtp0"
+
+# App passwords on user
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw1" \
+  "cn=jackdoe" \
+  "AppPwNoOtp1"
+
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw2" \
+  "cn=jackdoe" \
+  "AppPwNoOtp2"
+
+bindTest "cn=jackdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw3" \
+  "cn=jackdoe" \
+  "AppPwNoOtp3"
+
+
+####
+# Test for a user who also uses OTP
+####
+otpCode="$(oathtool --totp -b -d 6 '3hnvnk4ycv44glzigd6s25j4dougs3rk')"
+
+pass="dogood1"
+
+# Test the main pw
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "$pass$otpCode" \
+  "cn=sarahdoe" \
+  "AppPwOtp0"
+
+# App passwords on user
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw1" \
+  "cn=sarahdoe" \
+  "AppPwOtp1"
+
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw2" \
+  "cn=sarahdoe" \
+  "AppPwOtp2"
+
+bindTest "cn=sarahdoe,ou=superheros,dc=glauth,dc=com" \
+  "TestAppPw3" \
+  "cn=sarahdoe" \
+  "AppPwOtp3"
 
 #############
 ## Cleanup
