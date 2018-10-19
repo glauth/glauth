@@ -99,7 +99,7 @@ More configuration options are documented here: https://github.com/nmcclain/glau
    * The user's username
  * ou
    * ID of the user's primary group
- * uidbumber
+ * uidnumber
    * The user's unix user id
  * sshPublicKey
    * Specify an array of public keys
