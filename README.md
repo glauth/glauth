@@ -92,7 +92,7 @@ In order to use S3, you must set your AWS credentials.  Either:
 1. set the -K and -S command-line flags  **OR**
 2. set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
 
-More configuration options are documented here: https://github.com/nmcclain/glauth/blob/master/sample-simple.cfg
+More configuration options are documented here: https://github.com/glauth/glauth/blob/master/sample-simple.cfg
 
 ### Required Fields
  * Name
