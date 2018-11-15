@@ -153,7 +153,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	}
 
 	stats_frontend.Add("bind_successes", 1)
-	log.Debug("Bind success as %s from %s", bindDN, conn.RemoteAddr().String())
+	log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -162,7 +162,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	log.Debug("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter)
+	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats_frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -249,7 +249,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		}
 	}
 	stats_frontend.Add("search_successes", 1)
-	log.Debug("AP: Search OK: %s", searchReq.Filter)
+	log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
 	return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
 }
 
