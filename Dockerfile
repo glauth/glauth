@@ -45,6 +45,9 @@ COPY --from=build /app/glauth /app/glauth
 COPY --from=build /app/scripts/docker/start.sh /app/docker/
 COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
 
+# Install ldapsearch for container health checks, then ensure ldapsearch is installed
+RUN apk update && apk add --no-cache openldap-clients && which ldapsearch && rm -rf /var/cache/apk/*
+
 # Install init
 RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.1/dumb-init_1.2.1_amd64 && chmod +x /usr/local/bin/dumb-init
 
