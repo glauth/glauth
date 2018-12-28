@@ -24,5 +24,5 @@ echo "";
 /app/glauth -c /app/config/config.cfg
 
 echo ""
-echo "GLauth has exited.""
+echo "GLauth has exited."
 echo "Exiting."
