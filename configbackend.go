@@ -26,6 +26,13 @@ func newConfigHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
 
 //
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+
+	// Allow anonymous binding
+	if bindDN == "" && bindSimplePw == "" {
+		log.Debug(fmt.Sprintf("Anonymous bind success from %s", conn.RemoteAddr().String()))
+		return ldap.LDAPResultSuccess, nil
+	}
+
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
@@ -162,9 +169,15 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
+	log.Debug(fmt.Sprintf("%+v\n", searchReq))
 	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats_frontend.Add("search_reqs", 1)
 
+	// Root DSE query
+	if searchReq.BaseDN == "" && searchReq.Scope == 0 {
+		var entries []*ldap.Entry
+		return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
+	}
 	// validate the user is authenticated and has appropriate access
 	if len(bindDN) < 1 {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
