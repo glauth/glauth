@@ -161,7 +161,6 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
-	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats_frontend.Add("search_reqs", 1)
 
@@ -171,9 +170,6 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	}
 	if !strings.HasSuffix(bindDN, baseDN) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
-	}
-	if !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
