@@ -91,6 +91,48 @@ memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
 
+dn: cn=jackdoe,ou=superheros,dc=glauth,dc=com
+cn: jackdoe
+uid: jackdoe
+givenName: Jack
+sn: Doe
+ou: superheros
+uidNumber: 5005
+accountStatus: active
+mail: jdoe3@example.com
+objectClass: posixAccount
+loginShell: /bin/sh
+homeDirectory: /home/jackdoe
+description: jackdoe via LDAP
+gecos: jackdoe via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
+memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+
+dn: cn=sarahdoe,ou=superheros,dc=glauth,dc=com
+cn: sarahdoe
+uid: sarahdoe
+givenName: Sarah
+sn: Doe
+ou: superheros
+uidNumber: 5006
+accountStatus: active
+mail: sdoe@example.com
+objectClass: posixAccount
+loginShell: /bin/sh
+homeDirectory: /home/sarahdoe
+description: sarahdoe via LDAP
+gecos: sarahdoe via LDAP
+gidNumber: 5501
+memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
+memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
+memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
+memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+
 dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
 uid: serviceuser
 cn: serviceuser

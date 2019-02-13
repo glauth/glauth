@@ -94,14 +94,14 @@ In order to use S3, you must set your AWS credentials.  Either:
 1. set the -K and -S command-line flags  **OR**
 2. set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
 
-More configuration options are documented here: https://github.com/nmcclain/glauth/blob/master/sample-simple.cfg
+More configuration options are documented here: https://github.com/glauth/glauth/blob/master/sample-simple.cfg
 
 ### Required Fields
  * Name
    * The user's username
  * ou
    * ID of the user's primary group
- * uidbumber
+ * uidnumber
    * The user's unix user id
  * sshPublicKey
    * Specify an array of public keys
@@ -139,6 +139,10 @@ More configuration options are documented here: https://github.com/nmcclain/glau
    * Specify OTP secret used to validate OTP passcode
    * Example: 3hnvnk4ycv44glzigd6s25j4dougs3rk
    * default = blank
+ * passappsha256
+   * Specify an array of app passwords which can also succesfully bind - these bypass the OTP check. Hash the same way as password.
+   * Example: ["c32255dbf6fd6b64883ec8801f793bccfa2a860f2b1ae1315cd95cdac1338efa","4939efa7c87095dacb5e7e8b8cfb3a660fa1f5edcc9108f6d7ec20ea4d6b3a88"]
+   * default = blank
  * yubikey
    * Specify Yubikey ID for maching Yubikey OTP against the user
    * Example: cccjgjgkhcbb
@@ -156,6 +160,11 @@ When using 2FA, append the 2FA code to the end of the password when authenticati
 
 #### TOTP Configuration
 To enable TOTP authentication on a user, you can use a tool [like this](https://freeotp.github.io/qrcode.html) to generate a QR code (pick 'Timeout' and optionally let it generate a random secret for you), which can be scanned and used with the [Google Authenticator](https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en) app. To enable TOTP authentication, configure the `otpsecret` for the user with the TOTP secret.
+
+#### App Passwords
+Additionally, you can specify an array of password hashes using the `passappsha256` for app passwords. These are not OTP validated, and are hashed in the same way as a password. This allows you to generate a long random string to be used in software which requires the ability to authenticate.
+
+However, app passwords can be used without OTP as well.
 
 #### Yubikey Configuration
 For Yubikey OTP token authentication, first [configure your Yubikey](https://www.yubico.com/products/services-software/personalization-tools/yubikey-otp/). After this, make sure to [request a `Client ID` and `Secret key` pair](https://upgrade.yubico.com/getapikey/).
@@ -192,6 +201,10 @@ You'll need go-bindata to build GLAuth. Then use the Makefile.
 go get github.com/jteeuwen/go-bindata/...
 make all
 ```
+
+## Stargazers over time
+
+[![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
 
 ### Support
 

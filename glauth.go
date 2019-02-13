@@ -89,20 +89,21 @@ type configAPI struct {
 	TLS         bool
 }
 type configUser struct {
-	Name         string
-	OtherGroups  []int
-	PassSHA256   string
-	PrimaryGroup int
-	SSHKeys      []string
-	OTPSecret    string
-	Yubikey      string
-	Disabled     bool
-	UnixID       int
-	Mail         string
-	LoginShell   string
-	GivenName    string
-	SN           string
-	Homedir      string
+	Name          string
+	OtherGroups   []int
+	PassSHA256    string
+	PassAppSHA256 []string
+	PrimaryGroup  int
+	SSHKeys       []string
+	OTPSecret     string
+	Yubikey       string
+	Disabled      bool
+	UnixID        int
+	Mail          string
+	LoginShell    string
+	GivenName     string
+	SN            string
+	Homedir       string
 }
 type configGroup struct {
 	Name          string
