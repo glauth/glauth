@@ -99,8 +99,8 @@ mail: jdoe3@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/jackdoe
-description: jackdoe via LDAP
-gecos: jackdoe via LDAP
+description: jackdoe
+gecos: jackdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
@@ -120,8 +120,8 @@ mail: sdoe@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/sarahdoe
-description: sarahdoe via LDAP
-gecos: sarahdoe via LDAP
+description: sarahdoe
+gecos: sarahdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
