@@ -188,8 +188,8 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	case "posixgroup":
 		for _, g := range h.cfg.Groups {
 			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{g.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
+			attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{g.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s", g.Name)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.UnixID)}})
 			attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup"}})
