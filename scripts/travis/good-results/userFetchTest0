@@ -1,5 +1,4 @@
 dn: cn=hackers,ou=superheros,dc=glauth,dc=com
-uid: hackers
 cn: hackers
 uid: hackers
 ou: superheros
