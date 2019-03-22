@@ -10,8 +10,8 @@ mail: jdoe2@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/jamesdoe
-description: jamesdoe via LDAP
-gecos: jamesdoe via LDAP
+description: jamesdoe
+gecos: jamesdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com

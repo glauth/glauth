@@ -7,8 +7,8 @@ accountStatus: active
 objectClass: posixAccount
 loginShell: /bin/bash
 homeDirectory: /home/serviceuser
-description: serviceuser via LDAP
-gecos: serviceuser via LDAP
+description: serviceuser
+gecos: serviceuser
 gidNumber: 5502
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com

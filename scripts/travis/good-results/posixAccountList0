@@ -7,8 +7,8 @@ accountStatus: active
 objectClass: posixAccount
 loginShell: /bin/bash
 homeDirectory: /home/hackers
-description: hackers via LDAP
-gecos: hackers via LDAP
+description: hackers
+gecos: hackers
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
@@ -26,8 +26,8 @@ mail: jdoe@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /root
-description: johndoe via LDAP
-gecos: johndoe via LDAP
+description: johndoe
+gecos: johndoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
@@ -51,8 +51,8 @@ mail: jdoe2@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/jamesdoe
-description: jamesdoe via LDAP
-gecos: jamesdoe via LDAP
+description: jamesdoe
+gecos: jamesdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
@@ -78,8 +78,8 @@ mail: adoe@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/alexdoe
-description: alexdoe via LDAP
-gecos: alexdoe via LDAP
+description: alexdoe
+gecos: alexdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
@@ -99,8 +99,8 @@ mail: jdoe3@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/jackdoe
-description: jackdoe via LDAP
-gecos: jackdoe via LDAP
+description: jackdoe
+gecos: jackdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
@@ -120,8 +120,8 @@ mail: sdoe@example.com
 objectClass: posixAccount
 loginShell: /bin/sh
 homeDirectory: /home/sarahdoe
-description: sarahdoe via LDAP
-gecos: sarahdoe via LDAP
+description: sarahdoe
+gecos: sarahdoe
 gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
@@ -138,8 +138,8 @@ accountStatus: active
 objectClass: posixAccount
 loginShell: /bin/bash
 homeDirectory: /home/serviceuser
-description: serviceuser via LDAP
-gecos: serviceuser via LDAP
+description: serviceuser
+gecos: serviceuser
 gidNumber: 5502
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com
