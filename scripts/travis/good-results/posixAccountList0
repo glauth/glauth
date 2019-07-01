@@ -5,6 +5,7 @@ ou: superheros
 uidNumber: 5001
 accountStatus: active
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/bash
 homeDirectory: /home/hackers
 description: hackers
@@ -13,6 +14,13 @@ gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
 dn: cn=johndoe,ou=superheros,dc=glauth,dc=com
 cn: johndoe
@@ -24,6 +32,7 @@ uidNumber: 5002
 accountStatus: active
 mail: jdoe@example.com
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/sh
 homeDirectory: /root
 description: johndoe
@@ -32,6 +41,13 @@ gidNumber: 5501
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
  w3AJwV34t2jzR+/tUNVeJ9XddKpYQektNHsFmY93lJw5QDSbeH/mAC4KPoUM47EriINKEelRbyG4h
  C/ko/e2JWqEclPS9LP7GtqGmscXXo4JFkqnKw4TIRD52XI9n1syYM9Y8rJ88fjC/Lpn+01AB0paLV
@@ -49,6 +65,7 @@ uidNumber: 5003
 accountStatus: active
 mail: jdoe2@example.com
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/sh
 homeDirectory: /home/jamesdoe
 description: jamesdoe
@@ -59,6 +76,13 @@ memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
 memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 sshPublicKey: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEA3UKCEllO2IZXgqNygiVb+dDLJJwV
  w3AJwV34t2jzR+/tUNVeJ9XddKpYQektNHsFmY93lJw5QDSbeH/mAC4KPoUM47EriINKEelRbyG4h
  C/ko/e2JWqEclPS9LP7GtqGmscXXo4JFkqnKw4TIRD52XI9n1syYM9Y8rJ88fjC/Lpn+01AB0paLV
@@ -76,6 +100,7 @@ uidNumber: 5004
 accountStatus: active
 mail: adoe@example.com
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/sh
 homeDirectory: /home/alexdoe
 description: alexdoe
@@ -86,6 +111,13 @@ memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
 memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
 dn: cn=jackdoe,ou=superheros,dc=glauth,dc=com
 cn: jackdoe
@@ -97,6 +129,7 @@ uidNumber: 5005
 accountStatus: active
 mail: jdoe3@example.com
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/sh
 homeDirectory: /home/jackdoe
 description: jackdoe
@@ -107,6 +140,13 @@ memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
 memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
 dn: cn=sarahdoe,ou=superheros,dc=glauth,dc=com
 cn: sarahdoe
@@ -118,6 +158,7 @@ uidNumber: 5006
 accountStatus: active
 mail: sdoe@example.com
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/sh
 homeDirectory: /home/sarahdoe
 description: sarahdoe
@@ -128,6 +169,13 @@ memberOf: cn=fulltime,ou=groups,dc=glauth,dc=com
 memberOf: cn=mailadmin,ou=groups,dc=glauth,dc=com
 memberOf: cn=superheros,ou=groups,dc=glauth,dc=com
 memberOf: cn=vpnaccess,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
 dn: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
 cn: serviceuser
@@ -136,6 +184,7 @@ ou: svcaccts
 uidNumber: 5003
 accountStatus: active
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/bash
 homeDirectory: /home/serviceuser
 description: serviceuser
@@ -143,4 +192,11 @@ gecos: serviceuser
 gidNumber: 5502
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
