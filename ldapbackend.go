@@ -5,14 +5,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/kr/pretty"
-	"github.com/nmcclain/ldap"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kr/pretty"
+	"github.com/nmcclain/ldap"
 )
 
 type ldapHandler struct {
