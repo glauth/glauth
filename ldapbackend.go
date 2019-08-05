@@ -17,12 +17,15 @@ import (
 )
 
 type ldapHandler struct {
-	sessions map[string]ldapSession
-	servers  []ldapBackend
-	lock     sync.Mutex // for sessions and servers
 	doPing   chan bool
 	cfg      *config
+	lock     *sync.Mutex // for sessions and servers
+	sessions map[string]ldapSession
+	servers  []ldapBackend
 }
+
+// global lock for ldapHandler sessions & servers manipulation
+var ldaplock sync.Mutex
 
 type ldapSession struct {
 	id   string
@@ -49,6 +52,7 @@ func newLdapHandler(cfg *config) Backend {
 		sessions: make(map[string]ldapSession),
 		doPing:   make(chan bool),
 		cfg:      cfg,
+		lock:     &ldaplock,
 	}
 	// parse LDAP URLs
 	for _, ldapurl := range cfg.Backend.Servers {
