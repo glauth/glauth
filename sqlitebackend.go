@@ -42,13 +42,13 @@ import (
 type sqliteHandler struct {
 	cfg         *config
 	yubikeyAuth *yubigo.YubiAuth
-	database     database
-	MemGroups    []configGroup
+	database    database
+	MemGroups   []configGroup
 }
 
 type database struct {
-	path   string
-	cnx   *sql.DB
+	path string
+	cnx  *sql.DB
 }
 
 func newSqliteHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS users (
 	handler := sqliteHandler{
 		cfg:         cfg,
 		yubikeyAuth: yubikeyAuth,
-	    database: dbInfo}
+		database:    dbInfo}
 	return handler
 }
 
@@ -127,7 +127,7 @@ func (h sqliteHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	err = h.database.cnx.QueryRow(`
 			SELECT u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey 
 			FROM users u WHERE name=?`, userName).Scan(
-			&user.UnixID,&user.PrimaryGroup,&user.PassSHA256,&user.OTPSecret,&user.Yubikey)
+		&user.UnixID, &user.PrimaryGroup, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err != nil {
 		log.Warning(fmt.Sprintf("Bind Error: User %s not found.", userName))
 		return ldap.LDAPResultInvalidCredentials, nil
@@ -135,7 +135,7 @@ func (h sqliteHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	group := configGroup{}
 	err = h.database.cnx.QueryRow("SELECT g.unixid FROM groups g WHERE name=?", groupName).Scan(
-			&group.UnixID)
+		&group.UnixID)
 	if err != nil {
 		log.Warning(fmt.Sprintf("Bind Error: Group %s not found.", userName))
 		return ldap.LDAPResultInvalidCredentials, nil
@@ -280,12 +280,12 @@ func (h sqliteHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		var disabled int
 		u := configUser{}
 		for rows.Next() {
-			err := rows.Scan(&u.Name, &u.UnixID,&u.PrimaryGroup,&u.PassSHA256,&u.OTPSecret,&u.Yubikey,&otherGroups,&u.GivenName,&u.SN,&u.Mail,&u.LoginShell,&u.Homedir,&disabled)
+			err := rows.Scan(&u.Name, &u.UnixID, &u.PrimaryGroup, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled)
 			if err != nil {
 				return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to retrieve data [%s]", err.Error())
 			}
 			u.OtherGroups = h.commaListToTable(otherGroups)
-			u.Disabled    = h.intToBool(disabled)
+			u.Disabled = h.intToBool(disabled)
 
 			attrs := []*ldap.EntryAttribute{}
 			attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{u.Name}})
@@ -383,10 +383,10 @@ func (h sqliteHandler) memoizeGroups() ([]configGroup, error) {
 	defer rows.Close()
 
 	var groupName string
-	var groupId   int
+	var groupId int
 	var includeId sql.NullInt64 // Store includeid from left join
-	var pg       *configGroup
-	recentId := -1    // id of recently updated group
+	var pg *configGroup
+	recentId := -1 // id of recently updated group
 	for rows.Next() {
 		err := rows.Scan(&groupName, &groupId, &includeId)
 		if err != nil {
@@ -394,7 +394,7 @@ func (h sqliteHandler) memoizeGroups() ([]configGroup, error) {
 		}
 		if recentId != groupId {
 			recentId = groupId
-			g := configGroup{Name:groupName, UnixID:groupId}
+			g := configGroup{Name: groupName, UnixID: groupId}
 			pg = &g // To manipulate end of slice
 			workMemGroups = append(workMemGroups, &g)
 		}
@@ -403,8 +403,8 @@ func (h sqliteHandler) memoizeGroups() ([]configGroup, error) {
 		}
 	}
 	memGroups := make([]configGroup, len(workMemGroups))
-	for i,v := range workMemGroups {
-		memGroups[i] = configGroup{Name:v.Name, UnixID:v.UnixID,IncludeGroups:v.IncludeGroups}
+	for i, v := range workMemGroups {
+		memGroups[i] = configGroup{Name: v.Name, UnixID: v.UnixID, IncludeGroups: v.IncludeGroups}
 	}
 	return memGroups, nil
 }
@@ -482,7 +482,7 @@ func (h sqliteHandler) getGroupMemberIDs(gid int) []string {
 	var otherGroups string
 	u := configUser{}
 	for rows.Next() {
-		err := rows.Scan(&u.Name, &u.UnixID,&u.PrimaryGroup,&u.PassSHA256,&u.OTPSecret,&u.Yubikey, &otherGroups)
+		err := rows.Scan(&u.Name, &u.UnixID, &u.PrimaryGroup, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups)
 		if err != nil {
 			return []string{}
 		}
