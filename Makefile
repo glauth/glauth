@@ -1,5 +1,6 @@
 VERSION=$(shell bin/glauth64 --version)
 
+
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
 BUILD_TIME=$(shell date --utc +%Y%m%d_%H%M%SZ)
 GIT_CLEAN=$(shell git status | grep -E "working (tree|directory) clean" | wc -l)
@@ -15,7 +16,7 @@ GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 # Build variables
 BUILD_VARS=-X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH} -X main.BuildTime=${BUILD_TIME} -X main.GitClean=${GIT_CLEAN} -X main.LastGitTag=${LAST_GIT_TAG} -X main.GitTagIsCommit=${GIT_IS_TAG_COMMIT}
-BUILD_FILES=glauth.go bindata.go ldapbackend.go webapi.go configbackend.go
+BUILD_FILES=glauth.go bindata.go ldapbackend.go webapi.go configbackend.go sqlitebackend.go
 
 #####################
 # High level commands
@@ -68,27 +69,52 @@ devrun:
 	go run ${BUILD_FILES} -c glauth.cfg
 
 
-linux32:
-	GOOS=linux GOARCH=386 go build -ldflags "${BUILD_VARS}" -o bin/glauth32 ${BUILD_FILES} && cd bin && sha256sum glauth32 > glauth32.sha256
+# Here is the first hint that cross-compilers are a package management headache for the Ubuntu maintainers.
+# When gcc-multilib is kicked out by its frennemy gcc-multilib-arm, it's really a dance of symlinks
+# so this the only dependency we can rely on for now:
+/usr/share/doc/gcc-multilib:
+	sudo apt-get install gcc-multilib
+
+linux32: /usr/share/doc/gcc-multilib
+	GOOS=linux CGO_ENABLED=1 GOARCH=386 go build -ldflags "${BUILD_VARS}" -o bin/glauth32 ${BUILD_FILES} && cd bin && sha256sum glauth32 > glauth32.sha256
 
 linux64:
 	GOOS=linux GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauth64 ${BUILD_FILES} && cd bin && sha256sum glauth64 > glauth64.sha256
 
-linuxarm32:
-	GOOS=linux GOARCH=arm go build -ldflags "${BUILD_VARS}" -o bin/glauth-arm32 ${BUILD_FILES} && cd bin && sha256sum glauth-arm32 > glauth-arm32.sha256
+# Note that gcc-multilib and gcc-multilib-arm cannot coexist. Worse, when one is removed, the other will not create the necessary
+# links to the asm directory, out of fear of creating a circular dependency.
+/usr/bin/arm-linux-gnueabihf-gcc:
+	sudo apt-get install gcc-multilib-arm-linux-gnueabihf && sudo ln -sfn /usr/include/asm-generic /usr/include/asm
+
+linuxarm32: /usr/bin/arm-linux-gnueabihf-gcc
+	GOOS=linux CGO_ENABLED=1 CC=arm-linux-gnueabihf-gcc GOARCH=arm go build -ldflags "${BUILD_VARS}" -o bin/glauth-arm32 ${BUILD_FILES} && cd bin && sha256sum glauth-arm32 > glauth-arm32.sha256
 
 linuxarm64:
-	GOOS=linux GOARCH=arm64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-arm64 ${BUILD_FILES} && cd bin && sha256sum glauth-arm64 > glauth-arm64.sha256
+	GGOOS=linux CGO_ENABLED=1 CC_FOR_TARGET=arm-linux-gnueabihf-gcc GGOARCH=arm64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-arm64 ${BUILD_FILES} && cd bin && sha256sum glauth-arm64 > glauth-arm64.sha256
 
-darwin64:
-	GOOS=darwin GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauthOSX ${BUILD_FILES} && cd bin && sha256sum glauthOSX > glauthOSX.sha256
+# Darwin cross-compiler
+osxcross:
+	git clone https://github.com/tpoechtrager/osxcross && \
+	cd osxcross && \
+	wget -nc https://s3.dockerproject.org/darwin/v2/MacOSX10.10.sdk.tar.xz && \
+	mv MacOSX10.10.sdk.tar.xz tarballs/ && \
+	UNATTENDED=yes OSX_VERSION_MIN=10.10 ./build.sh
 
-win32:
-	GOOS=windows GOARCH=386 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win32 ${BUILD_FILES} && cd bin && sha256sum glauth-win32 > glauth-win32.sha256
+darwin64: osxcross
+	PATH=$$PWD/osxcross/target/bin:$$PATH GOOS=darwin CGO_ENABLED=1 CC=o64-clang GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauthOSX ${BUILD_FILES} && cd bin && sha256sum glauthOSX > glauthOSX.sha256
 
-win64:
-	GOOS=windows GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win64 ${BUILD_FILES} && cd bin && sha256sum glauth-win64 > glauth-win64.sha256
+# Windows cross-compiler
+/usr/bin/x86_64-w64-mingw32-gcc:
+	sudo apt-get install gcc-mingw-w64
+
+win32: /usr/bin/x86_64-w64-mingw32-gcc
+	GOOS=windows CGO_ENABLED=1 CC=i686-w64-mingw32-gcc GOARCH=386 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win32 ${BUILD_FILES} && cd bin && sha256sum glauth-win32 > glauth-win32.sha256
+
+win64: /usr/bin/x86_64-w64-mingw32-gcc
+	GOOS=windows CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc GOARCH=amd64 go build -ldflags "${BUILD_VARS}" -o bin/glauth-win64 ${BUILD_FILES} && cd bin && sha256sum glauth-win64 > glauth-win64.sha256
 
 
 verify:
 	cd bin && sha256sum *.sha256 -c && cd ../;
+
+.PHONY: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64 verify

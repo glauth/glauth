@@ -1,0 +1,97 @@
+#################
+# glauth.conf
+
+#################
+# General configuration.
+debug = true
+#syslog = true
+
+#################
+# yubikeyclientid = "yubi-api-clientid"
+# yubikeysecret = "yubi-api-secret"
+
+#################
+# Server configuration.
+#
+# This is the old server-config format
+# - will still work, but please use new format, shown below
+#
+# [frontend]
+#   listen = "localhost:8484"
+#   tls = false
+#   cert ="certs/server.crt"
+#   key = "certs/server.key"
+
+# This ([ldap] and [ldaps]) is the new server-config format
+[ldap]
+  enabled = true
+  listen = "0.0.0.0:389"
+
+[ldaps]
+  enabled = true
+  listen = "0.0.0.0:636"
+  cert = "certs/server.crt"
+  key = "certs/server.key"
+
+#################
+# The backend section controls the data store.
+[backend]
+  datastore = "sqlite"
+  baseDN = "dc=militate,dc=com"
+  database = "gl.db"
+
+#################
+# The users section contains a hardcoded list of valid users.
+#   to create a passSHA256:   echo -n "mysecret" | openssl dgst -sha256
+[[users]]
+  name = "hackers"
+  unixid = 5001
+  primarygroup = 5501
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user1"
+  unixid = 5001
+  primarygroup = 5501
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user2"
+  unixid = 5002
+  primarygroup = 5502
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user3"
+  unixid = 5003
+  primarygroup = 5504
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+  #################
+  # The groups section contains a hardcoded list of valid users.
+  [[groups]]
+    name = "superheros"
+    unixid = 5501
+
+  [[groups]]
+    name = "crusaders"
+    unixid = 5502
+
+  [[groups]]
+    name = "civilians"
+    unixid = 5503
+    includegroups = [ 5501 ]
+
+  [[groups]]
+    name = "caped"
+    unixid = 5504
+    includegroups = [ 5502, 5501 ]
+
+  #################
+  # Enable and configure the optional REST API here.
+  [api]
+    enabled = true
+    tls = false # enable TLS for production!!
+    listen = "localhost:5555"
+    cert = "cert.pem"
+    key = "key.pem"

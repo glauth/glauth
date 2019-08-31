@@ -185,6 +185,105 @@ For advanced users, GLAuth supports pluggable backends.  Currently, it can use a
   servers = [ "ldaps://server1:636", "ldaps://server2:636" ]
 ```
 
+### SQLite
+
+Tables:
+- users, groups are self-explanatory
+- includegroups store the 'includegroups' relationships
+- othergroups, on the other hand, are a comma-separated list found in the users table (performance)
+
+Here is how to insert example data using the command line:
+```sql
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('hackers', 5001, 5501, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
+INSERT INTO groups(name, unixid) VALUES('superheros', 5501);
+INSERT INTO groups(name, unixid) VALUES('crusaders', 5502);
+INSERT INTO groups(name, unixid) VALUES('civilians', 5503);
+INSERT INTO groups(name, unixid) VALUES('caped', 5504);
+INSERT INTO groups(name, unixid) VALUES('lovesailing', 5505);
+INSERT INTO groups(name, unixid) VALUES('smoker', 5506);
+INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5503, 5501);
+INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5502);
+INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5501);
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user1', 5001, 5501, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user2', 5002, 5502, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user3', 5003, 5504, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
+INSERT INTO users(name, unixid, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a", "5505,5506");
+```
+This should be equivalent to this configuration:
+```text
+[[users]]
+  name = "hackers"
+  unixid = 5001
+  primarygroup = 5501
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user1"
+  unixid = 5001
+  primarygroup = 5501
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user2"
+  unixid = 5002
+  primarygroup = 5502
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user3"
+  unixid = 5003
+  primarygroup = 5504
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[users]]
+  name = "user4"
+  unixid = 5003
+  primarygroup = 5504
+  othergroups = [5505, 5506]
+  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+
+[[groups]]
+  name = "superheros"
+  unixid = 5501
+
+[[groups]]
+  name = "crusaders"
+  unixid = 5502
+
+[[groups]]
+  name = "civilians"
+  unixid = 5503
+  includegroups = [ 5501 ]
+
+[[groups]]
+  name = "caped"
+  unixid = 5504
+  includegroups = [ 5502, 5501 ]
+```
+and LDAP should return these `memberOf` values:
+```text
+uid: user1
+ou: superheros
+memberOf: cn=caped,ou=groups,dc=militate,dc=com
+memberOf: cn=civilians,ou=groups,dc=militate,dc=com
+memberOf: cn=superheros,ou=groups,dc=militate,dc=com
+
+uid: user2
+ou: crusaders
+memberOf: cn=caped,ou=groups,dc=militate,dc=com
+memberOf: cn=crusaders,ou=groups,dc=militate,dc=com
+
+uid: user3
+ou: caped
+memberOf: cn=caped,ou=groups,dc=militate,dc=com
+
+uid: user4
+ou: caped
+memberOf: cn=caped,ou=groups,dc=militate,dc=com
+memberOf: cn=lovesailing,ou=groups,dc=militate,dc=com
+memberOf: cn=smoker,ou=groups,dc=militate,dc=com
+
+```
 ### Production:
 Any of the architectures above will work for production.  Just remember:
 

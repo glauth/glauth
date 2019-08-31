@@ -18,6 +18,7 @@ git:
 before_script:
   - travis_retry sudo apt-get -qq update && sudo apt-get install -y ldap-utils oathtool  # need this for integration tests
   - travis_retry sudo apt-get -qq update && sudo apt-get install -y go-bindata           # need this for makefile
+  - travis_retry sudo apt-get -qq update && sudo apt-get install -y libc6-dev-i386 linux-libc-dev:i386 libc6-dev-armhf-cross
   - GO_FILES=$(find . -iname '*.go' -type f | grep -v /vendor/)             # All the .go files, excluding vendor/
   #- travis_retry go get github.com/golang/lint/golint                                   # Linter
   #- travis_retry go get honnef.co/go/tools/cmd/megacheck                                # Badass static analyzer/linter

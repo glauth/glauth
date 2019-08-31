@@ -59,6 +59,7 @@ type configBackend struct {
 	Datastore string
 	Insecure  bool     // For LDAP backend only
 	Servers   []string // For LDAP backend only
+	Database  string   // For Sqlite backend only
 }
 type configFrontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
@@ -209,8 +210,10 @@ func main() {
 		handler = newLdapHandler(cfg)
 	case "config":
 		handler = newConfigHandler(cfg, yubiAuth)
+	case "sqlite":
+		handler = newSqliteHandler(cfg, yubiAuth)
 	default:
-		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap'.", cfg.Backend.Datastore)
+		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'.", cfg.Backend.Datastore)
 	}
 	log.Notice(fmt.Sprintf("Using %s backend", cfg.Backend.Datastore))
 	s.BindFunc("", handler)
@@ -357,8 +360,9 @@ func doConfig() (*config, error) {
 		cfg.Backend.Datastore = "config"
 	case "config":
 	case "ldap":
+	case "sqlite":
 	default:
-		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap'.", cfg.Backend.Datastore)
+		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap' or 'sqlite'.", cfg.Backend.Datastore)
 	}
 	return &cfg, nil
 }
