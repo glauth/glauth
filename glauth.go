@@ -204,14 +204,15 @@ func main() {
 	// configure the backend
 	s := ldap.NewServer()
 	s.EnforceLDAP = true
+	toolbox := newLocalToolbox(cfg)
 	var handler Backend
 	switch cfg.Backend.Datastore {
 	case "ldap":
 		handler = newLdapHandler(cfg)
 	case "config":
-		handler = newConfigHandler(cfg, yubiAuth)
+		handler = newConfigHandler(toolbox, cfg, yubiAuth)
 	case "sqlite":
-		handler = newSqliteHandler(cfg, yubiAuth)
+		handler = newSqliteHandler(toolbox, cfg, yubiAuth)
 	default:
 		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'.", cfg.Backend.Datastore)
 	}

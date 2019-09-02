@@ -13,12 +13,14 @@ import (
 )
 
 type configHandler struct {
+	toolbox     *localToolbox
 	cfg         *config
 	yubikeyAuth *yubigo.YubiAuth
 }
 
-func newConfigHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
+func newConfigHandler(toolbox *localToolbox, cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
 	handler := configHandler{
+		toolbox:     toolbox,
 		cfg:         cfg,
 		yubikeyAuth: yubikeyAuth}
 	return handler
@@ -186,66 +188,11 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
 	case "posixgroup":
 		for _, g := range h.cfg.Groups {
-			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.UnixID)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup"}})
-			attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMembers(g.UnixID)})
-			attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.UnixID)})
-			dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.cfg.Backend.BaseDN)
-			entries = append(entries, &ldap.Entry{dn, attrs})
+			entries = append(entries, h.toolbox.getGroup(h, g))
 		}
 	case "posixaccount", "":
 		for _, u := range h.cfg.Users {
-			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{u.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{u.Name}})
-
-			if len(u.GivenName) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"givenName", []string{u.GivenName}})
-			}
-
-			if len(u.SN) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"sn", []string{u.SN}})
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{"ou", []string{h.getGroupName(u.PrimaryGroup)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"uidNumber", []string{fmt.Sprintf("%d", u.UnixID)}})
-
-			if u.Disabled {
-				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"inactive"}})
-			} else {
-				attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
-			}
-
-			if len(u.Mail) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"mail", []string{u.Mail}})
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixAccount"}})
-
-			if len(u.LoginShell) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{u.LoginShell}})
-			} else {
-				attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{"/bin/bash"}})
-			}
-
-			if len(u.Homedir) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{u.Homedir}})
-			} else {
-				attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{"/home/" + u.Name}})
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"gecos", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-			attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
-			if len(u.SSHKeys) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{"sshPublicKey", u.SSHKeys})
-			}
-			dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
-			entries = append(entries, &ldap.Entry{dn, attrs})
+			entries = append(entries, h.toolbox.getAccount(h, u))
 		}
 	}
 	stats_frontend.Add("search_successes", 1)
