@@ -36,9 +36,11 @@ debug = true
 #################
 # The backend section controls the data store.
 [backend]
-  datastore = "sqlite"
+  datastore = "mysql"
   baseDN = "dc=militate,dc=com"
-  database = "gl.db"
+  #database = "gl.db"
+  database = "glauth:glauth@tcp(192.168.1.22:3306)/glauth"
+  dbengine = "sqlite3"
 
 #################
 # The users section contains a hardcoded list of valid users.

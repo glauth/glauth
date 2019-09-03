@@ -59,7 +59,7 @@ type configBackend struct {
 	Datastore string
 	Insecure  bool     // For LDAP backend only
 	Servers   []string // For LDAP backend only
-	Database  string   // For Sqlite backend only
+	Database  string   // For Sql backend only
 }
 type configFrontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
@@ -204,17 +204,18 @@ func main() {
 	// configure the backend
 	s := ldap.NewServer()
 	s.EnforceLDAP = true
-	toolbox := newLocalToolbox(cfg)
 	var handler Backend
 	switch cfg.Backend.Datastore {
 	case "ldap":
 		handler = newLdapHandler(cfg)
 	case "config":
-		handler = newConfigHandler(toolbox, cfg, yubiAuth)
+		handler = newConfigHandler(newLocalToolbox(cfg), cfg, yubiAuth)
 	case "sqlite":
-		handler = newSqliteHandler(toolbox, cfg, yubiAuth)
+		handler = newSqlHandler(newSqliteBackend(), newLocalToolbox(cfg), cfg, yubiAuth)
+	case "mysql":
+		handler = newSqlHandler(newMysqlBackend(), newLocalToolbox(cfg), cfg, yubiAuth)
 	default:
-		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'.", cfg.Backend.Datastore)
+		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'.", cfg.Backend.Datastore)
 	}
 	log.Notice(fmt.Sprintf("Using %s backend", cfg.Backend.Datastore))
 	s.BindFunc("", handler)
@@ -362,8 +363,9 @@ func doConfig() (*config, error) {
 	case "config":
 	case "ldap":
 	case "sqlite":
+	case "mysql":
 	default:
-		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap' or 'sqlite'.", cfg.Backend.Datastore)
+		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'.", cfg.Backend.Datastore)
 	}
 	return &cfg, nil
 }
