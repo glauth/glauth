@@ -214,8 +214,10 @@ func main() {
 		handler = newSqlHandler(newSqliteBackend(), newLocalToolbox(cfg), cfg, yubiAuth)
 	case "mysql":
 		handler = newSqlHandler(newMysqlBackend(), newLocalToolbox(cfg), cfg, yubiAuth)
+	case "postgres":
+		handler = newSqlHandler(newPostgresqlBackend(), newLocalToolbox(cfg), cfg, yubiAuth)
 	default:
-		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'.", cfg.Backend.Datastore)
+		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'/'postgres'.", cfg.Backend.Datastore)
 	}
 	log.Notice(fmt.Sprintf("Using %s backend", cfg.Backend.Datastore))
 	s.BindFunc("", handler)
@@ -364,8 +366,9 @@ func doConfig() (*config, error) {
 	case "ldap":
 	case "sqlite":
 	case "mysql":
+	case "postgres":
 	default:
-		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'.", cfg.Backend.Datastore)
+		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap' or 'sqlite'/'mysql'/'postgres'.", cfg.Backend.Datastore)
 	}
 	return &cfg, nil
 }

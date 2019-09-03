@@ -185,7 +185,7 @@ For advanced users, GLAuth supports pluggable backends.  Currently, it can use a
   servers = [ "ldaps://server1:636", "ldaps://server2:636" ]
 ```
 
-### SQLite
+### SQLite, MySQL, Postgres
 
 Tables:
 - users, groups are self-explanatory
@@ -194,7 +194,7 @@ Tables:
 
 Here is how to insert example data using the command line:
 ```sql
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('hackers', 5001, 5501, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('hackers', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
 INSERT INTO groups(name, unixid) VALUES('superheros', 5501);
 INSERT INTO groups(name, unixid) VALUES('crusaders', 5502);
 INSERT INTO groups(name, unixid) VALUES('civilians', 5503);
@@ -204,10 +204,10 @@ INSERT INTO groups(name, unixid) VALUES('smoker', 5506);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5503, 5501);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5502);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5501);
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user1', 5001, 5501, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user2', 5002, 5502, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user3', 5003, 5504, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a");
-INSERT INTO users(name, unixid, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a", "5505,5506");
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user1', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user2', 5002, 5502, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user3', 5003, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, unixid, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a', '5505,5506');
 ```
 This should be equivalent to this configuration:
 ```text
@@ -282,8 +282,8 @@ ou: caped
 memberOf: cn=caped,ou=groups,dc=militate,dc=com
 memberOf: cn=lovesailing,ou=groups,dc=militate,dc=com
 memberOf: cn=smoker,ou=groups,dc=militate,dc=com
-
 ```
+
 ### Production:
 Any of the architectures above will work for production.  Just remember:
 

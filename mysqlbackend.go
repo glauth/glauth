@@ -1,6 +1,9 @@
 package main
 
-import 	"database/sql"
+import 	(
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+)
 
 type MysqlBackend struct {
 }
@@ -12,6 +15,10 @@ func newMysqlBackend() *MysqlBackend {
 
 func (b MysqlBackend) getDriverName() string {
 	return "mysql"
+}
+
+func (b MysqlBackend) getPrepareSymbol() string {
+	return "?"
 }
 
 func (b MysqlBackend) createSchema(db *sql.DB) {

@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/GeertJohan/yubigo"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/nmcclain/ldap"
 	"github.com/pquerna/otp/totp"
 	"net"
@@ -40,6 +38,7 @@ import (
  * ssh keys (glaring omission due to my unease with storing ssh keys in a database)
  */
 type sqlHandler struct {
+	sqlBackend  SqlBackend
 	toolbox     *localToolbox
 	cfg         *config
 	yubikeyAuth *yubigo.YubiAuth
@@ -57,6 +56,8 @@ type SqlBackend interface {
 	getDriverName() string
 	// Create db/schema if necessary
 	createSchema(db *sql.DB)
+	//
+	getPrepareSymbol() string
 }
 
 func newSqlHandler(sqlBackend SqlBackend, toolbox *localToolbox, cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
@@ -73,6 +74,7 @@ func newSqlHandler(sqlBackend SqlBackend, toolbox *localToolbox, cfg *config, yu
 		cnx:  db,
 	}
 	handler := sqlHandler{
+		sqlBackend:  sqlBackend,
 		toolbox:     toolbox,
 		cfg:         cfg,
 		yubikeyAuth: yubikeyAuth,
@@ -108,9 +110,9 @@ func (h sqlHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode
 	}
 
 	user := configUser{}
-	err = h.database.cnx.QueryRow(`
+	err = h.database.cnx.QueryRow(fmt.Sprintf(`
 			SELECT u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE name=?`, userName).Scan(
+			FROM users u WHERE u.name=%s`, h.sqlBackend.getPrepareSymbol()), userName).Scan(
 		&user.UnixID, &user.PrimaryGroup, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err != nil {
 		log.Warning(fmt.Sprintf("Bind Error: User %s not found.", userName))
@@ -118,7 +120,8 @@ func (h sqlHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode
 	}
 
 	group := configGroup{}
-	err = h.database.cnx.QueryRow("SELECT g.unixid FROM groups g WHERE name=?", groupName).Scan(
+	err = h.database.cnx.QueryRow(fmt.Sprintf(`
+			SELECT g.unixid FROM groups g WHERE name=%s`, h.sqlBackend.getPrepareSymbol()), groupName).Scan(
 		&group.UnixID)
 	if err != nil {
 		log.Warning(fmt.Sprintf("Bind Error: Group %s not found.", userName))
