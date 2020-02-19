@@ -1,15 +1,16 @@
 package main
 
 import (
-	"expvar"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/GeertJohan/yubigo"
 	"github.com/docopt/docopt-go"
-	"github.com/nmcclain/ldap"
+	"github.com/glauth/glauth/pkg/config"
+	"github.com/glauth/glauth/pkg/frontend"
+	"github.com/glauth/glauth/pkg/server"
+	"github.com/glauth/glauth/pkg/stats"
 	"github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
@@ -40,90 +41,6 @@ Options:
   -h, --help                Show this screen.
   --version                 Show version.
 `
-
-// exposed expvar variables
-var stats_frontend = expvar.NewMap("proxy_frontend")
-var stats_backend = expvar.NewMap("proxy_backend")
-var stats_general = expvar.NewMap("proxy")
-
-// interface for backend handler
-type Backend interface {
-	ldap.Binder
-	ldap.Searcher
-	ldap.Closer
-}
-
-// config file
-type configBackend struct {
-	BaseDN    string
-	Datastore string
-	Insecure  bool     // For LDAP backend only
-	Servers   []string // For LDAP backend only
-}
-type configFrontend struct {
-	AllowedBaseDNs []string // For LDAP backend only
-	Listen         string
-	Cert           string
-	Key            string
-	TLS            bool
-}
-type configLDAP struct {
-	Enabled bool
-	Listen  string
-}
-type configLDAPS struct {
-	Enabled bool
-	Listen  string
-	Cert    string
-	Key     string
-}
-type configAPI struct {
-	Cert        string
-	Enabled     bool
-	Key         string
-	Listen      string
-	SecretToken string
-	TLS         bool
-}
-type configUser struct {
-	Name          string
-	OtherGroups   []int
-	PassSHA256    string
-	PassAppSHA256 []string
-	PrimaryGroup  int
-	SSHKeys       []string
-	OTPSecret     string
-	Yubikey       string
-	Disabled      bool
-	UnixID        int
-	Mail          string
-	LoginShell    string
-	GivenName     string
-	SN            string
-	Homedir       string
-}
-type configGroup struct {
-	Name          string
-	UnixID        int
-	IncludeGroups []int
-}
-type config struct {
-	API                configAPI
-	Backend            configBackend
-	Debug              bool
-	YubikeyClientID    string
-	YubikeySecret      string
-	Frontend           configFrontend
-	LDAP               configLDAP
-	LDAPS              configLDAPS
-	Groups             []configGroup
-	Syslog             bool
-	Users              []configUser
-	ConfigFile         string
-	AwsAccessKeyId     string
-	AwsSecretAccessKey string
-	AwsRegion          string
-}
 
 var log = logging.MustGetLogger(programName)
 
@@ -182,77 +99,23 @@ func main() {
 	}
 
 	// stats
-	stats_general.Set("version", stringer(LastGitTag))
+	stats.General.Set("version", frontend.Stringer(LastGitTag))
 
 	// web API
 	if cfg.API.Enabled {
 		log.Debug("Web API enabled")
-		go RunAPI(cfg)
+		go frontend.RunAPI(cfg)
 	}
 
-	yubiAuth := (*yubigo.YubiAuth)(nil)
-
-	if len(cfg.YubikeyClientID) > 0 && len(cfg.YubikeySecret) > 0 {
-		yubiAuth, err = yubigo.NewYubiAuth(cfg.YubikeyClientID, cfg.YubikeySecret)
-
-		if err != nil {
-			log.Fatalf("Yubikey Auth failed")
-		}
-	}
-
-	// configure the backend
-	s := ldap.NewServer()
-	s.EnforceLDAP = true
-	var handler Backend
-	switch cfg.Backend.Datastore {
-	case "ldap":
-		handler = newLdapHandler(cfg)
-	case "config":
-		handler = newConfigHandler(cfg, yubiAuth)
-	default:
-		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap'.", cfg.Backend.Datastore)
-	}
-	log.Notice(fmt.Sprintf("Using %s backend", cfg.Backend.Datastore))
-	s.BindFunc("", handler)
-	s.SearchFunc("", handler)
-	s.CloseFunc("", handler)
-
-	if cfg.LDAP.Enabled {
-		// Dont block if also starting a LDAPS server afterwards
-		shouldBlock := !cfg.LDAPS.Enabled
-
-		if shouldBlock {
-			startLDAP(&cfg.LDAP, s)
-		} else {
-			go startLDAP(&cfg.LDAP, s)
-		}
-	}
-
-	if cfg.LDAPS.Enabled {
-		// Always block here
-		startLDAPS(&cfg.LDAPS, s)
-	}
+	s, err := server.NewServer(cfg)
+	s.ListenAndServe()
 
 	log.Critical("AP exit")
 }
 
-func startLDAP(ldapConfig *configLDAP, server *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAP server listening on %s", ldapConfig.Listen))
-	if err := server.ListenAndServe(ldapConfig.Listen); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
-	}
-}
-
-func startLDAPS(ldapsConfig *configLDAPS, server *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAPS server listening on %s", ldapsConfig.Listen))
-	if err := server.ListenAndServeTLS(ldapsConfig.Listen, ldapsConfig.Cert, ldapsConfig.Key); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
-	}
-}
-
 // doConfig reads the cli flags and config file
-func doConfig() (*config, error) {
-	cfg := config{}
+func doConfig() (*config.Config, error) {
+	cfg := config.Config{}
 	// setup defaults
 	cfg.LDAP.Enabled = false
 	cfg.LDAPS.Enabled = true

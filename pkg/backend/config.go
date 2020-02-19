@@ -1,23 +1,26 @@
-package main
+package backend
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/GeertJohan/yubigo"
-	"github.com/nmcclain/ldap"
-	"github.com/pquerna/otp/totp"
 	"net"
 	"sort"
 	"strings"
+
+	"github.com/GeertJohan/yubigo"
+	"github.com/glauth/glauth/pkg/config"
+	"github.com/glauth/glauth/pkg/stats"
+	"github.com/nmcclain/ldap"
+	"github.com/pquerna/otp/totp"
 )
 
 type configHandler struct {
-	cfg         *config
+	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 }
 
-func newConfigHandler(cfg *config, yubikeyAuth *yubigo.YubiAuth) Backend {
+func NewConfigHandler(cfg *config.Config, yubikeyAuth *yubigo.YubiAuth) Backend {
 	handler := configHandler{
 		cfg:         cfg,
 		yubikeyAuth: yubikeyAuth}
@@ -31,7 +34,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
 
-	stats_frontend.Add("bind_reqs", 1)
+	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
@@ -52,7 +55,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the user
-	user := configUser{}
+	user := config.User{}
 	found := false
 	for _, u := range h.cfg.Users {
 		if u.Name == userName {
@@ -65,7 +68,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the group
-	group := configGroup{}
+	group := config.Group{}
 	found = false
 	for _, g := range h.cfg.Groups {
 		if g.Name == groupName {
@@ -129,7 +132,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
 			log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
 		} else {
-			stats_frontend.Add("bind_successes", 1)
+			stats.Frontend.Add("bind_successes", 1)
 			log.Debug("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
 			return ldap.LDAPResultSuccess, nil
 		}
@@ -152,7 +155,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
-	stats_frontend.Add("bind_successes", 1)
+	stats.Frontend.Add("bind_successes", 1)
 	log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
@@ -163,7 +166,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
-	stats_frontend.Add("search_reqs", 1)
+	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
 	if len(bindDN) < 1 {
@@ -248,14 +251,14 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			entries = append(entries, &ldap.Entry{dn, attrs})
 		}
 	}
-	stats_frontend.Add("search_successes", 1)
+	stats.Frontend.Add("search_successes", 1)
 	log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
 	return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
 }
 
 //
 func (h configHandler) Close(boundDn string, conn net.Conn) error {
-	stats_frontend.Add("closes", 1)
+	stats.Frontend.Add("closes", 1)
 	return nil
 }
 
