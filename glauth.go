@@ -3,6 +3,9 @@ package main
 import (
 	"expvar"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
 	"github.com/docopt/docopt-go"
@@ -12,8 +15,6 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
-	"os"
-	"strings"
 )
 
 // Set with buildtime vars
@@ -29,7 +30,7 @@ const programName = "glauth"
 var usage = `glauth: securely expose your LDAP for external auth
 
 Usage:
-  glauth [options] -c <file|s3url>
+  glauth [options] -c <file|s3 url>
   glauth -h --help
   glauth --version
 
