@@ -110,7 +110,14 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *g.ID)}})
 			//			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.UnixID)}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
-			//			attrs = append(attrs, &ldap.EntryAttribute{"memberUid", o.getGroupMembers(g.UnixID)})
+			if g.Members != nil {
+				members := make([]string, len(g.Members))
+				for i, v := range g.Members {
+					members[i] = *v.ID
+				}
+
+				attrs = append(attrs, &ldap.EntryAttribute{Name:"memberUid", Values: members})
+			}
 			dn := fmt.Sprintf("cn=%s,ou=groups,%s", *g.ID, o.cfg.Backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
@@ -186,6 +193,7 @@ func (o ownCloudSession) getGroups() ([]msgraph.Group, error) {
 	if o.useGraphAPI {
 		ctx := context.Background()
 		req := o.NewClient().Groups().Request()
+		req.Expand("members")
 		return req.Get(ctx)
 	}
 	groupsUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/groups?format=json", o.baseUrl)
