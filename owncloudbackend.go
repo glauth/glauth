@@ -72,7 +72,7 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + o.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
+	log.Debug(fmt.Sprintf("Search request as %s from %s for %s on %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter, searchBaseDN))
 	stats_frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -116,13 +116,20 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 					members[i] = *v.ID
 				}
 
-				attrs = append(attrs, &ldap.EntryAttribute{Name:"memberUid", Values: members})
+				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: members})
 			}
 			dn := fmt.Sprintf("cn=%s,ou=groups,%s", *g.ID, o.cfg.Backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "":
-		users, err := session.getUsers()
+		userName := ""
+		if searchBaseDN != strings.ToLower(o.cfg.Backend.BaseDN) {
+			parts := strings.Split(strings.TrimSuffix(searchBaseDN, baseDN), ",")
+			if len(parts) == 1 {
+				userName = strings.TrimPrefix(parts[0], "cn=")
+			}
+		}
+		users, err := session.getUsers(userName)
 		if err != nil {
 			log.Debug(err)
 			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, errors.New("search error: error getting users")
@@ -247,11 +254,18 @@ func (o ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
 	return g
 }
 
-func (o ownCloudSession) getUsers() ([]msgraph.User, error) {
+func (o ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 	if o.useGraphAPI {
 		ctx := context.Background()
-		req := o.NewClient().Users().Request()
-		return req.Get(ctx)
+		req := o.NewClient().Users()
+		if len(userName) > 0 {
+			u, err := req.ID(userName).Request().Get(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return []msgraph.User{*u}, nil
+		}
+		return req.Request().Get(ctx)
 	}
 	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", o.baseUrl)
 
