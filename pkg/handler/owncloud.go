@@ -1,89 +1,96 @@
-package main
+package handler
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	msgraph "github.com/DeepDiver1975/msgraph.go/v1.0"
-	"github.com/nmcclain/ldap"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/glauth/glauth/pkg/config"
+	"github.com/glauth/glauth/pkg/stats"
+	"github.com/nmcclain/ldap"
+	"github.com/op/go-logging"
+	msgraph "github.com/yaegashi/msgraph.go/v1.0"
 )
 
 type ownCloudSession struct {
+	log         *logging.Logger
 	user        string
 	password    string
 	baseUrl     string
 	useGraphAPI bool
 }
 type ownCloudHandler struct {
-	cfg      *config
+	log      *logging.Logger
+	cfg      *config.Config
 	meUrl    string
 	sessions map[string]ownCloudSession
 	lock     sync.Mutex
 }
 
-func (o ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + o.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, o.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+	h.log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
 
-	stats_frontend.Add("bind_reqs", 1)
+	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, o.cfg.Backend.BaseDN))
+		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.cfg.Backend.BaseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
 	if len(parts) > 2 {
-		log.Warning(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
+		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	userName := strings.TrimPrefix(parts[0], "cn=")
 
 	// try to login
-	if !o.login(userName, bindSimplePw) {
-		log.Warning(fmt.Sprintf("Bind Error: User %s login failed", userName))
+	if !h.login(userName, bindSimplePw) {
+		h.log.Warning(fmt.Sprintf("Bind Error: User %s login failed", userName))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	id := connID(conn)
-	o.lock.Lock()
-	o.sessions[id] = ownCloudSession{
+	h.lock.Lock()
+	h.sessions[id] = ownCloudSession{
+		log:         h.log,
 		user:        userName,
 		password:    bindSimplePw,
-		baseUrl:     o.cfg.Backend.Servers[0],
-		useGraphAPI: o.cfg.Backend.UseGraphAPI,
+		baseUrl:     h.cfg.Backend.Servers[0],
+		useGraphAPI: h.cfg.Backend.UseGraphAPI,
 	}
-	o.lock.Unlock()
+	h.lock.Unlock()
 
-	stats_frontend.Add("bind_successes", 1)
-	log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
+	stats.Frontend.Add("bind_successes", 1)
+	h.log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
 
-func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
+func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + o.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	log.Debug(fmt.Sprintf("Search request as %s from %s for %s on %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter, searchBaseDN))
-	stats_frontend.Add("search_reqs", 1)
+	h.log.Debug(fmt.Sprintf("Search request as %s from %s for %s on %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter, searchBaseDN))
+	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
 	if len(bindDN) < 1 {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: Anonymous BindDN not allowed %s", bindDN)
 	}
 	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: BindDN %s not in our BaseDN %s", bindDN, o.cfg.Backend.BaseDN)
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
 	}
-	if !strings.HasSuffix(searchBaseDN, o.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, o.cfg.Backend.BaseDN)
+	if !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
@@ -91,10 +98,10 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	if err != nil {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("search error: error parsing filter: %s", searchReq.Filter)
 	}
-	o.lock.Lock()
+	h.lock.Lock()
 	id := connID(conn)
-	session := o.sessions[id]
-	o.lock.Unlock()
+	session := h.sessions[id]
+	h.lock.Unlock()
 
 	switch filterEntity {
 	default:
@@ -118,12 +125,12 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: members})
 			}
-			dn := fmt.Sprintf("cn=%s,%s=groups,%s", *g.ID, o.cfg.Backend.GroupFormat, o.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("cn=%s,%s=groups,%s", *g.ID, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "":
 		userName := ""
-		if searchBaseDN != strings.ToLower(o.cfg.Backend.BaseDN) {
+		if searchBaseDN != strings.ToLower(h.cfg.Backend.BaseDN) {
 			parts := strings.Split(strings.TrimSuffix(searchBaseDN, baseDN), ",")
 			if len(parts) == 1 {
 				userName = strings.TrimPrefix(parts[0], "cn=")
@@ -131,7 +138,7 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 		users, err := session.getUsers(userName)
 		if err != nil {
-			log.Debug(err)
+			h.log.Debug(err)
 			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, errors.New("search error: error getting users")
 		}
 		for _, u := range users {
@@ -148,27 +155,27 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount"}})
 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *u.ID)}})
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", o.cfg.Backend.NameFormat, *u.ID, o.cfg.Backend.GroupFormat, "users", o.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, *u.ID, h.cfg.Backend.GroupFormat, "users", h.cfg.Backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	}
-	stats_frontend.Add("search_successes", 1)
-	log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
+	stats.Frontend.Add("search_successes", 1)
+	h.log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
-func (o ownCloudHandler) Close(boundDN string, conn net.Conn) error {
+func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	delete(o.sessions, connID(conn))
-	stats_frontend.Add("closes", 1)
-	stats_backend.Add("closes", 1)
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	delete(h.sessions, connID(conn))
+	stats.Frontend.Add("closes", 1)
+	stats.Backend.Add("closes", 1)
 	return nil
 }
 
-func (o ownCloudHandler) login(name, pw string) bool {
-	req, _ := http.NewRequest("GET", o.meUrl, nil)
+func (h ownCloudHandler) login(name, pw string) bool {
+	req, _ := http.NewRequest("GET", h.meUrl, nil)
 	req.SetBasicAuth(name, pw)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -191,22 +198,22 @@ type OCSGroupsResponse struct {
 	} `json:"ocs"`
 }
 
-func (o ownCloudSession) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.SetBasicAuth(o.user, o.password)
+func (s ownCloudSession) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(s.user, s.password)
 	return http.DefaultTransport.RoundTrip(req)
 }
 
-func (o ownCloudSession) getGroups() ([]msgraph.Group, error) {
-	if o.useGraphAPI {
+func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
+	if s.useGraphAPI {
 		ctx := context.Background()
-		req := o.NewClient().Groups().Request()
+		req := s.NewClient().Groups().Request()
 		req.Expand("members")
 		return req.Get(ctx)
 	}
-	groupsUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/groups?format=json", o.baseUrl)
+	groupsUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/groups?format=json", s.baseUrl)
 
 	req, _ := http.NewRequest("GET", groupsUrl, nil)
-	req.SetBasicAuth(o.user, o.password)
+	req.SetBasicAuth(s.user, s.password)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -243,21 +250,21 @@ type OCSUsersResponse struct {
 }
 
 // NewClient returns GraphService request builder with default base URL
-func (o ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
-	graphAPIBaseUrl := fmt.Sprintf("%s/index.php/apps/graphapi/v1.0/", o.baseUrl)
+func (s ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
+	graphAPIBaseUrl := fmt.Sprintf("%s/index.php/apps/graphapi/v1.0/", s.baseUrl)
 
 	httpClient := &http.Client{
-		Transport: o,
+		Transport: s,
 	}
 	g := msgraph.NewClient(httpClient)
 	g.SetURL(graphAPIBaseUrl)
 	return g
 }
 
-func (o ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
-	if o.useGraphAPI {
+func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
+	if s.useGraphAPI {
 		ctx := context.Background()
-		req := o.NewClient().Users()
+		req := s.NewClient().Users()
 		if len(userName) > 0 {
 			u, err := req.ID(userName).Request().Get(ctx)
 			if err != nil {
@@ -267,10 +274,10 @@ func (o ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 		}
 		return req.Request().Get(ctx)
 	}
-	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", o.baseUrl)
+	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", s.baseUrl)
 
 	req, _ := http.NewRequest("GET", usersUrl, nil)
-	req.SetBasicAuth(o.user, o.password)
+	req.SetBasicAuth(s.user, s.password)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -293,16 +300,19 @@ func (o ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 	return ret, nil
 }
 
-func (o ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Request) error {
-	log.Debug("Setting user and password")
-	req.SetBasicAuth(o.user, o.password)
+func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Request) error {
+	s.log.Debug("Setting user and password")
+	req.SetBasicAuth(s.user, s.password)
 	return nil
 }
 
-func newOwnCloudHandler(cfg *config) Backend {
+func NewOwnCloudHandler(log *logging.Logger, cfg *config.Config) Handler {
 	meUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", cfg.Backend.Servers[0])
 
-	handler := ownCloudHandler{cfg: cfg, meUrl: meUrl,
+	handler := ownCloudHandler{
+		log:      log,
+		cfg:      cfg,
+		meUrl:    meUrl,
 		sessions: make(map[string]ownCloudSession),
 	}
 	return handler

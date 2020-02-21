@@ -15,7 +15,7 @@ GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 # Build variables
 BUILD_VARS=-X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH} -X main.BuildTime=${BUILD_TIME} -X main.GitClean=${GIT_CLEAN} -X main.LastGitTag=${LAST_GIT_TAG} -X main.GitTagIsCommit=${GIT_IS_TAG_COMMIT}
-BUILD_FILES=glauth.go bindata.go ldapbackend.go webapi.go configbackend.go owncloudbackend.go
+BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
 
 #####################
@@ -56,11 +56,11 @@ updatetest:
 	./scripts/travis/integration-test.sh
 
 bindata:
-	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
+	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=assets -o=pkg/assets/bindata.go assets && gofmt -w pkg/assets/bindata.go
 
 
 cleanup:
-	rm bindata.go
+	rm pkg/assets/bindata.go
 
 format:
 	go fmt

@@ -24,7 +24,7 @@ RUN apk add --no-cache git bzr make
 RUN go get -d -v ./...
 
 # Run go-bindata to embed data for API
-RUN go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=main assets && gofmt -w bindata.go
+RUN go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=assets -o=pkg/assets/bindata.go assets && gofmt -w pkg/assets/bindata.go
 
 # Build and copy final result
 RUN make linux64 && cp ./bin/glauth64 /app/glauth

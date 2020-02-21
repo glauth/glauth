@@ -10,7 +10,7 @@ certs/
 # Built binaries
 bin
 
-bindata.go
+pkg/assets/bindata.go
 
 .*.swp
 
