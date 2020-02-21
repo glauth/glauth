@@ -30,7 +30,7 @@ const programName = "glauth"
 var usage = `glauth: securely expose your LDAP for external auth
 
 Usage:
-  glauth [options] -c <file|s3url>
+  glauth [options] -c <file|s3 url>
   glauth -h --help
   glauth --version
 
