@@ -1,7 +1,6 @@
 package main
 
 import (
-	"expvar"
 	"fmt"
 	"os"
 	"strings"
@@ -10,8 +9,11 @@ import (
 	"github.com/GeertJohan/yubigo"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
+	"github.com/glauth/glauth/pkg/config"
+	"github.com/glauth/glauth/pkg/frontend"
+	"github.com/glauth/glauth/pkg/server"
+	"github.com/glauth/glauth/pkg/stats"
 	"github.com/jinzhu/copier"
-	"github.com/nmcclain/ldap"
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
@@ -48,98 +50,9 @@ var (
 	args     map[string]interface{}
 	stderr   *logging.LogBackend
 	yubiAuth *yubigo.YubiAuth
-	// exposed expvar variables
-	// TODO: Should be renamed according to golang naming conventions for exported vars, StatsFrontend, StatsBackend, StatsGeneral
-	stats_frontend = expvar.NewMap("proxy_frontend")
-	stats_backend  = expvar.NewMap("proxy_backend")
-	stats_general  = expvar.NewMap("proxy")
 
-	activeConfig = &config{}
+	activeConfig = &config.Config{}
 )
-
-// interface for backend handler
-type Backend interface {
-	ldap.Binder
-	ldap.Searcher
-	ldap.Closer
-}
-
-// config file
-type configBackend struct {
-	BaseDN      string
-	Datastore   string
-	Insecure    bool     // For LDAP backend only
-	Servers     []string // For LDAP and ownCloud backend only
-	NameFormat  string
-	GroupFormat string
-	SSHKeyAttr  string
-	UseGraphAPI bool // For ownCloud backend only
-}
-type configFrontend struct {
-	AllowedBaseDNs []string // For LDAP backend only
-	Listen         string
-	Cert           string
-	Key            string
-	TLS            bool
-}
-type configLDAP struct {
-	Enabled bool
-	Listen  string
-}
-type configLDAPS struct {
-	Enabled bool
-	Listen  string
-	Cert    string
-	Key     string
-}
-type configAPI struct {
-	Cert        string
-	Enabled     bool
-	Key         string
-	Listen      string
-	SecretToken string
-	TLS         bool
-}
-type configUser struct {
-	Name          string
-	OtherGroups   []int
-	PassSHA256    string
-	PassAppSHA256 []string
-	PrimaryGroup  int
-	SSHKeys       []string
-	OTPSecret     string
-	Yubikey       string
-	Disabled      bool
-	UnixID        int
-	Mail          string
-	LoginShell    string
-	GivenName     string
-	SN            string
-	Homedir       string
-}
-type configGroup struct {
-	Name          string
-	UnixID        int
-	IncludeGroups []int
-}
-type config struct {
-	API                configAPI
-	Backend            configBackend
-	Debug              bool
-	WatchConfig        bool
-	YubikeyClientID    string
-	YubikeySecret      string
-	Frontend           configFrontend
-	LDAP               configLDAP
-	LDAPS              configLDAPS
-	Groups             []configGroup
-	Syslog             bool
-	Users              []configUser
-	ConfigFile         string
-	AwsAccessKeyId     string
-	AwsSecretAccessKey string
-	AwsRegion          string
-}
 
 // Reads builtime vars and returns a full string containing info about
 // the currently running version of the software. Primarily used by the
@@ -199,50 +112,21 @@ func main() {
 
 func startService() {
 	// stats
-	stats_general.Set("version", stringer(LastGitTag))
+	stats.General.Set("version", stats.Stringer(LastGitTag))
 
 	// web API
 	if activeConfig.API.Enabled {
 		log.Debug("Web API enabled")
-		go RunAPI(activeConfig)
+		go frontend.RunAPI(activeConfig)
 	}
 
 	startConfigWatcher()
 
-	// configure the backend
-	s := ldap.NewServer()
-	s.EnforceLDAP = true
-	var handler Backend
-	switch activeConfig.Backend.Datastore {
-	case "ldap":
-		handler = newLdapHandler(activeConfig)
-	case "owncloud":
-		handler = newOwnCloudHandler(activeConfig)
-	case "config":
-		handler = newConfigHandler(activeConfig, yubiAuth)
-	default:
-		log.Fatalf("Unsupported backend %s - must be 'config' or 'ldap'.", activeConfig.Backend.Datastore)
+	s, err := server.NewServer(activeConfig)
+	if err != nil {
+		log.Fatalf("Could not start server: %s", err.Error())
 	}
-	log.Notice(fmt.Sprintf("Using %s backend", activeConfig.Backend.Datastore))
-	s.BindFunc("", handler)
-	s.SearchFunc("", handler)
-	s.CloseFunc("", handler)
-
-	if activeConfig.LDAP.Enabled {
-		// Dont block if also starting a LDAPS server afterwards
-		shouldBlock := !activeConfig.LDAPS.Enabled
-
-		if shouldBlock {
-			startLDAP(&activeConfig.LDAP, s)
-		} else {
-			go startLDAP(&activeConfig.LDAP, s)
-		}
-	}
-
-	if activeConfig.LDAPS.Enabled {
-		// Always block here
-		startLDAPS(&activeConfig.LDAPS, s)
-	}
+	s.ListenAndServe()
 
 	log.Critical("AP exit")
 }
@@ -283,20 +167,6 @@ func startConfigWatcher() {
 	watcher.Add(configFileLocation)
 }
 
-func startLDAP(ldapConfig *configLDAP, server *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAP server listening on %s", ldapConfig.Listen))
-	if err := server.ListenAndServe(ldapConfig.Listen); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
-	}
-}
-
-func startLDAPS(ldapsConfig *configLDAPS, server *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAPS server listening on %s", ldapsConfig.Listen))
-	if err := server.ListenAndServeTLS(ldapsConfig.Listen, ldapsConfig.Cert, ldapsConfig.Key); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
-	}
-}
-
 func parseArgs() error {
 	var err error
 
@@ -311,8 +181,8 @@ func getConfigLocation() string {
 	return args["--config"].(string)
 }
 
-func parseConfigFile(configFileLocation string) (*config, error) {
-	cfg := config{}
+func parseConfigFile(configFileLocation string) (*config.Config, error) {
+	cfg := config.Config{}
 	// setup defaults
 	cfg.LDAP.Enabled = false
 	cfg.LDAPS.Enabled = true
@@ -359,7 +229,7 @@ func parseConfigFile(configFileLocation string) (*config, error) {
 	return &cfg, nil
 }
 
-func handleConfig(cfg config) (*config, error) {
+func handleConfig(cfg config.Config) (*config.Config, error) {
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
 		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")

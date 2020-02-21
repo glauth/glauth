@@ -1,17 +1,20 @@
-package main
+package handler
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	msgraph "github.com/DeepDiver1975/msgraph.go/v1.0"
-	"github.com/nmcclain/ldap"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/glauth/glauth/pkg/config"
+	"github.com/glauth/glauth/pkg/stats"
+	"github.com/nmcclain/ldap"
+	msgraph "github.com/yaegashi/msgraph.go/v1.0"
 )
 
 type ownCloudSession struct {
@@ -21,7 +24,7 @@ type ownCloudSession struct {
 	useGraphAPI bool
 }
 type ownCloudHandler struct {
-	cfg      *config
+	cfg      *config.Config
 	meUrl    string
 	sessions map[string]ownCloudSession
 	lock     sync.Mutex
@@ -33,7 +36,7 @@ func (o ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 
 	log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, o.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
 
-	stats_frontend.Add("bind_reqs", 1)
+	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
@@ -63,7 +66,7 @@ func (o ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	}
 	o.lock.Unlock()
 
-	stats_frontend.Add("bind_successes", 1)
+	stats.Frontend.Add("bind_successes", 1)
 	log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
@@ -73,7 +76,7 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	baseDN := strings.ToLower("," + o.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	log.Debug(fmt.Sprintf("Search request as %s from %s for %s on %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter, searchBaseDN))
-	stats_frontend.Add("search_reqs", 1)
+	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
 	if len(bindDN) < 1 {
@@ -152,7 +155,7 @@ func (o ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	}
-	stats_frontend.Add("search_successes", 1)
+	stats.Frontend.Add("search_successes", 1)
 	log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
@@ -162,8 +165,8 @@ func (o ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	delete(o.sessions, connID(conn))
-	stats_frontend.Add("closes", 1)
-	stats_backend.Add("closes", 1)
+	stats.Frontend.Add("closes", 1)
+	stats.Backend.Add("closes", 1)
 	return nil
 }
 
@@ -299,7 +302,7 @@ func (o ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Reque
 	return nil
 }
 
-func newOwnCloudHandler(cfg *config) Backend {
+func NewOwnCloudHandler(cfg *config.Config) Handler {
 	meUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", cfg.Backend.Servers[0])
 
 	handler := ownCloudHandler{cfg: cfg, meUrl: meUrl,
