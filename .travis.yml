@@ -3,9 +3,9 @@ language: go
 # USE THIS alongside makefile tag detection: $TRAVIS_TAG
 
 go: 
- - 1.9.x       # older version
- - 1.10.x      # last version
- - 1.11.x      # current version
+ - 1.11.x       # older version
+ - 1.12.x      # last version
+ - 1.13.x      # current version
 
 # Speed up git clones
 git:
