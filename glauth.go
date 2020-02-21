@@ -8,11 +8,11 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
-	"github.com/docopt/docopt-go"
+	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/jinzhu/copier"
 	"github.com/nmcclain/ldap"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
 )
@@ -69,10 +69,11 @@ type configBackend struct {
 	BaseDN      string
 	Datastore   string
 	Insecure    bool     // For LDAP backend only
-	Servers     []string // For LDAP backend only
+	Servers     []string // For LDAP and ownCloud backend only
 	NameFormat  string
 	GroupFormat string
 	SSHKeyAttr  string
+	UseGraphAPI bool // For ownCloud backend only
 }
 type configFrontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
@@ -215,6 +216,8 @@ func startService() {
 	switch activeConfig.Backend.Datastore {
 	case "ldap":
 		handler = newLdapHandler(activeConfig)
+	case "owncloud":
+		handler = newOwnCloudHandler(activeConfig)
 	case "config":
 		handler = newConfigHandler(activeConfig, yubiAuth)
 	default:
@@ -410,8 +413,9 @@ func handleConfig(cfg config) (*config, error) {
 		cfg.Backend.Datastore = "config"
 	case "config":
 	case "ldap":
+	case "owncloud":
 	default:
-		return &cfg, fmt.Errorf("Invalid backend %s - must be 'config' or 'ldap'", cfg.Backend.Datastore)
+		return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap' or 'owncloud", cfg.Backend.Datastore)
 	}
 	return &cfg, nil
 }
