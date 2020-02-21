@@ -3,17 +3,18 @@ package main
 import (
 	"expvar"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
-	"github.com/docopt/docopt-go"
+	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/jinzhu/copier"
 	"github.com/nmcclain/ldap"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
 	"gopkg.in/amz.v1/s3"
-	"os"
-	"strings"
 )
 
 // Set with buildtime vars
