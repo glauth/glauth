@@ -11,18 +11,18 @@ import (
 	"github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("glauth")
-
 type LdapSvc struct {
+	log      *logging.Logger
 	c        *config.Config
 	yubiAuth *yubigo.YubiAuth
 	l        *ldap.Server
 }
 
-func NewServer(cfg *config.Config) (*LdapSvc, error) {
+func NewServer(log *logging.Logger, cfg *config.Config) (*LdapSvc, error) {
 
 	s := LdapSvc{
-		c: cfg,
+		log: log,
+		c:   cfg,
 	}
 
 	var err error
@@ -41,11 +41,11 @@ func NewServer(cfg *config.Config) (*LdapSvc, error) {
 	var h handler.Handler
 	switch cfg.Backend.Datastore {
 	case "ldap":
-		h = handler.NewLdapHandler(cfg)
+		h = handler.NewLdapHandler(log, cfg)
 	case "owncloud":
-		h = handler.NewOwnCloudHandler(cfg)
+		h = handler.NewOwnCloudHandler(log, cfg)
 	case "config":
-		h = handler.NewConfigHandler(cfg, s.yubiAuth)
+		h = handler.NewConfigHandler(log, cfg, s.yubiAuth)
 	default:
 		return nil, fmt.Errorf("unsupported backend %s - must be 'config' or 'ldap'", cfg.Backend.Datastore)
 	}
@@ -64,28 +64,28 @@ func (s *LdapSvc) ListenAndServe() {
 		shouldBlock := !s.c.LDAPS.Enabled
 
 		if shouldBlock {
-			startLDAP(&s.c.LDAP, s.l)
+			s.startLDAP()
 		} else {
-			go startLDAP(&s.c.LDAP, s.l)
+			go s.startLDAP()
 		}
 	}
 
 	if s.c.LDAPS.Enabled {
 		// Always block here
-		startLDAPS(&s.c.LDAPS, s.l)
+		s.startLDAPS()
 	}
 }
 
-func startLDAP(ldapConfig *config.LDAP, l *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAP server listening on %s", ldapConfig.Listen))
-	if err := l.ListenAndServe(ldapConfig.Listen); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
+func (s *LdapSvc) startLDAP() {
+	s.log.Notice(fmt.Sprintf("LDAP server listening on %s", s.c.LDAP.Listen))
+	if err := s.l.ListenAndServe(s.c.LDAP.Listen); err != nil {
+		s.log.Fatalf("LDAP Server Failed: %s", err.Error())
 	}
 }
 
-func startLDAPS(ldapsConfig *config.LDAPS, l *ldap.Server) {
-	log.Notice(fmt.Sprintf("LDAPS server listening on %s", ldapsConfig.Listen))
-	if err := l.ListenAndServeTLS(ldapsConfig.Listen, ldapsConfig.Cert, ldapsConfig.Key); err != nil {
-		log.Fatalf("LDAP Server Failed: %s", err.Error())
+func (s *LdapSvc) startLDAPS() {
+	s.log.Notice(fmt.Sprintf("LDAPS server listening on %s", s.c.LDAPS.Listen))
+	if err := s.l.ListenAndServeTLS(s.c.LDAPS.Listen, s.c.LDAPS.Cert, s.c.LDAPS.Key); err != nil {
+		s.log.Fatalf("LDAP Server Failed: %s", err.Error())
 	}
 }

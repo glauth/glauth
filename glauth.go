@@ -117,12 +117,12 @@ func startService() {
 	// web API
 	if activeConfig.API.Enabled {
 		log.Debug("Web API enabled")
-		go frontend.RunAPI(activeConfig)
+		go frontend.RunAPI(log, activeConfig)
 	}
 
 	startConfigWatcher()
 
-	s, err := server.NewServer(activeConfig)
+	s, err := server.NewServer(log, activeConfig)
 	if err != nil {
 		log.Fatalf("Could not start server: %s", err.Error())
 	}

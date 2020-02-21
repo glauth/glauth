@@ -16,10 +16,12 @@ import (
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/kr/pretty"
 	"github.com/nmcclain/ldap"
+	"github.com/op/go-logging"
 )
 
 type ldapHandler struct {
 	doPing   chan bool
+	log      *logging.Logger
 	cfg      *config.Config
 	lock     *sync.Mutex // for sessions and servers
 	sessions map[string]ldapSession
@@ -49,10 +51,11 @@ type ldapBackend struct {
 	Ping     time.Duration
 }
 
-func NewLdapHandler(cfg *config.Config) Handler {
+func NewLdapHandler(log *logging.Logger, cfg *config.Config) Handler {
 	handler := ldapHandler{ // set non-zero-value defaults here
 		sessions: make(map[string]ldapSession),
 		doPing:   make(chan bool),
+		log:      log,
 		cfg:      cfg,
 		lock:     &ldaplock,
 	}
@@ -73,27 +76,27 @@ func NewLdapHandler(cfg *config.Config) Handler {
 
 //
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
-	log.Debug(fmt.Sprintf("Bind request as %s from %s", bindDN, conn.RemoteAddr().String()))
+	h.log.Debug(fmt.Sprintf("Bind request as %s from %s", bindDN, conn.RemoteAddr().String()))
 	stats.Frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
 		stats.Frontend.Add("bind_ldapSession_errors", 1)
-		log.Debug(fmt.Sprintf("Bind ops error as %s from %s == %s", bindDN, conn.RemoteAddr().String(), err.Error()))
+		h.log.Debug(fmt.Sprintf("Bind ops error as %s from %s == %s", bindDN, conn.RemoteAddr().String(), err.Error()))
 		return ldap.LDAPResultOperationsError, err
 	}
 	if err := s.ldap.Bind(bindDN, bindSimplePw); err != nil {
 		stats.Frontend.Add("bind_errors", 1)
-		log.Debug(fmt.Sprintf("Bind invalid creds as %s from %s", bindDN, conn.RemoteAddr().String()))
+		h.log.Debug(fmt.Sprintf("Bind invalid creds as %s from %s", bindDN, conn.RemoteAddr().String()))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	stats.Frontend.Add("bind_successes", 1)
-	log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
+	h.log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
 
 //
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	log.Debug(fmt.Sprintf("Search request as %s from %s for %s", boundDN, conn.RemoteAddr().String(), searchReq.Filter))
+	h.log.Debug(fmt.Sprintf("Search request as %s from %s for %s", boundDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats.Frontend.Add("search_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
@@ -112,24 +115,24 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 		searchReq.Controls,
 	)
 
-	log.Debug(fmt.Sprintf("Search req to backend: %# v", pretty.Formatter(search)))
+	h.log.Debug(fmt.Sprintf("Search req to backend: %# v", pretty.Formatter(search)))
 	sr, err := s.ldap.Search(search)
-	log.Debug(fmt.Sprintf("Backend Search result: %# v", pretty.Formatter(sr)))
+	h.log.Debug(fmt.Sprintf("Backend Search result: %# v", pretty.Formatter(sr)))
 	ssr := ldap.ServerSearchResult{
 		Entries:   sr.Entries,
 		Referrals: sr.Referrals,
 		Controls:  sr.Controls,
 	}
-	log.Debug(fmt.Sprintf("Frontend Search result: %# v", pretty.Formatter(ssr)))
+	h.log.Debug(fmt.Sprintf("Frontend Search result: %# v", pretty.Formatter(ssr)))
 	if err != nil {
 		e := err.(*ldap.Error)
-		log.Debug(fmt.Sprintf("Search Err: %# v", pretty.Formatter(err)))
+		h.log.Debug(fmt.Sprintf("Search Err: %# v", pretty.Formatter(err)))
 		stats.Frontend.Add("search_errors", 1)
 		ssr.ResultCode = ldap.LDAPResultCode(e.ResultCode)
 		return ssr, err
 	}
 	stats.Frontend.Add("search_successes", 1)
-	log.Debug(fmt.Sprintf("AP: Search OK: %s -> num of entries = %d\n", search.Filter, len(ssr.Entries)))
+	h.log.Debug(fmt.Sprintf("AP: Search OK: %s -> num of entries = %d\n", search.Filter, len(ssr.Entries)))
 	return ssr, nil
 }
 func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
@@ -146,22 +149,22 @@ func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
 func (h *ldapHandler) monitorServers() {
 	err := h.ping()
 	if err != nil {
-		log.Fatal(err)
+		h.log.Fatal(err)
 	}
 	go func() {
 		for {
 			select {
 			case <-h.doPing:
-				log.Notice("doPing requested due to server failure")
+				h.log.Notice("doPing requested due to server failure")
 				err = h.ping()
 				if err != nil {
-					log.Fatal(err)
+					h.log.Fatal(err)
 				}
 			case <-time.NewTimer(60 * time.Second).C:
-				log.Debug("doPing after timeout")
+				h.log.Debug("doPing after timeout")
 				err = h.ping()
 				if err != nil {
-					log.Fatal(err)
+					h.log.Fatal(err)
 				}
 			}
 		}
@@ -225,7 +228,7 @@ func (h ldapHandler) ping() error {
 		elapsed := time.Since(start)
 		h.lock.Lock()
 		if err != nil || l == nil {
-			log.Error(fmt.Sprintf("Server %s:%d ping failed: %s", s.Hostname, s.Port, err.Error()))
+			h.log.Error(fmt.Sprintf("Server %s:%d ping failed: %s", s.Hostname, s.Port, err.Error()))
 			h.servers[k].Ping = 0
 			h.servers[k].Status = Down
 		} else {
@@ -236,10 +239,10 @@ func (h ldapHandler) ping() error {
 		}
 		h.lock.Unlock()
 	}
-	log.Debug(fmt.Sprintf("Server health: %# v", pretty.Formatter(h.servers)))
+	h.log.Debug(fmt.Sprintf("Server health: %# v", pretty.Formatter(h.servers)))
 	b, err := json.Marshal(h.servers)
 	if err != nil {
-		log.Error(fmt.Sprintf("Error encoding tail data: %s", err.Error()))
+		h.log.Error(fmt.Sprintf("Error encoding tail data: %s", err.Error()))
 	}
 	stats.Backend.Set("servers", stats.Stringer(string(b)))
 	if healthy == false {
@@ -265,7 +268,7 @@ func (h ldapHandler) getBestServer() (ldapBackend, error) {
 	if bestping == forever {
 		return ldapBackend{}, fmt.Errorf("No healthy servers found")
 	}
-	log.Debug(fmt.Sprintf("Best server: %# v", pretty.Formatter(favorite)))
+	h.log.Debug(fmt.Sprintf("Best server: %# v", pretty.Formatter(favorite)))
 	return favorite, nil
 }
 
