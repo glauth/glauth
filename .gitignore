@@ -16,3 +16,5 @@ bindata.go
 
 # Ignoring travis CLI tool logs
 *travis.log
+
+certs/

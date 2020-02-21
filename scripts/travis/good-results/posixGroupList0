@@ -1,6 +1,7 @@
 dn: cn=superheros,ou=groups,dc=glauth,dc=com
 cn: superheros
-description: superheros via LDAP
+uid: superheros
+description: superheros
 gidNumber: 5501
 objectClass: posixGroup
 uniqueMember: cn=alexdoe,ou=superheros,dc=glauth,dc=com
@@ -18,7 +19,8 @@ memberUid: sarahdoe
 
 dn: cn=svcaccts,ou=groups,dc=glauth,dc=com
 cn: svcaccts
-description: svcaccts via LDAP
+uid: svcaccts
+description: svcaccts
 gidNumber: 5502
 objectClass: posixGroup
 uniqueMember: cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
@@ -26,7 +28,8 @@ memberUid: serviceuser
 
 dn: cn=vpnaccess,ou=groups,dc=glauth,dc=com
 cn: vpnaccess
-description: vpnaccess via LDAP
+uid: vpnaccess
+description: vpnaccess
 gidNumber: 5503
 objectClass: posixGroup
 uniqueMember: cn=alexdoe,ou=superheros,dc=glauth,dc=com
@@ -44,7 +47,8 @@ memberUid: sarahdoe
 
 dn: cn=allaccs,ou=groups,dc=glauth,dc=com
 cn: allaccs
-description: allaccs via LDAP
+uid: allaccs
+description: allaccs
 gidNumber: 5504
 objectClass: posixGroup
 uniqueMember: cn=alexdoe,ou=superheros,dc=glauth,dc=com
@@ -64,7 +68,8 @@ memberUid: serviceuser
 
 dn: cn=mailadmin,ou=groups,dc=glauth,dc=com
 cn: mailadmin
-description: mailadmin via LDAP
+uid: mailadmin
+description: mailadmin
 gidNumber: 5505
 objectClass: posixGroup
 uniqueMember: cn=alexdoe,ou=superheros,dc=glauth,dc=com
@@ -78,13 +83,15 @@ memberUid: sarahdoe
 
 dn: cn=webmail,ou=groups,dc=glauth,dc=com
 cn: webmail
-description: webmail via LDAP
+uid: webmail
+description: webmail
 gidNumber: 5506
 objectClass: posixGroup
 
 dn: cn=fulltime,ou=groups,dc=glauth,dc=com
 cn: fulltime
-description: fulltime via LDAP
+uid: fulltime
+description: fulltime
 gidNumber: 5507
 objectClass: posixGroup
 uniqueMember: cn=alexdoe,ou=superheros,dc=glauth,dc=com
