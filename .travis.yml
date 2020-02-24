@@ -71,7 +71,7 @@ deploy:
   file: bin/*
   draft: true
   name: "DRAFT RELEASE: $TRAVIS_TAG"
-  release_notes: |
+  body: |
     # Commit Details
     $TRAVIS_COMMIT_MESSAGE
     
