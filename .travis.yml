@@ -66,7 +66,7 @@ script:
 deploy:
   provider: releases
   api_key:
-    secure: CsQb802CJJlum5suwo3Yvw1TkmX56O6TPrtJqMI0Qm6A878dhrZIjyVmfG3Iq9rtZvfFhK+Y3SIfPZp8BjV3cicc+X1Yh1VvMG12ukqHSruvGvLG49dtnq40P31u85Y4HdBk+W8YIsCQHEonsID9l+q2LbhuiC358UF+HNgzESEz6ZyTZz0AvAJzm1uyiUiPTHMFwqN7qQsookmLXf490rqp9YmFFqte+o3/JwoYXc3pE/rBMJitPSJNGULzu2QofV5gJ0JxgPWlfF5DsHHEi1jhpBcTfiFzEvkdcl1SVme9MMNPue7j8u9+PLJ6uIdlnTeBcMPKgtzOg/kBqY4+3QzY4aPXjKm3+MF3Cau66+g3QC7dKenvYefapQYN7t1SSpiR9X3TLWZrBbw2ovMe3em+uMnIM08bemzj8DapRgKXmYKWnwTlA9KLf0Vl22255OzMGarkhx94cDvUHmEkNo7qBXqmUxPo0Fc5XJyD7JmUNgYoWj0/NjyN09VG22FL2FW44HR3eitq2wSFSMO/jsC2rLuCnyLHViP+O2YJu0T4Q3gdQUcdQmjT7y8ogH5Shn9t2wY4NRxI3MyXO7+fGEOj1DaD6CFQwcSwbJVpIzS6J8z7+rRrzE9QkXeCmwNNt5UkpR9lYmOEzpc00rTRimwjfmJn/nTXsIDiQg9iZJM=
+    secure: lPI5FftcQB1eHihN9daeFOT97vZcfq2w0hRb6amC6U4P+K7Ih23R9NmWhDuvGM9CPLaAqgOKiHWIUnP4q9EeBeAUMgg6FI2syr/0nDYz5cHqZMMPWFgeDvn+HqfMdFIVeiKT80+uGY/JNsMI8lsJ0eILEp0GpyIZkoAewCEyxJ/fcLM5htGnQIQ8mQ+2ZXflvPofv6/RPHgu3ryC0icJFVMREIivp2QIZBpFnawnI+OE8ZzxD5R05gfg3IJtYtc/4diX4RPyqVTCqljU/x7/g9KgNsnaLGEz37pBUS0IQcq4ITX/cm4y5LLWPV6JugxjyTq1SXKJnHEgfEFk5/hPM7Q1DMZJ5tGpb2B4aSMwB6YHwvVW83ih96Vw8ZgIrxWT9LyF4n9AHakLhDIiJieDXa3dvG7U5oTxlSP/RJkXlMZEJ3lS/1RZ9vvQ0EOEMAO6ePQzSZ4EM/UShFalBI+fqDtzqxFGeeCWw6lwiKLF2GF7enT8+wLsWOMI43JM5uPAq2g0KFMtJEEcK08IFraObvK5bcFH7snCDtsAaLyjdkVIIBteNtfDsXQ8PMi4bQpLr5kpY68dkyuxDr4IpL1GKqlpe2LbjkzsGrq5wifcHMFmUkEfY/6/ELFc9fL+1ZnMAe7YiW41AvX+hrgVmc3M8zp1kVvy2oERV4LfV1vfaEU=
   file_glob: true 
   file: bin/*
   draft: true
@@ -79,3 +79,4 @@ deploy:
     branch: master
     tags: true
     condition: $TRAVIS_GO_VERSION =~ ^1\.13
+    repo: glauth/glauth
