@@ -10,9 +10,11 @@ certs/
 # Built binaries
 bin
 
-bindata.go
+pkg/assets/bindata.go
 
 .*.swp
 
 # Ignoring travis CLI tool logs
 *travis.log
+
+certs/

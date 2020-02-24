@@ -5,11 +5,19 @@ ou: svcaccts
 uidNumber: 5003
 accountStatus: active
 objectClass: posixAccount
+objectClass: shadowAccount
 loginShell: /bin/bash
 homeDirectory: /home/serviceuser
-description: serviceuser via LDAP
-gecos: serviceuser via LDAP
+description: serviceuser
+gecos: serviceuser
 gidNumber: 5502
 memberOf: cn=allaccs,ou=groups,dc=glauth,dc=com
 memberOf: cn=svcaccts,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
 
