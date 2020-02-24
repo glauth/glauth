@@ -71,17 +71,6 @@ deploy:
   file: bin/*
   draft: true
   name: "DRAFT RELEASE: $TRAVIS_TAG"
-  body: |
-    # Commit Details
-    $TRAVIS_COMMIT_MESSAGE
-    
-    # Note About Non-Linux 64bit Files
-    While I expect the code is system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows.
-    
-    As such, the primary release platform is Linux 64 bit. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.
-    
-    We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable using them with this knowledge."
-
   skip_cleanup: true
   on:
     branch: master
