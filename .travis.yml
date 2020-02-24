@@ -77,4 +77,4 @@ deploy:
   on:
     branch: master
     tags: true
-    condition: $TRAVIS_GO_VERSION = "1.10.1"
+    condition: $TRAVIS_GO_VERSION =~ ^1\.13
