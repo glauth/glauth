@@ -3,7 +3,6 @@ package server
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
@@ -59,7 +58,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			handler.YubiAuth(s.yubiAuth),
 		)
 	default:
-		return nil, fmt.Errorf("unsupported backend %s - must be 'config' or 'ldap'", s.c.Backend.Datastore)
+		return nil, fmt.Errorf("unsupported backend %s - must be 'config', 'ldap' or 'owncloud'", s.c.Backend.Datastore)
 	}
 	s.log.V(3).Info("Using backend", "datastore", s.c.Backend.Datastore)
 	s.l.BindFunc("", h)
@@ -69,39 +68,23 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	return &s, nil
 }
 
-func (s *LdapSvc) ListenAndServe() {
-
-	if s.c.LDAP.Enabled {
-		// Dont block if also starting a LDAPS server afterwards
-		shouldBlock := !s.c.LDAPS.Enabled
-
-		if shouldBlock {
-			s.startLDAP()
-		} else {
-			go s.startLDAP()
-		}
-	}
-
-	if s.c.LDAPS.Enabled {
-		// Always block here
-		s.startLDAPS()
-	}
-}
-
-func (s *LdapSvc) startLDAP() {
+// ListenAndServe listens on the TCP network address s.c.LDAP.Listen
+func (s *LdapSvc) ListenAndServe() error {
 	s.log.V(3).Info("LDAP server listening", "address", s.c.LDAP.Listen)
-	if err := s.l.ListenAndServe(s.c.LDAP.Listen); err != nil {
-		s.log.Error(err, "LDAP Server Failed")
-		os.Exit(1)
-		// TODO return error
-	}
+	return s.l.ListenAndServe(s.c.LDAP.Listen)
 }
 
-func (s *LdapSvc) startLDAPS() {
+// ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
+func (s *LdapSvc) ListenAndServeTLS() error {
 	s.log.V(3).Info("LDAPS server listening", "address", s.c.LDAPS.Listen)
-	if err := s.l.ListenAndServeTLS(s.c.LDAPS.Listen, s.c.LDAPS.Cert, s.c.LDAPS.Key); err != nil {
-		s.log.Error(err, "LDAP Server Failed")
-		os.Exit(1)
-		// TODO return error
-	}
+	return s.l.ListenAndServeTLS(
+		s.c.LDAPS.Listen,
+		s.c.LDAPS.Cert,
+		s.c.LDAPS.Key,
+	)
+}
+
+// Shutdown ends listeners by sending true to the ldap serves quit channel
+func (s *LdapSvc) Shutdown() {
+	s.l.Quit <- true
 }
