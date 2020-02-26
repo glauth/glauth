@@ -11,37 +11,41 @@ import (
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/stats"
+	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
-	"github.com/op/go-logging"
 	"github.com/pquerna/otp/totp"
 )
 
 type configHandler struct {
-	log         *logging.Logger
+	log         logr.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 }
 
-func NewConfigHandler(log *logging.Logger, cfg *config.Config, yubikeyAuth *yubigo.YubiAuth) Handler {
+// NewConfigHandler creates a new config backed handler
+func NewConfigHandler(opts ...Option) Handler {
+	options := newOptions(opts...)
+
 	handler := configHandler{
-		log:         log,
-		cfg:         cfg,
-		yubikeyAuth: yubikeyAuth}
+		log:         options.Logger,
+		cfg:         options.Config,
+		yubikeyAuth: options.YubiAuth,
+	}
 	return handler
 }
 
-//
+// Bind implements a bind request against the config file
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	h.log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.cfg.Backend.BaseDN))
+		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
 		// h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -54,7 +58,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
 		groupName = strings.TrimPrefix(parts[1], h.cfg.Backend.GroupFormat+"=")
 	} else {
-		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
+		h.log.V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -68,7 +72,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 	if !found {
-		h.log.Warning(fmt.Sprintf("Bind Error: User %s not found.", userName))
+		h.log.V(2).Info(fmt.Sprintf("User not found", "username", userName))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the group
@@ -81,12 +85,12 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 	if !found {
-		h.log.Warning(fmt.Sprintf("Bind Error: Group %s not found.", groupName))
+		h.log.V(2).Info("Group not found", "groupname", groupName)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// validate group membership
 	if user.PrimaryGroup != group.UnixID {
-		h.log.Warning(fmt.Sprintf("Bind Error: User %s primary group is not %s.", userName, groupName))
+		h.log.V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.UnixID)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -134,10 +138,10 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	for index, appPw := range user.PassAppSHA256 {
 
 		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-			h.log.Debug(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
+			h.log.V(6).Info("Attempt to bind app pw failed", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
 		} else {
 			stats.Frontend.Add("bind_successes", 1)
-			h.log.Debug("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
+			h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
 			return ldap.LDAPResultSuccess, nil
 		}
 
@@ -149,27 +153,27 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {
-		h.log.Warning(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
+		h.log.V(2).Info("invalid OTP token", "binddn", bindDN, "src", conn.RemoteAddr())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	// Now, check the hash
 	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
-		h.log.Warning(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
+		h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
+	h.log.V(6).Info("Bind success", "binddn", bindDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
-//
+// Search implements a search request against the config file
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.Debug(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
+	h.log.V(6).Info("Search request", "binddn", bindDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -266,17 +270,16 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		}
 	}
 	stats.Frontend.Add("search_successes", 1)
-	h.log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
+	h.log.V(6).Info("AP: Search OK", "filter", searchReq.Filter)
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
-//
+// Close does not actually close anything, because the config data is kept in memory
 func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	stats.Frontend.Add("closes", 1)
 	return nil
 }
 
-//
 func (h configHandler) getGroupMembers(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
@@ -317,7 +320,6 @@ func (h configHandler) getGroupMembers(gid int) []string {
 	return m
 }
 
-//
 func (h configHandler) getGroupMemberIDs(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
@@ -336,7 +338,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.UnixID {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.Warning(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+					h.log.V(2).Info("Ignoring myself as included group", "groupid", includegroupid)
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 
@@ -390,7 +392,6 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	return g
 }
 
-//
 func (h configHandler) getGroupName(gid int) string {
 	for _, g := range h.cfg.Groups {
 		if g.UnixID == gid {

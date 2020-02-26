@@ -3,32 +3,34 @@ package server
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/handler"
+	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
-	"github.com/op/go-logging"
 )
 
 type LdapSvc struct {
-	log      *logging.Logger
+	log      logr.Logger
 	c        *config.Config
 	yubiAuth *yubigo.YubiAuth
 	l        *ldap.Server
 }
 
-func NewServer(log *logging.Logger, cfg *config.Config) (*LdapSvc, error) {
+func NewServer(opts ...Option) (*LdapSvc, error) {
+	options := newOptions(opts...)
 
 	s := LdapSvc{
-		log: log,
-		c:   cfg,
+		log: options.Logger,
+		c:   options.Config,
 	}
 
 	var err error
 
-	if len(cfg.YubikeyClientID) > 0 && len(cfg.YubikeySecret) > 0 {
-		s.yubiAuth, err = yubigo.NewYubiAuth(cfg.YubikeyClientID, cfg.YubikeySecret)
+	if len(s.c.YubikeyClientID) > 0 && len(s.c.YubikeySecret) > 0 {
+		s.yubiAuth, err = yubigo.NewYubiAuth(s.c.YubikeyClientID, s.c.YubikeySecret)
 
 		if err != nil {
 			return nil, errors.New("Yubikey Auth failed")
@@ -39,17 +41,27 @@ func NewServer(log *logging.Logger, cfg *config.Config) (*LdapSvc, error) {
 	s.l = ldap.NewServer()
 	s.l.EnforceLDAP = true
 	var h handler.Handler
-	switch cfg.Backend.Datastore {
+	switch s.c.Backend.Datastore {
 	case "ldap":
-		h = handler.NewLdapHandler(log, cfg)
+		h = handler.NewLdapHandler(
+			handler.Logger(s.log),
+			handler.Config(s.c),
+		)
 	case "owncloud":
-		h = handler.NewOwnCloudHandler(log, cfg)
+		h = handler.NewOwnCloudHandler(
+			handler.Logger(s.log),
+			handler.Config(s.c),
+		)
 	case "config":
-		h = handler.NewConfigHandler(log, cfg, s.yubiAuth)
+		h = handler.NewConfigHandler(
+			handler.Logger(s.log),
+			handler.Config(s.c),
+			handler.YubiAuth(s.yubiAuth),
+		)
 	default:
-		return nil, fmt.Errorf("unsupported backend %s - must be 'config' or 'ldap'", cfg.Backend.Datastore)
+		return nil, fmt.Errorf("unsupported backend %s - must be 'config' or 'ldap'", s.c.Backend.Datastore)
 	}
-	log.Notice(fmt.Sprintf("Using %s backend", cfg.Backend.Datastore))
+	s.log.V(3).Info("Using backend", "datastore", s.c.Backend.Datastore)
 	s.l.BindFunc("", h)
 	s.l.SearchFunc("", h)
 	s.l.CloseFunc("", h)
@@ -77,15 +89,19 @@ func (s *LdapSvc) ListenAndServe() {
 }
 
 func (s *LdapSvc) startLDAP() {
-	s.log.Notice(fmt.Sprintf("LDAP server listening on %s", s.c.LDAP.Listen))
+	s.log.V(3).Info("LDAP server listening", "address", s.c.LDAP.Listen)
 	if err := s.l.ListenAndServe(s.c.LDAP.Listen); err != nil {
-		s.log.Fatalf("LDAP Server Failed: %s", err.Error())
+		s.log.Error(err, "LDAP Server Failed")
+		os.Exit(1)
+		// TODO return error
 	}
 }
 
 func (s *LdapSvc) startLDAPS() {
-	s.log.Notice(fmt.Sprintf("LDAPS server listening on %s", s.c.LDAPS.Listen))
+	s.log.V(3).Info("LDAPS server listening", "address", s.c.LDAPS.Listen)
 	if err := s.l.ListenAndServeTLS(s.c.LDAPS.Listen, s.c.LDAPS.Cert, s.c.LDAPS.Key); err != nil {
-		s.log.Fatalf("LDAP Server Failed: %s", err.Error())
+		s.log.Error(err, "LDAP Server Failed")
+		os.Exit(1)
+		// TODO return error
 	}
 }
