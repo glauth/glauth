@@ -11,8 +11,10 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/frontend"
+	gologgingr "github.com/glauth/glauth/pkg/gologgingr"
 	"github.com/glauth/glauth/pkg/server"
 	"github.com/glauth/glauth/pkg/stats"
+	"github.com/go-logr/logr"
 	"github.com/jinzhu/copier"
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v1/aws"
@@ -46,7 +48,7 @@ Options:
 `
 
 var (
-	log      *logging.Logger
+	log      logr.Logger
 	args     map[string]interface{}
 	stderr   *logging.LogBackend
 	yubiAuth *yubigo.YubiAuth
@@ -98,13 +100,15 @@ func getVersionString() string {
 
 func main() {
 	stderr = initLogging()
-	log.Debug("AP start")
+	log.V(6).Info("AP start")
 
 	if err := parseArgs(); err != nil {
-		log.Fatalf("Could not parse command-line arguments", err.Error())
+		log.Error(err, "Could not parse command-line arguments")
+		os.Exit(1)
 	}
 	if err := doConfig(); err != nil {
-		log.Fatalf("Configuration file error: %s", err.Error())
+		log.Error(err, "Configuration file error")
+		os.Exit(1)
 	}
 
 	startService()
@@ -116,19 +120,27 @@ func startService() {
 
 	// web API
 	if activeConfig.API.Enabled {
-		log.Debug("Web API enabled")
-		go frontend.RunAPI(log, activeConfig)
+		log.V(6).Info("Web API enabled")
+		go frontend.RunAPI(
+			frontend.Logger(log),
+			frontend.Config(activeConfig),
+		)
 	}
 
 	startConfigWatcher()
 
-	s, err := server.NewServer(log, activeConfig)
+	s, err := server.NewServer(
+		server.Logger(log),
+		server.Config(activeConfig),
+	)
 	if err != nil {
-		log.Fatalf("Could not start server: %s", err.Error())
+		log.Error(err, "Could not start server")
+		os.Exit(1)
 	}
 	s.ListenAndServe()
 
-	log.Critical("AP exit")
+	log.V(0).Info("AP exit")
+	os.Exit(1)
 }
 
 func startConfigWatcher() {
@@ -140,7 +152,7 @@ func startConfigWatcher() {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatalf("Could not start config-watcher: %s", err.Error())
+		log.Error(err, "Could not start config-watcher")
 	}
 
 	go func() {
@@ -150,15 +162,15 @@ func startConfigWatcher() {
 				if activeConfig.WatchConfig {
 					if event.Op.String() == "WRITE" {
 						if err := doConfig(); err != nil {
-							log.Warningf("Could not reload config: %sHolding on to old config", err.Error())
+							log.V(2).Info("Could not reload config.Holding on to old config", "error", err.Error())
 						} else {
-							log.Notice("Config was reloaded")
+							log.V(3).Info("Config was reloaded")
 						}
 					}
 				}
 			case err := <-watcher.Errors:
 				if activeConfig.WatchConfig {
-					log.Info("Error!", err)
+					log.Error(err, "Error!")
 				}
 			}
 		}
@@ -237,7 +249,7 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 
 	if len(cfg.Frontend.Listen) > 0 {
 		// We're going with old format - parse it into new
-		log.Warning("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
+		log.V(2).Info("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
 
 		cfg.LDAP.Enabled = !cfg.Frontend.TLS
 		cfg.LDAPS.Enabled = cfg.Frontend.TLS
@@ -328,7 +340,7 @@ func doConfig() error {
 
 	if activeConfig.Debug {
 		logging.SetLevel(logging.DEBUG, programName)
-		log.Debug("Debugging enabled")
+		log.V(6).Info("Debugging enabled")
 	}
 	if activeConfig.Syslog {
 		enableSyslog(stderr)
@@ -339,7 +351,14 @@ func doConfig() error {
 
 // initLogging sets up logging to stderr
 func initLogging() *logging.LogBackend {
-	log = logging.MustGetLogger(programName)
+
+	l := logging.MustGetLogger(programName)
+	l.ExtraCalldepth = 2 // add extra call depth for the logr wrapper
+
+	log = gologgingr.New(
+		gologgingr.Logger(l),
+	)
+	gologgingr.SetVerbosity(10) // do not filter by verbosity. glauth uses the go-logging lib to filter the levels
 
 	format := "%{color}%{time:15:04:05.000000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}"
 	logBackend := logging.NewLogBackend(os.Stderr, "", 0)
@@ -356,10 +375,11 @@ func enableSyslog(stderrBackend *logging.LogBackend) {
 	logging.SetFormatter(logging.MustStringFormatter(format))
 	syslogBackend, err := logging.NewSyslogBackend("")
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err, "Could not create new syslog backend")
+		os.Exit(1)
 	}
 
 	logging.SetBackend(stderrBackend, syslogBackend)
 
-	log.Debug("Syslog enabled")
+	log.V(6).Info("Syslog enabled")
 }

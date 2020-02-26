@@ -2,7 +2,7 @@ package handler
 
 import "github.com/nmcclain/ldap"
 
-// interface for backend handler
+// Handler is the common interface for all datastores
 type Handler interface {
 	ldap.Binder
 	ldap.Searcher

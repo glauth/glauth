@@ -13,20 +13,20 @@ import (
 
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/stats"
+	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
-	"github.com/op/go-logging"
 	msgraph "github.com/yaegashi/msgraph.go/v1.0"
 )
 
 type ownCloudSession struct {
-	log         *logging.Logger
+	log         logr.Logger
 	user        string
 	password    string
 	baseUrl     string
 	useGraphAPI bool
 }
 type ownCloudHandler struct {
-	log      *logging.Logger
+	log      logr.Logger
 	cfg      *config.Config
 	meUrl    string
 	sessions map[string]ownCloudSession
@@ -37,25 +37,25 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	h.log.Debug(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "source", conn.RemoteAddr().String())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.cfg.Backend.BaseDN))
+		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
 	if len(parts) > 2 {
-		h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
+		h.log.V(2).Info("BindDN should have only one or two parts", "BindDN", bindDN, "numparts", len(parts))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	userName := strings.TrimPrefix(parts[0], "cn=")
 
 	// try to login
 	if !h.login(userName, bindSimplePw) {
-		h.log.Warning(fmt.Sprintf("Bind Error: User %s login failed", userName))
+		h.log.V(2).Info("Login failed", "username", userName, "basedn", h.cfg.Backend.BaseDN)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -71,7 +71,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	h.lock.Unlock()
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.Debug(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
+	h.log.V(6).Info("Login failed", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "source", conn.RemoteAddr().String())
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -79,7 +79,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.Debug(fmt.Sprintf("Search request as %s from %s for %s on %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter, searchBaseDN))
+	h.log.V(6).Info("Search request", "BindDN", bindDN, "source", conn.RemoteAddr().String(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -138,7 +138,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 		users, err := session.getUsers(userName)
 		if err != nil {
-			h.log.Debug(err)
+			h.log.V(6).Info("Could not get user", "username", userName, "err", err)
 			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, errors.New("search error: error getting users")
 		}
 		for _, u := range users {
@@ -160,7 +160,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 	}
 	stats.Frontend.Add("search_successes", 1)
-	h.log.Debug(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
+	h.log.V(6).Info("AP: Search OK", "filter", searchReq.Filter)
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
@@ -301,17 +301,19 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 }
 
 func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Request) error {
-	s.log.Debug("Setting user and password")
+	s.log.V(6).Info("Setting user and password", "username", s.user)
 	req.SetBasicAuth(s.user, s.password)
 	return nil
 }
 
-func NewOwnCloudHandler(log *logging.Logger, cfg *config.Config) Handler {
-	meUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", cfg.Backend.Servers[0])
+func NewOwnCloudHandler(opts ...Option) Handler {
+	options := newOptions(opts...)
+
+	meUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", options.Config.Backend.Servers[0])
 
 	handler := ownCloudHandler{
-		log:      log,
-		cfg:      cfg,
+		log:      options.Logger,
+		cfg:      options.Config,
 		meUrl:    meUrl,
 		sessions: make(map[string]ownCloudSession),
 	}
