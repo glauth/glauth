@@ -37,7 +37,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
@@ -48,7 +48,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	}
 	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
 	if len(parts) > 2 {
-		h.log.V(2).Info("BindDN should have only one or two parts", "BindDN", bindDN, "numparts", len(parts))
+		h.log.V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	userName := strings.TrimPrefix(parts[0], "cn=")
@@ -71,7 +71,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	h.lock.Unlock()
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("Login failed", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("Login failed", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -79,7 +79,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(6).Info("Search request", "BindDN", bindDN, "source", conn.RemoteAddr().String(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", bindDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access

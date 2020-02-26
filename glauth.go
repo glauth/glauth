@@ -123,7 +123,7 @@ func startService() {
 		log.V(6).Info("Web API enabled")
 		go frontend.RunAPI(
 			frontend.Logger(log),
-			frontend.Config(activeConfig),
+			frontend.Config(&activeConfig.API),
 		)
 	}
 

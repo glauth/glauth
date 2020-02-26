@@ -32,16 +32,16 @@ func RunAPI(opts ...Option) {
 		fmt.Fprintf(w, string(pageTemplate))
 	})
 	http.HandleFunc("/assets/", webStaticHandler(log))
-	if cfg.API.TLS {
-		log.V(3).Info("Starting HTTPS server", "address", cfg.API.Listen)
-		err := http.ListenAndServeTLS(cfg.API.Listen, cfg.API.Cert, cfg.API.Key, nil)
+	if cfg.TLS {
+		log.V(3).Info("Starting HTTPS server", "address", cfg.Listen)
+		err := http.ListenAndServeTLS(cfg.Listen, cfg.Cert, cfg.Key, nil)
 		if err != nil {
 			log.Error(err, "Error starting HTTPS server")
 			return
 		}
 	} else {
-		log.V(3).Info("Starting HTTP server", "address", cfg.API.Listen)
-		err := http.ListenAndServe(cfg.API.Listen, nil)
+		log.V(3).Info("Starting HTTP server", "address", cfg.Listen)
+		err := http.ListenAndServe(cfg.Listen, nil)
 		if err != nil {
 			log.Error(err, "Error starting HTTP server")
 			return

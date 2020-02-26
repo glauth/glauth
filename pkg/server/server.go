@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
@@ -91,6 +92,7 @@ func (s *LdapSvc) startLDAP() {
 	s.log.V(3).Info("LDAP server listening", "address", s.c.LDAP.Listen)
 	if err := s.l.ListenAndServe(s.c.LDAP.Listen); err != nil {
 		s.log.Error(err, "LDAP Server Failed")
+		os.Exit(1)
 		// TODO return error
 	}
 }
@@ -99,6 +101,7 @@ func (s *LdapSvc) startLDAPS() {
 	s.log.V(3).Info("LDAPS server listening", "address", s.c.LDAPS.Listen)
 	if err := s.l.ListenAndServeTLS(s.c.LDAPS.Listen, s.c.LDAPS.Cert, s.c.LDAPS.Key); err != nil {
 		s.log.Error(err, "LDAP Server Failed")
+		os.Exit(1)
 		// TODO return error
 	}
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/go-logr/logr"
-	"github.com/kr/pretty"
 	"github.com/nmcclain/ldap"
 )
 
@@ -81,28 +80,28 @@ func NewLdapHandler(opts ...Option) Handler {
 
 //
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
-	h.log.V(6).Info("Bind request", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
 		stats.Frontend.Add("bind_ldapSession_errors", 1)
-		h.log.V(6).Info("could not get session", "BindDN", bindDN, "source", conn.RemoteAddr().String(), "error", err)
+		h.log.V(6).Info("could not get session", "binddn", bindDN, "src", conn.RemoteAddr(), "error", err)
 		return ldap.LDAPResultOperationsError, err
 	}
 	if err := s.ldap.Bind(bindDN, bindSimplePw); err != nil {
 		stats.Frontend.Add("bind_errors", 1)
-		h.log.V(6).Info("invalid creds", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+		h.log.V(6).Info("invalid creds", "binddn", bindDN, "src", conn.RemoteAddr())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("bind success", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("bind success", "binddn", bindDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
 //
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	h.log.V(6).Info("Search request", "BindDN", boundDN, "source", conn.RemoteAddr().String(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
@@ -121,18 +120,18 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 		searchReq.Controls,
 	)
 
-	h.log.V(6).Info("Search request to backend", "request", pretty.Formatter(search))
+	h.log.V(6).Info("Search request to backend", "request", search)
 	sr, err := s.ldap.Search(search)
-	h.log.V(6).Info("Backend Search result", "result", pretty.Formatter(sr))
+	h.log.V(6).Info("Backend Search result", "result", sr)
 	ssr := ldap.ServerSearchResult{
 		Entries:   sr.Entries,
 		Referrals: sr.Referrals,
 		Controls:  sr.Controls,
 	}
-	h.log.V(6).Info("Frontend Search result", "result", pretty.Formatter(ssr))
+	h.log.V(6).Info("Frontend Search result", "result", ssr)
 	if err != nil {
 		e := err.(*ldap.Error)
-		h.log.V(6).Info("Search Err", "error", pretty.Formatter(err))
+		h.log.V(6).Info("Search Err", "error", err)
 		stats.Frontend.Add("search_errors", 1)
 		ssr.ResultCode = ldap.LDAPResultCode(e.ResultCode)
 		return ssr, err
@@ -251,7 +250,7 @@ func (h ldapHandler) ping() error {
 		}
 		h.lock.Unlock()
 	}
-	h.log.V(6).Info("Server health", "servers", pretty.Formatter(h.servers))
+	h.log.V(6).Info("Server health", "servers", h.servers)
 	b, err := json.Marshal(h.servers)
 	if err != nil {
 		h.log.V(1).Info("Error encoding tail data", "error", err)
@@ -280,7 +279,7 @@ func (h ldapHandler) getBestServer() (ldapBackend, error) {
 	if bestping == forever {
 		return ldapBackend{}, fmt.Errorf("No healthy servers found")
 	}
-	h.log.V(6).Info("Best server", "favorite", pretty.Formatter(favorite))
+	h.log.V(6).Info("Best server", "favorite", favorite)
 	return favorite, nil
 }
 

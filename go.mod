@@ -9,7 +9,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-logr/logr v0.1.0
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
-	github.com/kr/pretty v0.2.0
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/nmcclain/asn1-ber v0.0.0-20170104154839-2661553a0484 // indirect
 	github.com/nmcclain/ldap v0.0.0-20191021200707-3b3b69a7e9e3
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

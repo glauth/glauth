@@ -39,13 +39,13 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	h.log.V(6).Info("Bind request", "BindDN", bindDN, "BaseDN", h.cfg.Backend.BaseDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info("BindDN not part of our BaseDN", "BindDN", bindDN, "BaseDN", h.cfg.Backend.BaseDN)
+		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
 		// h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -58,7 +58,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
 		groupName = strings.TrimPrefix(parts[1], h.cfg.Backend.GroupFormat+"=")
 	} else {
-		h.log.V(2).Info("BindDN should have only one or two parts", "BindDN", bindDN, "numparts", len(parts))
+		h.log.V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -138,10 +138,10 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	for index, appPw := range user.PassAppSHA256 {
 
 		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-			h.log.V(6).Info("Attempt to bind app pw failed", "index", index, "BindDN", bindDN, "source", conn.RemoteAddr().String())
+			h.log.V(6).Info("Attempt to bind app pw failed", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
 		} else {
 			stats.Frontend.Add("bind_successes", 1)
-			h.log.V(6).Info("Bind success using app pw", "index", index, "BindDN", bindDN, "source", conn.RemoteAddr().String())
+			h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
 			return ldap.LDAPResultSuccess, nil
 		}
 
@@ -153,18 +153,18 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {
-		h.log.V(2).Info("invalid OTP token", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+		h.log.V(2).Info("invalid OTP token", "binddn", bindDN, "src", conn.RemoteAddr())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	// Now, check the hash
 	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
-		h.log.V(2).Info("invalid credentials", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+		h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("Bind success", "BindDN", bindDN, "source", conn.RemoteAddr().String())
+	h.log.V(6).Info("Bind success", "binddn", bindDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -173,7 +173,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(6).Info("Search request", "BindDN", bindDN, "source", conn.RemoteAddr().String(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", bindDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access

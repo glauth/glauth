@@ -13,8 +13,8 @@ type Option func(o *Options)
 // Options defines the available options for this package.
 type Options struct {
 	Logger  logr.Logger
-	Config  *config.Config
-	Context *context.Context
+	Config  *config.API
+	Context context.Context
 }
 
 // newOptions initializes the available default options.
@@ -36,14 +36,14 @@ func Logger(val logr.Logger) Option {
 }
 
 // Config provides a function to set the config option.
-func Config(val *config.Config) Option {
+func Config(val *config.API) Option {
 	return func(o *Options) {
 		o.Config = val
 	}
 }
 
 // Context provides a function to set the context option.
-func Context(val *context.Context) Option {
+func Context(val context.Context) Option {
 	return func(o *Options) {
 		o.Context = val
 	}
