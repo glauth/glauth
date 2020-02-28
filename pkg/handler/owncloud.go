@@ -71,7 +71,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	h.lock.Unlock()
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("Login failed", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
+	h.log.V(6).Info("Bind success", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -79,7 +79,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(6).Info("Search request", "binddn", bindDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -132,7 +132,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		userName := ""
 		if searchBaseDN != strings.ToLower(h.cfg.Backend.BaseDN) {
 			parts := strings.Split(strings.TrimSuffix(searchBaseDN, baseDN), ",")
-			if len(parts) == 1 {
+			if len(parts) >= 1 {
 				userName = strings.TrimPrefix(parts[0], "cn=")
 			}
 		}
@@ -229,8 +229,8 @@ func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 	}
 
 	ret := make([]msgraph.Group, len(f.Ocs.Data.Groups))
-	for i, v := range f.Ocs.Data.Groups {
-		ret[i] = msgraph.Group{DirectoryObject: msgraph.DirectoryObject{Entity: msgraph.Entity{ID: &v}}}
+	for i := range f.Ocs.Data.Groups {
+		ret[i] = msgraph.Group{DirectoryObject: msgraph.DirectoryObject{Entity: msgraph.Entity{ID: &f.Ocs.Data.Groups[i]}}}
 	}
 
 	return ret, nil
@@ -293,8 +293,12 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 	}
 
 	ret := make([]msgraph.User, len(f.Ocs.Data.Users))
-	for i, v := range f.Ocs.Data.Users {
-		ret[i] = msgraph.User{DirectoryObject: msgraph.DirectoryObject{Entity: msgraph.Entity{ID: &v}}}
+	for i := range f.Ocs.Data.Users {
+		ret[i] = msgraph.User{
+			DirectoryObject: msgraph.DirectoryObject{
+				Entity: msgraph.Entity{ID: &f.Ocs.Data.Users[i]},
+			},
+		}
 	}
 
 	return ret, nil
