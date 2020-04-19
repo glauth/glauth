@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"plugin"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
@@ -46,6 +47,23 @@ func NewServer(log *logging.Logger, cfg *config.Config) (*LdapSvc, error) {
 		h = handler.NewOwnCloudHandler(log, cfg)
 	case "config":
 		h = handler.NewConfigHandler(log, cfg, s.yubiAuth)
+	case "plugin":
+		plug, err := plugin.Open(cfg.Backend.Plugin)
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("Unable to load specified backend plugin: %s", err))
+		}
+		nph, err := plug.Lookup("NewPluginHandler")
+		if err != nil {
+			return nil, errors.New("Unable to find 'NewPluginHandler' in loaded backend plugin")
+		}
+		initFunc, ok := nph.(func(*logging.Logger, *config.Config, *yubigo.YubiAuth) handler.Handler)
+
+		if !ok {
+			return nil, errors.New("Loaded backend plugin lacks a proper NewPluginHandler function")
+		}
+		// Normally, here, we would somehow have imported our plugin into our
+		// handler namespace. Oops?
+		h = initFunc(log, cfg, s.yubiAuth)
 	default:
 		return nil, fmt.Errorf("unsupported backend %s - must be 'config' or 'ldap'", cfg.Backend.Datastore)
 	}
