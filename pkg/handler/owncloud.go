@@ -22,13 +22,13 @@ type ownCloudSession struct {
 	log         logr.Logger
 	user        string
 	password    string
-	baseUrl     string
+	endpoint    string
 	useGraphAPI bool
 }
 type ownCloudHandler struct {
 	log      logr.Logger
 	cfg      *config.Config
-	meUrl    string
+	meURL    string
 	sessions map[string]ownCloudSession
 	lock     sync.Mutex
 }
@@ -65,7 +65,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 		log:         h.log,
 		user:        userName,
 		password:    bindSimplePw,
-		baseUrl:     h.cfg.Backend.Servers[0],
+		endpoint:    h.cfg.Backend.Servers[0],
 		useGraphAPI: h.cfg.Backend.UseGraphAPI,
 	}
 	h.lock.Unlock()
@@ -175,7 +175,7 @@ func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 }
 
 func (h ownCloudHandler) login(name, pw string) bool {
-	req, _ := http.NewRequest("GET", h.meUrl, nil)
+	req, _ := http.NewRequest("GET", h.meURL, nil)
 	req.SetBasicAuth(name, pw)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -210,7 +210,7 @@ func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 		req.Expand("members")
 		return req.Get(ctx)
 	}
-	groupsUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/groups?format=json", s.baseUrl)
+	groupsUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/groups?format=json", s.endpoint)
 
 	req, _ := http.NewRequest("GET", groupsUrl, nil)
 	req.SetBasicAuth(s.user, s.password)
@@ -251,13 +251,11 @@ type OCSUsersResponse struct {
 
 // NewClient returns GraphService request builder with default base URL
 func (s ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
-	graphAPIBaseUrl := fmt.Sprintf("%s/index.php/apps/graphapi/v1.0/", s.baseUrl)
-
 	httpClient := &http.Client{
 		Transport: s,
 	}
 	g := msgraph.NewClient(httpClient)
-	g.SetURL(graphAPIBaseUrl)
+	g.SetURL(s.endpoint)
 	return g
 }
 
@@ -274,7 +272,7 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 		}
 		return req.Request().Get(ctx)
 	}
-	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", s.baseUrl)
+	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", s.endpoint)
 
 	req, _ := http.NewRequest("GET", usersUrl, nil)
 	req.SetBasicAuth(s.user, s.password)
@@ -313,12 +311,12 @@ func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Reque
 func NewOwnCloudHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
-	meUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", options.Config.Backend.Servers[0])
+	meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", options.Config.Backend.Servers[0])
 
 	handler := ownCloudHandler{
 		log:      options.Logger,
 		cfg:      options.Config,
-		meUrl:    meUrl,
+		meURL:    meURL,
 		sessions: make(map[string]ownCloudSession),
 	}
 	return handler
