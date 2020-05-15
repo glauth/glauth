@@ -208,7 +208,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
-	case "posixaccount", "":
+	case "posixaccount", "shadowaccount", "":
 		for _, u := range h.cfg.Users {
 			attrs := []*ldap.EntryAttribute{}
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{u.Name}})
