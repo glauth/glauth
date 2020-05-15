@@ -164,6 +164,21 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
+// Add is not yet supported for the owncloud backend
+func (h ownCloudHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Modify is not yet supported for the owncloud backend
+func (h ownCloudHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Delete is not yet supported for the owncloud backend
+func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
 func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()
