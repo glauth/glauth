@@ -140,6 +140,22 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	h.log.V(6).Info("AP: Search OK", "filter", search.Filter, "numentries", len(ssr.Entries))
 	return ssr, nil
 }
+
+// Add is not yet supported for the ldap backend
+func (h ldapHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Modify is not yet supported for the ldap backend
+func (h ldapHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Delete is not yet supported for the ldap backend
+func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
 func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()

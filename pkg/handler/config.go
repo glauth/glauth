@@ -274,6 +274,21 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
+// Add is not supported for a static config file
+func (h configHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Modify is not supported for a static config file
+func (h configHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+// Delete is not supported for a static config file
+func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
 // Close does not actually close anything, because the config data is kept in memory
 func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	stats.Frontend.Add("closes", 1)
