@@ -320,6 +320,7 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 	case "":
 		cfg.Backend.Datastore = "config"
 	case "config":
+	case "homed":
 	case "ldap":
 	case "owncloud":
 	default:

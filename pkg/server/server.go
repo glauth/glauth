@@ -41,6 +41,17 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	s.l.EnforceLDAP = true
 	var h handler.Handler
 	switch s.c.Backend.Datastore {
+	case "config":
+		h = handler.NewConfigHandler(
+			handler.Logger(s.log),
+			handler.Config(s.c),
+			handler.YubiAuth(s.yubiAuth),
+		)
+	case "homed":
+		h = handler.NewHomedHandler(
+			handler.Logger(s.log),
+			handler.Config(s.c),
+		)
 	case "ldap":
 		h = handler.NewLdapHandler(
 			handler.Logger(s.log),
@@ -51,19 +62,16 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			handler.Logger(s.log),
 			handler.Config(s.c),
 		)
-	case "config":
-		h = handler.NewConfigHandler(
-			handler.Logger(s.log),
-			handler.Config(s.c),
-			handler.YubiAuth(s.yubiAuth),
-		)
 	default:
-		return nil, fmt.Errorf("unsupported backend %s - must be 'config', 'ldap' or 'owncloud'", s.c.Backend.Datastore)
+		return nil, fmt.Errorf("unsupported backend %s - must be 'config', 'homed', 'ldap' or 'owncloud'", s.c.Backend.Datastore)
 	}
 	s.log.V(3).Info("Using backend", "datastore", s.c.Backend.Datastore)
-	s.l.BindFunc("", h)
-	s.l.SearchFunc("", h)
-	s.l.CloseFunc("", h)
+	s.l.BindFunc(s.c.Backend.BaseDN, h)
+	s.l.SearchFunc(s.c.Backend.BaseDN, h)
+	s.l.AddFunc(s.c.Backend.BaseDN, h)
+	s.l.ModifyFunc(s.c.Backend.BaseDN, h)
+	s.l.DeleteFunc(s.c.Backend.BaseDN, h)
+	s.l.CloseFunc(s.c.Backend.BaseDN, h)
 
 	return &s, nil
 }

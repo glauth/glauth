@@ -10,6 +10,9 @@ type Backend struct {
 	GroupFormat string
 	SSHKeyAttr  string
 	UseGraphAPI bool // For ownCloud backend only
+	// homed
+	UserRecordsPath  string
+	GroupRecordsPath string
 }
 type Frontend struct {
 	AllowedBaseDNs []string // For LDAP backend only

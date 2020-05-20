@@ -94,6 +94,38 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
+	// TODO why only one objectclass?
+	// try collecting all objectclasses?
+	// well ... ldap.GetFilterObjectClass(searchReq.Filter) cannotd just return a single objectclass ...
+	// "Operations Error": search error: unhandled filter type: kopano-addresslist
+	//  [
+	//    (&
+	//      (|
+	//        (|
+	//          (objectClass=posixAccount)
+	//          (objectClass=kopano-contact)
+	//        )
+	//        (objectClass=kopano-contact)
+	//        (|
+	//          (objectClass=posixGroup)
+	//          (objectClass=kopano-dynamicgroup)
+	//        )
+	//        (|
+	//          (&
+	//            (objectClass=kopano-addresslist)
+	//          )
+	//        )
+	//      )
+	//    )
+	//  ]
+	// I know the filter is nuts ... it is actually just a giant or
+	// solve by allowing to customize the user and group objectclasses?
+	// ignore unknown objectclasses and only check if one of the objectclasses is posixaccount?
+	//f, err := ldap.CompileFilter(searchReq.Filter)
+	//if err != nil {
+	//	return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("search error: error parsing filter: %s", searchReq.Filter)
+	//}
+
 	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
 	if err != nil {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("search error: error parsing filter: %s", searchReq.Filter)
