@@ -193,7 +193,7 @@ func (h ownCloudHandler) login(name, pw string) bool {
 	req, _ := http.NewRequest("GET", h.meURL, nil)
 	req.SetBasicAuth(name, pw)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		return false
 	}
 	defer resp.Body.Close()
