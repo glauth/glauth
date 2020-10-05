@@ -5,7 +5,7 @@ type Backend struct {
 	BaseDN      string
 	Datastore   string
 	Insecure    bool     // For LDAP backend only
-	Servers     []string // For LDAP backend only
+	Servers     []string // For LDAP and owncloud backend only
 	NameFormat  string
 	GroupFormat string
 	SSHKeyAttr  string
