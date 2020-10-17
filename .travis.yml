@@ -4,9 +4,8 @@ language: go
 
 # if you change the version here, also update the travis deploy condition
 go: 
- - 1.11.x      # older version
- - 1.12.x      # last version
- - 1.13.x      # current version
+ - 1.14.x      # last version
+ - 1.15.x      # current version
 
 # Speed up git clones
 git:
@@ -75,5 +74,5 @@ deploy:
   on:
     branch: master
     tags: true
-    condition: $TRAVIS_GO_VERSION =~ ^1\.13
+    condition: $TRAVIS_GO_VERSION =~ ^1\.15
     repo: glauth/glauth
