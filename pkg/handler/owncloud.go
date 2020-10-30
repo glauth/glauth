@@ -28,7 +28,6 @@ type ownCloudSession struct {
 type ownCloudHandler struct {
 	log      logr.Logger
 	cfg      *config.Config
-	meURL    string
 	sessions map[string]ownCloudSession
 	lock     sync.Mutex
 }
@@ -190,10 +189,24 @@ func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 }
 
 func (h ownCloudHandler) login(name, pw string) bool {
-	req, _ := http.NewRequest("GET", h.meURL, nil)
+	var req *http.Request
+	if h.cfg.Backend.UseGraphAPI {
+		// TODO oc10 graphapi app should implement /me
+		req, _ = http.NewRequest("GET", h.cfg.Backend.Servers[0]+"/users/"+name, nil)
+	} else {
+		// use provisioning api
+		meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", h.cfg.Backend.Servers[0])
+		req, _ = http.NewRequest("GET", meURL, nil)
+	}
 	req.SetBasicAuth(name, pw)
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
+		h.log.Error(err, "failed login", "status", resp.StatusCode)
 		return false
 	}
 	defer resp.Body.Close()
@@ -276,17 +289,21 @@ func (s ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
 
 func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 	if s.useGraphAPI {
+		s.log.V(6).Info("using graph api")
 		ctx := context.Background()
 		req := s.NewClient().Users()
 		if len(userName) > 0 {
+			s.log.V(6).Info("fetching single user")
 			u, err := req.ID(userName).Request().Get(ctx)
 			if err != nil {
 				return nil, err
 			}
 			return []msgraph.User{*u}, nil
 		}
+		s.log.V(6).Info("fetching all users")
 		return req.Request().Get(ctx)
 	}
+	s.log.V(6).Info("using provisioning api")
 	usersUrl := fmt.Sprintf("%s/ocs/v2.php/cloud/users?format=json", s.endpoint)
 
 	req, _ := http.NewRequest("GET", usersUrl, nil)
@@ -326,12 +343,9 @@ func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Reque
 func NewOwnCloudHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
-	meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", options.Config.Backend.Servers[0])
-
 	handler := ownCloudHandler{
 		log:      options.Logger,
 		cfg:      options.Config,
-		meURL:    meURL,
 		sessions: make(map[string]ownCloudSession),
 	}
 	return handler
