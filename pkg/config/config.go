@@ -75,4 +75,5 @@ type Config struct {
 	AwsAccessKeyId     string
 	AwsSecretAccessKey string
 	AwsRegion          string
+	AllowAnonymous     bool
 }

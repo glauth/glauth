@@ -37,9 +37,9 @@ func NewConfigHandler(opts ...Option) Handler {
 // Bind implements a bind request against the config file
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	// Allow anonymous binding
-	if bindDN == "" && bindSimplePw == "" {
-	        h.log.V(6).Info(fmt.Sprintf("Anonymous bind success from %s", conn.RemoteAddr().String()))
-	        return ldap.LDAPResultSuccess, nil
+	if h.cfg.AllowAnonymous && bindDN == "" && bindSimplePw == "" {
+		h.log.V(6).Info(fmt.Sprintf("Anonymous bind success from %s", conn.RemoteAddr().String()))
+		return ldap.LDAPResultSuccess, nil
 	}
 
 	bindDN = strings.ToLower(bindDN)
@@ -184,9 +184,9 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	stats.Frontend.Add("search_reqs", 1)
 
 	// Root DSE query
-	if searchReq.BaseDN == "" && searchReq.Scope == 0 {
-	        var entries []*ldap.Entry
-	        return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
+	if h.cfg.AllowAnonymous && searchReq.BaseDN == "" && searchReq.Scope == 0 {
+		var entries []*ldap.Entry
+		return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
 	}
 
 	// validate the user is authenticated and has appropriate access
