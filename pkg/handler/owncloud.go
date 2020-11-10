@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 
 type ownCloudSession struct {
 	log         logr.Logger
+	client      *http.Client
 	user        string
 	password    string
 	endpoint    string
@@ -28,6 +30,7 @@ type ownCloudSession struct {
 type ownCloudHandler struct {
 	log      logr.Logger
 	cfg      *config.Config
+	client   *http.Client
 	sessions map[string]ownCloudSession
 	lock     sync.Mutex
 }
@@ -66,6 +69,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 		password:    bindSimplePw,
 		endpoint:    h.cfg.Backend.Servers[0],
 		useGraphAPI: h.cfg.Backend.UseGraphAPI,
+		client:      h.client,
 	}
 	h.lock.Unlock()
 
@@ -199,12 +203,7 @@ func (h ownCloudHandler) login(name, pw string) bool {
 		req, _ = http.NewRequest("GET", meURL, nil)
 	}
 	req.SetBasicAuth(name, pw)
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
+	resp, err := h.client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		h.log.Error(err, "failed login", "status", resp.StatusCode)
 		return false
@@ -226,11 +225,6 @@ type OCSGroupsResponse struct {
 	} `json:"ocs"`
 }
 
-func (s ownCloudSession) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.SetBasicAuth(s.user, s.password)
-	return http.DefaultTransport.RoundTrip(req)
-}
-
 func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 	if s.useGraphAPI {
 		ctx := context.Background()
@@ -242,7 +236,7 @@ func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 
 	req, _ := http.NewRequest("GET", groupsUrl, nil)
 	req.SetBasicAuth(s.user, s.password)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +281,11 @@ func (s ownCloudSession) NewClient() *msgraph.GraphServiceRequestBuilder {
 	return g
 }
 
+func (s ownCloudSession) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(s.user, s.password)
+	return s.client.Transport.RoundTrip(req)
+}
+
 func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 	if s.useGraphAPI {
 		s.log.V(6).Info("using graph api")
@@ -308,7 +307,7 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 
 	req, _ := http.NewRequest("GET", usersUrl, nil)
 	req.SetBasicAuth(s.user, s.password)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -343,10 +342,19 @@ func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Reque
 func NewOwnCloudHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
-	handler := ownCloudHandler{
+	return ownCloudHandler{
 		log:      options.Logger,
 		cfg:      options.Config,
 		sessions: make(map[string]ownCloudSession),
+		client: &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: options.Config.Backend.Insecure,
+				},
+			},
+		},
 	}
-	return handler
 }
