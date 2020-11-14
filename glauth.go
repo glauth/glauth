@@ -192,7 +192,7 @@ func startConfigWatcher() {
 						watcher.Add(configFileLocation)
 					}
 
-					if event.Op.String() == "WRITE" || event.Op&fsnotify.Remove == fsnotify.Remove {
+					if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
 						if err := doConfig(); err != nil {
 							log.V(2).Info("Could not reload config.Holding on to old config", "error", err.Error())
 						} else {
