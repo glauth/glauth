@@ -156,7 +156,7 @@ GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as
 ### Two Factor Authentication
 GLAuth can be configured to accept OTP tokens as appended to a users password. Support is added for both **TOTP tokens** (often known by it's most prominent implementation, "Google Authenticator") and **Yubikey OTP tokens**.
 
-When using 2FA, append the 2FA code to the end of the password when authenticating. For example, if your password is "monkey" and your otp is "123456", enter "monkey123456" as your password. 
+When using 2FA, append the 2FA code to the end of the password when authenticating. For example, if your password is "monkey" and your otp is "123456", enter "monkey123456" as your password.
 
 #### TOTP Configuration
 To enable TOTP authentication on a user, you can use a tool [like this](https://freeotp.github.io/qrcode.html) to generate a QR code (pick 'Timeout' and optionally let it generate a random secret for you), which can be scanned and used with the [Google Authenticator](https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en) app. To enable TOTP authentication, configure the `otpsecret` for the user with the TOTP secret.
@@ -194,13 +194,27 @@ Any of the architectures above will work for production.  Just remember:
 A small note about other architectures: while I expect the code is, for the most part, system-independent, there is not a good (and free) CI system which can be easily used to continuously test releases on ARM, BSD, Linux-32bit, and Windows. As such, all of the non-linux-64bit packages are provided as is. The extent of testing on these packages consists solely of cross-compiling for these architectures from a linux 64 bit system.
 
 We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable with this.
- 
+
 ### Building:
 You'll need go-bindata to build GLAuth. Then use the Makefile.
 ```unix
 go get github.com/jteeuwen/go-bindata/...
 make all
 ```
+
+# Logging
+- using logr with increasing verbosity
+  - 0 you always want to see this
+  - 1 common logging that you might *possibly* want to turn off (error)
+  - 2 warn
+  - 3 notice
+  - 4 info
+  - 6 debug
+  - 8 trace
+  - 10 I would like to performance test your log collection stack
+- errors really are errors that cannot be handled or returned
+  - returning a proper ldep error code is handling an error
+
 
 ## Stargazers over time
 
