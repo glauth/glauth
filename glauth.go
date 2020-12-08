@@ -186,7 +186,13 @@ func startConfigWatcher() {
 			select {
 			case event := <-watcher.Events:
 				if activeConfig.WatchConfig {
-					if event.Op.String() == "WRITE" {
+					if event.Op&fsnotify.Remove == fsnotify.Remove {
+						// Ensure we still watch when symlinks are updated
+						watcher.Remove(event.Name)
+						watcher.Add(configFileLocation)
+					}
+
+					if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
 						if err := doConfig(); err != nil {
 							log.V(2).Info("Could not reload config.Holding on to old config", "error", err.Error())
 						} else {
