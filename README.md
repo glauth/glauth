@@ -30,7 +30,7 @@ This quickstart is a great way to try out GLAuth in a non-production environment
 3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
    - `sudo ./glauth64 -c sample-simple.cfg`
 4. Test with traditional LDAP tools
-   - For example: `ldapsearch -LLL -H ldap://localhost:389 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+   - For example: `ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
 
 
 
