@@ -43,6 +43,10 @@ Options:
   -K <aws_key_id>           AWS Key ID.
   -S <aws_secret_key>       AWS Secret Key.
   -r <aws_region>           AWS Region [default: us-east-1].
+  --ldap <address>          Listen address for the LDAP server.
+  --ldaps <address>         Listen address for the LDAPS server.
+  --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
+  --ldaps-key <key-file>    Path to key file for the LDAPS server.
   -h, --help                Show this screen.
   --version                 Show version.
 `
@@ -274,6 +278,24 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 }
 
 func handleConfig(cfg config.Config) (*config.Config, error) {
+	// LDAP flags
+	if ldap, ok := args["--ldap"].(string); ok && ldap != "" {
+		cfg.LDAP.Enabled = true
+		cfg.LDAP.Listen = ldap
+	}
+
+	// LDAPS flags
+	if ldaps, ok := args["--ldaps"].(string); ok && ldaps != "" {
+		cfg.LDAPS.Enabled = true
+		cfg.LDAPS.Listen = ldaps
+	}
+	if ldapsCert, ok := args["--ldaps-cert"].(string); ok && ldapsCert != "" {
+		cfg.LDAPS.Cert = ldapsCert
+	}
+	if ldapsKey, ok := args["--ldaps-key"].(string); ok && ldapsKey != "" {
+		cfg.LDAPS.Key = ldapsKey
+	}
+
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
 		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
