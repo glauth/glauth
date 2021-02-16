@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
@@ -15,10 +14,11 @@ import (
 	"github.com/glauth/glauth/pkg/server"
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/go-logr/logr"
+	"github.com/hydronica/toml"
 	"github.com/jinzhu/copier"
 	logging "github.com/op/go-logging"
-	"gopkg.in/amz.v1/aws"
-	"gopkg.in/amz.v1/s3"
+	"gopkg.in/amz.v3/aws"
+	"gopkg.in/amz.v3/s3"
 )
 
 // Set with buildtime vars
@@ -260,7 +260,10 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		if len(parts) != 2 {
 			return &cfg, fmt.Errorf("Invalid S3 URL: %s", s3url)
 		}
-		b := s3.New(auth, region).Bucket(parts[0])
+		b, err := s3.New(auth, region).Bucket(parts[0])
+		if err != nil {
+			return &cfg, err
+		}
 		tomlData, err := b.Get(parts[1])
 		if err != nil {
 			return &cfg, err
@@ -277,7 +280,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	return &cfg, nil
 }
 
-func handleConfig(cfg config.Config) (*config.Config, error) {
+func handleArgs(cfg config.Config) (*config.Config, error) {
 	// LDAP flags
 	if ldap, ok := args["--ldap"].(string); ok && ldap != "" {
 		cfg.LDAP.Enabled = true
@@ -296,6 +299,10 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 		cfg.LDAPS.Key = ldapsKey
 	}
 
+	return &cfg, nil
+}
+
+func handleLegacyConfig(cfg config.Config) (*config.Config, error) {
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
 		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
@@ -321,6 +328,9 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 			cfg.LDAPS.Key = cfg.Frontend.Key
 		}
 	}
+	return &cfg, nil
+}
+func validateConfig(cfg config.Config) (*config.Config, error) {
 
 	if !cfg.LDAP.Enabled && !cfg.LDAPS.Enabled {
 		return &cfg, fmt.Errorf("No server configuration found: please provide either LDAP or LDAPS configuration")
@@ -364,8 +374,19 @@ func doConfig() error {
 		return err
 	}
 
-	// Handle validation and parsing of old [frontend] section into [ldap] and/or [ldaps] sections
-	cfg, err = handleConfig(*cfg)
+	// Handle parsed flags
+	cfg, err = handleArgs(*cfg)
+	if err != nil {
+		return err
+	}
+
+	// Handle parsing of legacy [frontend] section into [ldap] and/or [ldaps] sections
+	cfg, err = handleLegacyConfig(*cfg)
+	if err != nil {
+		return err
+	}
+
+	cfg, err = validateConfig(*cfg)
 	if err != nil {
 		return err
 	}
