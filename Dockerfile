@@ -20,12 +20,12 @@ ENV CGO_ENABLED=0
 # Only needed for alpine builds
 RUN apk add --no-cache git make go-bindata
 
-# Install deps
-RUN go get -d -v ./...
-
 # Run go-bindata to embed data for API
 RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
 RUN gofmt -w pkg/assets/bindata.go
+
+# Install deps
+RUN go get -d -v ./...
 
 # Build and copy final result
 RUN uname -a
