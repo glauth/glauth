@@ -38,7 +38,7 @@ fast: setup linux64 verify cleanup
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 
 # Setup commands to always run
-setup: getdeps bindata format
+setup: bindata getdeps format
 
 #####################
 # Subcommands
