@@ -28,11 +28,9 @@ This quickstart is a great way to try out GLAuth in a non-production environment
 1. Download a precompiled binary from the [releases](https://github.com/glauth/glauth/releases) page.
 2. Download the [example config file](https://github.com/glauth/glauth/blob/master/sample-simple.cfg).
 3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
-   - `sudo ./glauth64 -c sample-simple.cfg`
+   - `./glauth64 -c sample-simple.cfg`
 4. Test with traditional LDAP tools
    - For example: `ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
-
-
 
 ### Make Commands
 
@@ -60,6 +58,10 @@ Options:
   -K <aws_key_id>           AWS Key ID.
   -S <aws_secret_key>       AWS Secret Key.
   -r <aws_region>           AWS Region [default: us-east-1].
+  --ldap <address>          Listen address for the LDAP server.
+  --ldaps <address>         Listen address for the LDAPS server.
+  --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
+  --ldaps-key <key-file>    Path to key file for the LDAPS server.
   -h, --help                Show this screen.
   --version                 Show version.
 ```
@@ -213,7 +215,7 @@ make all
   - 8 trace
   - 10 I would like to performance test your log collection stack
 - errors really are errors that cannot be handled or returned
-  - returning a proper ldep error code is handling an error
+  - returning a proper LDAP error code is handling an error
 
 
 ## Stargazers over time
