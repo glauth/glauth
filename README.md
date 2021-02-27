@@ -222,15 +222,3 @@ make all
 
 [![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
 
-### Support
-
-Support the ongoing development of GLAuth!
-
-**Paypal**
-
-[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
-
-
-**Bitcoin Address**
-
-39z2Zkoc24LsuiqCQNFe7QrX4da3mzbGjK
