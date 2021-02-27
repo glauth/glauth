@@ -217,7 +217,6 @@ make all
 - errors really are errors that cannot be handled or returned
   - returning a proper LDAP error code is handling an error
 
-
 ## Stargazers over time
 
 [![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
