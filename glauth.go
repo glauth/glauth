@@ -363,6 +363,21 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 	default:
 		return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap' or 'owncloud", cfg.Backend.Datastore)
 	}
+
+	// TODO: remove after deprecating UnixID on User and Group
+	for _, user := range cfg.Users {
+		if user.UnixID != 0 {
+			user.UIDNumber = user.UnixID
+			log.V(2).Info("'unixid' on users is deprecated - please move to 'uidnumber' as-per documentation")
+		}
+	}
+	for _, group := range cfg.Groups {
+		if group.UnixID != 0 {
+			group.GIDNumber = group.UnixID
+			log.V(2).Info("'unixid' on groups is deprecated - please move to 'gidnumber' as-per documentation")
+		}
+	}
+
 	return &cfg, nil
 }
 
