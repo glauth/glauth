@@ -65,8 +65,10 @@ cleanup:
 format:
 	go fmt
 
-devrun:
-	go run ${BUILD_FILES} -c glauth.cfg
+devrunback:
+	go run ${BUILD_FILES} -c cfr-back.toml
+devrunproxy:
+	go run ${BUILD_FILES} -c cfr-proxy.toml
 
 
 linux32:

@@ -17,6 +17,8 @@ import (
 	"github.com/kr/pretty"
 	"github.com/nmcclain/ldap"
 	"github.com/op/go-logging"
+
+	"github.com/pquerna/otp/totp"
 )
 
 type ldapHandler struct {
@@ -76,7 +78,47 @@ func NewLdapHandler(log *logging.Logger, cfg *config.Config) Handler {
 
 //
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+	bindDN = strings.ToLower(bindDN)
+	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+
 	h.log.Debug(fmt.Sprintf("Bind request as %s from %s", bindDN, conn.RemoteAddr().String()))
+
+	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
+
+	//groupName := ""
+	userName := strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
+
+	validotp := false
+
+	// find the user
+	user := config.User{}
+	found := false
+	for _, u := range h.cfg.Users {
+		if u.Name == userName {
+			found = true
+			user = u
+		}
+	}
+
+	if !found {
+		validotp = true
+	} else {
+		if len(user.OTPSecret) == 0 {
+			validotp = true
+		} else {
+			if len(bindSimplePw) > 6 {
+				otp := bindSimplePw[len(bindSimplePw)-6:]
+				bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
+				validotp = totp.Validate(otp, user.OTPSecret)
+			}
+		}
+	}
+
+	if !validotp {
+		h.log.Warning(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
+
 	stats.Frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
