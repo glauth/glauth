@@ -11,7 +11,7 @@ import (
 type SqliteBackend struct {
 }
 
-func NewPluginHandler(opts ...handler.Option) handler.Handler {
+func NewSQLiteHandler(opts ...handler.Option) handler.Handler {
 	backend := SqliteBackend{}
 	return NewDatabaseHandler(backend, opts...)
 }

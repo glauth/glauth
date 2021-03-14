@@ -2,16 +2,17 @@ package config
 
 // config file
 type Backend struct {
-	BaseDN      string
-	Datastore   string
-	Insecure    bool     // For LDAP and owncloud backend only
-	Servers     []string // For LDAP and owncloud backend only
-	NameFormat  string
-	GroupFormat string
-	SSHKeyAttr  string
-	UseGraphAPI bool // For ownCloud backend only
-	Plugin      string // Path to plugin library, for plugin backend only
-	Database    string // For MySQL backend only TODO REname to match plugin
+	BaseDN        string
+	Datastore     string
+	Insecure      bool     // For LDAP and owncloud backend only
+	Servers       []string // For LDAP and owncloud backend only
+	NameFormat    string
+	GroupFormat   string
+	SSHKeyAttr    string
+	UseGraphAPI   bool   // For ownCloud backend only
+	Plugin        string // Path to plugin library, for plugin backend only
+	PluginHandler string // Name of plugin's main handler function
+	Database      string // For MySQL backend only TODO REname to match plugin
 }
 type Frontend struct {
 	AllowedBaseDNs []string // For LDAP backend only

@@ -11,7 +11,7 @@ import (
 type PostgresBackend struct {
 }
 
-func NewPluginHandler(opts ...handler.Option) handler.Handler {
+func NewPostgresHandler(opts ...handler.Option) handler.Handler {
 	backend := PostgresBackend{}
 	return NewDatabaseHandler(backend, opts...)
 }

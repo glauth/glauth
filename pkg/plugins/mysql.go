@@ -11,7 +11,7 @@ import (
 type MysqlBackend struct {
 }
 
-func NewPluginHandler(opts ...handler.Option) handler.Handler {
+func NewMySQLHandler(opts ...handler.Option) handler.Handler {
 	backend := MysqlBackend{}
 	return NewDatabaseHandler(backend, opts...)
 }

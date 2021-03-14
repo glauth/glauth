@@ -63,7 +63,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("Unable to load specified backend plugin: %s", err))
 		}
-		nph, err := plug.Lookup("NewPluginHandler")
+		nph, err := plug.Lookup(s.c.Backend.PluginHandler)
 		if err != nil {
 			return nil, errors.New("Unable to find 'NewPluginHandler' in loaded backend plugin")
 		}
