@@ -81,7 +81,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	// configure the backends
 	s.l = ldap.NewServer()
 	s.l.EnforceLDAP = true
-	for i, backend := range s.c.Backend {
+	for i, backend := range s.c.Backends {
 		var h handler.Handler
 		switch backend.Datastore {
 		case "ldap":

@@ -19,6 +19,7 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 // Set with buildtime vars
@@ -275,15 +276,15 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	}
 
 	// Patch with default values where not specified
-	for i := range cfg.Backend {
-		if cfg.Backend[i].NameFormat == "" {
-			cfg.Backend[i].NameFormat = "cn"
+	for i := range cfg.Backends {
+		if cfg.Backends[i].NameFormat == "" {
+			cfg.Backends[i].NameFormat = "cn"
 		}
-		if cfg.Backend[i].GroupFormat == "" {
-			cfg.Backend[i].GroupFormat = "ou"
+		if cfg.Backends[i].GroupFormat == "" {
+			cfg.Backends[i].GroupFormat = "ou"
 		}
-		if cfg.Backend[i].SSHKeyAttr == "" {
-			cfg.Backend[i].SSHKeyAttr = "sshPublicKey"
+		if cfg.Backends[i].SSHKeyAttr == "" {
+			cfg.Backends[i].SSHKeyAttr = "sshPublicKey"
 		}
 	}
 	//
@@ -365,16 +366,25 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 		}
 	}
 
-	for i := range cfg.Backend {
-		switch cfg.Backend[i].Datastore {
+	//spew.Dump(cfg)
+	if cfg.Backend.Datastore != "" {
+		if cfg.Backends != nil {
+			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+		} else {
+			cfg.Backends = append(cfg.Backends, cfg.Backend)
+		}
+	}
+
+	for i := range cfg.Backends {
+		switch cfg.Backends[i].Datastore {
 		case "":
-			cfg.Backend[i].Datastore = "config"
+			cfg.Backends[i].Datastore = "config"
 		case "config":
 		case "ldap":
 		case "owncloud":
 		case "plugin":
 		default:
-			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backend[i].Datastore)
+			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backends[i].Datastore)
 		}
 	}
 	return &cfg, nil
