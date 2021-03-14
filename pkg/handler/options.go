@@ -30,6 +30,17 @@ func newOptions(opts ...Option) Options {
 	return opt
 }
 
+// newOptions initializes the available default options.
+func NewOptions(opts ...Option) Options {
+	opt := Options{}
+
+	for _, o := range opts {
+		o(&opt)
+	}
+
+	return opt
+}
+
 // Logger provides a function to set the logger option.
 func Logger(val logr.Logger) Option {
 	return func(o *Options) {

@@ -18,6 +18,9 @@ BUILD_VARS=-s -w -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH}
 BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
 
+# Plugins
+include pkg/plugins/Makefile
+
 #####################
 # High level commands
 #####################
