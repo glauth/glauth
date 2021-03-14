@@ -593,3 +593,5 @@ func (h databaseHandler) getAccount(u config.User) *ldap.Entry {
 	dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 	return &ldap.Entry{dn, attrs}
 }
+
+func main() {}
