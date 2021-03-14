@@ -182,6 +182,10 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
+func (h ownCloudHandler) FindUser(userName string) (found bool, user config.User, err error) {
+	return false, config.User{}, nil
+}
+
 func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()

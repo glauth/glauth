@@ -14,6 +14,14 @@ type Backend struct {
 	PluginHandler string // Name of plugin's main handler function
 	Database      string // For MySQL backend only TODO REname to match plugin
 }
+type Helper struct {
+	Enabled       bool
+	BaseDN        string
+	Datastore     string
+	Plugin        string // Path to plugin library, for plugin backend only
+	PluginHandler string // Name of plugin's main handler function
+	Database      string // For MySQL backend only TODO REname to match plugin
+}
 type Frontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
 	Listen         string
@@ -64,6 +72,7 @@ type Group struct {
 type Config struct {
 	API                API
 	Backend            Backend
+	Helper             Helper
 	Debug              bool
 	WatchConfig        bool
 	YubikeyClientID    string

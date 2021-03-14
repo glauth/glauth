@@ -289,6 +289,18 @@ func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (r
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
+func (h configHandler) FindUser(userName string) (f bool, u config.User, err error) {
+	user := config.User{}
+	found := false
+	for _, u := range h.cfg.Users {
+		if u.Name == userName {
+			found = true
+			user = u
+		}
+	}
+	return found, user, nil
+}
+
 // Close does not actually close anything, because the config data is kept in memory
 func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	stats.Frontend.Add("closes", 1)

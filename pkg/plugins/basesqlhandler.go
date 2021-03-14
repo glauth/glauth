@@ -74,7 +74,7 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 
 	sqlBackend.CreateSchema(db)
 
-	options.Logger.V(2).Info("MySQL Plugin: Ready")
+	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + ") Plugin: Ready")
 
 	return handler
 }
@@ -83,7 +83,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 
-	h.log.V(2).Info(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+	h.log.V(3).Info(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
 
 	stats.Frontend.Add("bind_reqs", 1)
 
@@ -178,7 +178,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 			h.log.V(2).Info(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
 		} else {
 			stats.Frontend.Add("bind_successes", 1)
-			h.log.V(2).Info("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
+			h.log.V(3).Info("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
 			return ldap.LDAPResultSuccess, nil
 		}
 
@@ -201,7 +201,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 	}
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(2).Info(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
+	h.log.V(3).Info(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
 	return ldap.LDAPResultSuccess, nil
 }
 
@@ -209,7 +209,7 @@ func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(2).Info(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
+	h.log.V(3).Info(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
@@ -269,7 +269,7 @@ func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 	}
 	stats.Frontend.Add("search_successes", 1)
-	h.log.V(2).Info(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
+	h.log.V(3).Info(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
@@ -286,6 +286,12 @@ func (h databaseHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net
 // Delete is not yet supported for the sql backend
 func (h databaseHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
 	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+func (h databaseHandler) FindUser(userName string) (f bool, u config.User, err error) {
+	user := config.User{}
+	found := false
+	return found, user, nil
 }
 
 func (h databaseHandler) Close(boundDn string, conn net.Conn) error {
@@ -448,7 +454,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.UnixID {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.V(2).Info(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+					h.log.V(3).Info(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 

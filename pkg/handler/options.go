@@ -17,6 +17,7 @@ type Options struct {
 	Config   *config.Config
 	Context  *context.Context
 	YubiAuth *yubigo.YubiAuth
+	Helper   Handler
 }
 
 // newOptions initializes the available default options.
@@ -66,5 +67,12 @@ func Context(val *context.Context) Option {
 func YubiAuth(val *yubigo.YubiAuth) Option {
 	return func(o *Options) {
 		o.YubiAuth = val
+	}
+}
+
+// If we specified a helper, for instance for OTP injection
+func Helper(val Handler) Option {
+	return func(o *Options) {
+		o.Helper = val
 	}
 }

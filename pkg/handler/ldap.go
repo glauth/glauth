@@ -17,6 +17,7 @@ import (
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
+	"github.com/pquerna/otp/totp"
 )
 
 type ldapHandler struct {
@@ -26,6 +27,7 @@ type ldapHandler struct {
 	lock     *sync.Mutex // for sessions and servers
 	sessions map[string]ldapSession
 	servers  []ldapBackend
+	helper   Handler
 }
 
 // global lock for ldapHandler sessions & servers manipulation
@@ -59,6 +61,7 @@ func NewLdapHandler(opts ...Option) Handler {
 		doPing:   make(chan bool),
 		log:      options.Logger,
 		cfg:      options.Config,
+		helper:   options.Helper,
 		lock:     &ldaplock,
 	}
 	// parse LDAP URLs
@@ -81,6 +84,38 @@ func NewLdapHandler(opts ...Option) Handler {
 //
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	h.log.V(6).Info("Bind request", "binddn", bindDN, "src", conn.RemoteAddr())
+
+	if h.helper != nil {
+
+		lowerBindDN := strings.ToLower(bindDN)
+		baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+		parts := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")
+		userName := strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
+
+		validotp := false
+
+		// find the user
+		found, user, _ := h.helper.FindUser(userName)
+
+		if !found {
+			validotp = true
+		} else {
+			if len(user.OTPSecret) == 0 {
+				validotp = true
+			} else {
+				if len(bindSimplePw) > 6 {
+					otp := bindSimplePw[len(bindSimplePw)-6:]
+					bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
+					validotp = totp.Validate(otp, user.OTPSecret)
+				}
+			}
+		}
+
+		if !validotp {
+			h.log.V(6).Info(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+	}
 
 	stats.Frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
@@ -154,6 +189,10 @@ func (h ldapHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Con
 // Delete is not yet supported for the ldap backend
 func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
 	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+func (h ldapHandler) FindUser(userName string) (found bool, user config.User, err error) {
+	return false, config.User{}, nil
 }
 
 func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
