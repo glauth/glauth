@@ -14,5 +14,6 @@ bin/postgres.so: pkg/plugins/postgres.go pkg/plugins/basesqlhandler.go
 
 plugin_sqlite: bin/sqlite.so
 
+# Note: to make a plugin compatible with a binary built in debug mode, add `-gcflags='all=-N -l'`
 bin/sqlite.so: pkg/plugins/sqlite.go pkg/plugins/basesqlhandler.go
 	GOOS=linux GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -buildmode=plugin -o $@ $^

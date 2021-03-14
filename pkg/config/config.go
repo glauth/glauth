@@ -71,7 +71,7 @@ type Group struct {
 }
 type Config struct {
 	API                API
-	Backend            Backend
+	Backend            []Backend
 	Helper             Helper
 	Debug              bool
 	WatchConfig        bool

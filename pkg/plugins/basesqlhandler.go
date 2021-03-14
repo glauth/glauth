@@ -36,6 +36,7 @@ type database struct {
 }
 
 type databaseHandler struct {
+	backend     config.Backend
 	log         logr.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
@@ -49,23 +50,24 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	options := handler.NewOptions(opts...)
 
 	// Note: we will never terminate this connection pool.
-	db, err := sql.Open(sqlBackend.GetDriverName(), options.Config.Backend.Database)
+	db, err := sql.Open(sqlBackend.GetDriverName(), options.Backend.Database)
 	if err != nil {
-		options.Logger.Error(err, "Unable to open SQL database named '%s' error: %s", options.Config.Backend.Database)
+		options.Logger.Error(err, "Unable to open SQL database named '%s' error: %s", options.Backend.Database)
 		os.Exit(1)
 	}
 	err = db.Ping()
 	if err != nil {
-		options.Logger.Error(err, "Unable to communicate with SQL database error: %s", options.Config.Backend.Database)
+		options.Logger.Error(err, "Unable to communicate with SQL database error: %s", options.Backend.Database)
 		os.Exit(1)
 	}
 
 	dbInfo := database{
-		path: options.Config.Backend.Database,
+		path: options.Backend.Database,
 		cnx:  db,
 	}
 
 	handler := databaseHandler{
+		backend:     options.Backend,
 		log:         options.Logger,
 		cfg:         options.Config,
 		yubikeyAuth: options.YubiAuth,
@@ -74,22 +76,22 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 
 	sqlBackend.CreateSchema(db)
 
-	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + ") Plugin: Ready")
+	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
 }
 
 func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 
-	h.log.V(3).Info(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.cfg.Backend.BaseDN, conn.RemoteAddr().String()))
+	h.log.V(3).Info(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.backend.BaseDN, conn.RemoteAddr().String()))
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.cfg.Backend.BaseDN))
+		h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.backend.BaseDN))
 		// h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -97,10 +99,10 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 	groupName := ""
 	userName := ""
 	if len(parts) == 1 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
+		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
 	} else if len(parts) == 2 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
-		groupName = strings.TrimPrefix(parts[1], h.cfg.Backend.GroupFormat+"=")
+		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
+		groupName = strings.TrimPrefix(parts[1], h.backend.GroupFormat+"=")
 	} else {
 		h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
 		return ldap.LDAPResultInvalidCredentials, nil
@@ -207,7 +209,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 
 func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	h.log.V(3).Info(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
 	stats.Frontend.Add("search_reqs", 1)
@@ -217,10 +219,10 @@ func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
 	}
 	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
 	}
-	if !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
+	if !strings.HasSuffix(searchBaseDN, h.backend.BaseDN) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.backend.BaseDN)
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
@@ -291,7 +293,16 @@ func (h databaseHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 func (h databaseHandler) FindUser(userName string) (f bool, u config.User, err error) {
 	user := config.User{}
 	found := false
-	return found, user, nil
+
+	err = h.database.cnx.QueryRow(fmt.Sprintf(`
+			SELECT u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey 
+			FROM users u WHERE u.name=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+		&user.UnixID, &user.PrimaryGroup, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
+	if err == nil {
+		found = true
+	}
+
+	return found, user, err
 }
 
 func (h databaseHandler) Close(boundDn string, conn net.Conn) error {
@@ -367,7 +378,8 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 
 	rows, err := h.database.cnx.Query(`
 			SELECT u.name,u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
-			FROM users u`)
+			FROM users u WHERE u.name=?`,
+	)
 	if err != nil {
 		// Silent fail... for now
 		return []string{}
@@ -382,13 +394,13 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			u.OtherGroups = h.commaListToTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+					dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -482,7 +494,7 @@ func (h databaseHandler) getGroupDNs(gids []int) []string {
 	for _, gid := range gids {
 		for _, g := range h.MemGroups {
 			if g.UnixID == gid {
-				dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.cfg.Backend.BaseDN)
+				dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.backend.BaseDN)
 				groups[dn] = true
 			}
 
@@ -527,7 +539,7 @@ func (h databaseHandler) getGroup(g config.Group) *ldap.Entry {
 	attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup"}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMembers(g.UnixID)})
 	attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.UnixID)})
-	dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.cfg.Backend.BaseDN)
+	dn := fmt.Sprintf("cn=%s,ou=groups,%s", g.Name, h.backend.BaseDN)
 	return &ldap.Entry{dn, attrs}
 }
 
@@ -578,6 +590,6 @@ func (h databaseHandler) getAccount(u config.User) *ldap.Entry {
 	if len(u.SSHKeys) > 0 {
 		attrs = append(attrs, &ldap.EntryAttribute{"sshPublicKey", u.SSHKeys})
 	}
-	dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+	dn := fmt.Sprintf("cn=%s,ou=%s,%s", u.Name, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 	return &ldap.Entry{dn, attrs}
 }

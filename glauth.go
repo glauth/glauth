@@ -234,9 +234,6 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	// setup defaults
 	cfg.LDAP.Enabled = false
 	cfg.LDAPS.Enabled = true
-	cfg.Backend.NameFormat = "cn"
-	cfg.Backend.GroupFormat = "ou"
-	cfg.Backend.SSHKeyAttr = "sshPublicKey"
 
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
@@ -276,6 +273,20 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 			return &cfg, err
 		}
 	}
+
+	// Patch with default values where not specified
+	for i := range cfg.Backend {
+		if cfg.Backend[i].NameFormat == "" {
+			cfg.Backend[i].NameFormat = "cn"
+		}
+		if cfg.Backend[i].GroupFormat == "" {
+			cfg.Backend[i].GroupFormat = "ou"
+		}
+		if cfg.Backend[i].SSHKeyAttr == "" {
+			cfg.Backend[i].SSHKeyAttr = "sshPublicKey"
+		}
+	}
+	//
 
 	return &cfg, nil
 }
@@ -354,15 +365,17 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 		}
 	}
 
-	switch cfg.Backend.Datastore {
-	case "":
-		cfg.Backend.Datastore = "config"
-	case "config":
-	case "ldap":
-	case "owncloud":
-	case "plugin":
-	default:
-		return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backend.Datastore)
+	for i := range cfg.Backend {
+		switch cfg.Backend[i].Datastore {
+		case "":
+			cfg.Backend[i].Datastore = "config"
+		case "config":
+		case "ldap":
+		case "owncloud":
+		case "plugin":
+		default:
+			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backend[i].Datastore)
+		}
 	}
 	return &cfg, nil
 }

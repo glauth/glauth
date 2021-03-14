@@ -21,6 +21,8 @@ import (
 )
 
 type ldapHandler struct {
+	backend  config.Backend
+	handlers HandlerWrapper
 	doPing   chan bool
 	log      logr.Logger
 	cfg      *config.Config
@@ -57,6 +59,8 @@ func NewLdapHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
 	handler := ldapHandler{ // set non-zero-value defaults here
+		backend:  options.Backend,
+		handlers: options.Handlers,
 		sessions: make(map[string]ldapSession),
 		doPing:   make(chan bool),
 		log:      options.Logger,
@@ -65,12 +69,11 @@ func NewLdapHandler(opts ...Option) Handler {
 		lock:     &ldaplock,
 	}
 	// parse LDAP URLs
-	for _, ldapurl := range handler.cfg.Backend.Servers {
+	for _, ldapurl := range handler.backend.Servers {
 		l, err := parseURL(ldapurl)
 		if err != nil {
 			handler.log.Error(err, "could not parse url")
 			os.Exit(1)
-			// TODO log error and os exit
 		}
 		handler.servers = append(handler.servers, l)
 	}
@@ -85,17 +88,30 @@ func NewLdapHandler(opts ...Option) Handler {
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	h.log.V(6).Info("Bind request", "binddn", bindDN, "src", conn.RemoteAddr())
 
-	if h.helper != nil {
+	//	if h.helper != nil {
+	if true {
 
 		lowerBindDN := strings.ToLower(bindDN)
-		baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+		baseDN := strings.ToLower("," + h.backend.BaseDN)
 		parts := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")
-		userName := strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
+		userName := strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
 
 		validotp := false
 
-		// find the user
-		found, user, _ := h.helper.FindUser(userName)
+		// Find the user
+		// We are going to go through all backends and ask
+		// until we find our user or die of boredom.
+		user := config.User{}
+		found := false
+		for i, handler := range h.handlers.Handlers {
+			found, user, _ = handler.FindUser(userName)
+			if found {
+				break
+			}
+			if i >= *h.handlers.Count {
+				break
+			}
+		}
 
 		if !found {
 			validotp = true
@@ -252,7 +268,7 @@ func (h ldapHandler) getSession(conn net.Conn) (ldapSession, error) {
 		dest := fmt.Sprintf("%s:%d", server.Hostname, server.Port)
 		if server.Scheme == "ldaps" {
 			tlsCfg := &tls.Config{}
-			if h.cfg.Backend.Insecure {
+			if h.backend.Insecure {
 				tlsCfg.InsecureSkipVerify = true
 			}
 			l, err = ldap.DialTLS("tcp", dest, tlsCfg)
@@ -284,7 +300,7 @@ func (h ldapHandler) ping() error {
 		start := time.Now()
 		if h.servers[0].Scheme == "ldaps" {
 			tlsCfg := &tls.Config{}
-			if h.cfg.Backend.Insecure {
+			if h.backend.Insecure {
 				tlsCfg.InsecureSkipVerify = true
 			}
 			l, err = ldap.DialTLS("tcp", dest, tlsCfg)

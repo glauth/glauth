@@ -17,6 +17,7 @@ import (
 )
 
 type configHandler struct {
+	backend     config.Backend
 	log         logr.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
@@ -27,6 +28,7 @@ func NewConfigHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
 	handler := configHandler{
+		backend:     options.Backend,
 		log:         options.Logger,
 		cfg:         options.Config,
 		yubikeyAuth: options.YubiAuth,
@@ -37,15 +39,15 @@ func NewConfigHandler(opts ...Option) Handler {
 // Bind implements a bind request against the config file
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 
-	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.backend.BaseDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
+		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.backend.BaseDN)
 		// h.log.Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -53,10 +55,10 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	groupName := ""
 	userName := ""
 	if len(parts) == 1 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
+		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
 	} else if len(parts) == 2 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
-		groupName = strings.TrimPrefix(parts[1], h.cfg.Backend.GroupFormat+"=")
+		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
+		groupName = strings.TrimPrefix(parts[1], h.backend.GroupFormat+"=")
 	} else {
 		h.log.V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
 		return ldap.LDAPResultInvalidCredentials, nil
@@ -171,7 +173,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 // Search implements a search request against the config file
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
@@ -181,10 +183,10 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
 	}
 	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
 	}
-	if !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
+	if !strings.HasSuffix(searchBaseDN, h.backend.BaseDN) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.backend.BaseDN)
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
@@ -205,7 +207,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMembers(g.UnixID)})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.UnixID)})
-			dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "shadowaccount", "":
@@ -263,9 +265,9 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowWarning", Values: []string{"7"}})
 
 			if len(u.SSHKeys) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: h.cfg.Backend.SSHKeyAttr, Values: u.SSHKeys})
+				attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.SSHKeyAttr, Values: u.SSHKeys})
 			}
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, u.Name, h.cfg.Backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	}
@@ -311,12 +313,12 @@ func (h configHandler) getGroupMembers(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, u.Name, h.cfg.Backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, u.Name, h.cfg.Backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.cfg.Backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -393,7 +395,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	for _, gid := range gids {
 		for _, g := range h.cfg.Groups {
 			if g.UnixID == gid {
-				dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
+				dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
 				groups[dn] = true
 			}
 

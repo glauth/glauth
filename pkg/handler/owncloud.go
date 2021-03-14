@@ -28,6 +28,7 @@ type ownCloudSession struct {
 	useGraphAPI bool
 }
 type ownCloudHandler struct {
+	backend  config.Backend
 	log      logr.Logger
 	cfg      *config.Config
 	client   *http.Client
@@ -37,15 +38,15 @@ type ownCloudHandler struct {
 
 func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 
-	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
+	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.backend.BaseDN, "src", conn.RemoteAddr())
 
 	stats.Frontend.Add("bind_reqs", 1)
 
 	// parse the bindDN - ensure that the bindDN ends with the BaseDN
 	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
+		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.backend.BaseDN)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
@@ -57,7 +58,7 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 
 	// try to login
 	if !h.login(userName, bindSimplePw) {
-		h.log.V(2).Info("Login failed", "username", userName, "basedn", h.cfg.Backend.BaseDN)
+		h.log.V(2).Info("Login failed", "username", userName, "basedn", h.backend.BaseDN)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -67,20 +68,20 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 		log:         h.log,
 		user:        userName,
 		password:    bindSimplePw,
-		endpoint:    h.cfg.Backend.Servers[0],
-		useGraphAPI: h.cfg.Backend.UseGraphAPI,
+		endpoint:    h.backend.Servers[0],
+		useGraphAPI: h.backend.UseGraphAPI,
 		client:      h.client,
 	}
 	h.lock.Unlock()
 
 	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("Bind success", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
+	h.log.V(6).Info("Bind success", "binddn", bindDN, "basedn", h.backend.BaseDN, "src", conn.RemoteAddr())
 	return ldap.LDAPResultSuccess, nil
 }
 
 func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
+	baseDN := strings.ToLower("," + h.backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
@@ -90,10 +91,10 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: Anonymous BindDN not allowed %s", bindDN)
 	}
 	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
 	}
-	if !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
+	if !strings.HasSuffix(searchBaseDN, h.backend.BaseDN) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.backend.BaseDN)
 	}
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
@@ -128,12 +129,12 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: members})
 			}
-			dn := fmt.Sprintf("cn=%s,%s=groups,%s", *g.ID, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("cn=%s,%s=groups,%s", *g.ID, h.backend.GroupFormat, h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "":
 		userName := ""
-		if searchBaseDN != strings.ToLower(h.cfg.Backend.BaseDN) {
+		if searchBaseDN != strings.ToLower(h.backend.BaseDN) {
 			parts := strings.Split(strings.TrimSuffix(searchBaseDN, baseDN), ",")
 			if len(parts) >= 1 {
 				userName = strings.TrimPrefix(parts[0], "cn=")
@@ -158,7 +159,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount"}})
 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *u.ID)}})
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, *u.ID, h.cfg.Backend.GroupFormat, "users", h.cfg.Backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, *u.ID, h.backend.GroupFormat, "users", h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	}
@@ -198,12 +199,12 @@ func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
 
 func (h ownCloudHandler) login(name, pw string) bool {
 	var req *http.Request
-	if h.cfg.Backend.UseGraphAPI {
+	if h.backend.UseGraphAPI {
 		// TODO oc10 graphapi app should implement /me
-		req, _ = http.NewRequest("GET", h.cfg.Backend.Servers[0]+"/users/"+name, nil)
+		req, _ = http.NewRequest("GET", h.backend.Servers[0]+"/users/"+name, nil)
 	} else {
 		// use provisioning api
-		meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", h.cfg.Backend.Servers[0])
+		meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", h.backend.Servers[0])
 		req, _ = http.NewRequest("GET", meURL, nil)
 	}
 	req.SetBasicAuth(name, pw)
@@ -347,6 +348,7 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
 	return ownCloudHandler{
+		backend:  options.Backend,
 		log:      options.Logger,
 		cfg:      options.Config,
 		sessions: make(map[string]ownCloudSession),
@@ -356,7 +358,7 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 			},
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: options.Config.Backend.Insecure,
+					InsecureSkipVerify: options.Backend.Insecure,
 				},
 			},
 		},

@@ -24,3 +24,11 @@ type Handler interface {
 	// helper
 	HelperMaker
 }
+
+// TODO When I grow up, I want to handle pointers same as I would in C
+// and not need a counter because I would not allocate statically
+// but use idiomatic slicing instead
+type HandlerWrapper struct {
+	Handlers []Handler
+	Count    *int
+}

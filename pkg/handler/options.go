@@ -13,6 +13,8 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
+	Backend  config.Backend
+	Handlers HandlerWrapper
 	Logger   logr.Logger
 	Config   *config.Config
 	Context  *context.Context
@@ -40,6 +42,20 @@ func NewOptions(opts ...Option) Options {
 	}
 
 	return opt
+}
+
+// Backend is our current backend
+func Backend(val config.Backend) Option {
+	return func(o *Options) {
+		o.Backend = val
+	}
+}
+
+// Our friendly handlers for all backends
+func Handlers(val HandlerWrapper) Option {
+	return func(o *Options) {
+		o.Handlers = val
+	}
 }
 
 // Logger provides a function to set the logger option.
