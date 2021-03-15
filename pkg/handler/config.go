@@ -74,7 +74,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		}
 	}
 	if !found {
-		h.log.V(2).Info(fmt.Sprintf("User not found", "username", userName))
+		h.log.V(2).Info("User not found", "username", userName)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the group

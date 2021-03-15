@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/GeertJohan/yubigo"
+	"github.com/davecgh/go-spew/spew"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
@@ -275,6 +276,16 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		}
 	}
 
+	// Backward Compability
+	if cfg.Backend.Datastore != "" {
+		if cfg.Backends != nil {
+			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+		} else {
+			cfg.Backends = append(cfg.Backends, cfg.Backend)
+		}
+	}
+	spew.Dump(cfg.Backends)
+
 	// Patch with default values where not specified
 	for i := range cfg.Backends {
 		if cfg.Backends[i].NameFormat == "" {
@@ -367,14 +378,6 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 	}
 
 	//spew.Dump(cfg)
-	if cfg.Backend.Datastore != "" {
-		if cfg.Backends != nil {
-			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
-		} else {
-			cfg.Backends = append(cfg.Backends, cfg.Backend)
-		}
-	}
-
 	for i := range cfg.Backends {
 		switch cfg.Backends[i].Datastore {
 		case "":
