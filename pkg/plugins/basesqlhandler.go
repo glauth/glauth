@@ -112,7 +112,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 	user := config.User{}
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
 			SELECT u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE u.name=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+			FROM users u WHERE lower(u.name)=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
 		&user.UnixID, &user.PrimaryGroup, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err != nil {
 		h.log.V(2).Info(fmt.Sprintf("Bind Error: User %s not found.", userName))
@@ -121,7 +121,7 @@ func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 	// find the group
 	group := config.Group{}
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT g.unixid FROM groups g WHERE name=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
+			SELECT g.unixid FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
 		&group.UnixID)
 	if err != nil {
 		h.log.V(2).Info(fmt.Sprintf("Bind Error: Group %s not found.", userName))
@@ -296,7 +296,7 @@ func (h databaseHandler) FindUser(userName string) (f bool, u config.User, err e
 
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
 			SELECT u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE u.name=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+			FROM users u WHERE lower(u.name)=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
 		&user.UnixID, &user.PrimaryGroup, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err == nil {
 		found = true
@@ -378,7 +378,7 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 
 	rows, err := h.database.cnx.Query(`
 			SELECT u.name,u.unixid,u.primarygroup,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
-			FROM users u WHERE u.name=?`,
+			FROM users u WHERE lower(u.name)=?`,
 	)
 	if err != nil {
 		// Silent fail... for now

@@ -68,7 +68,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	user := config.User{}
 	found := false
 	for _, u := range h.cfg.Users {
-		if u.Name == userName {
+	    if strings.EqualFold(u.Name, userName) {
 			found = true
 			user = u
 		}
@@ -81,7 +81,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	group := config.Group{}
 	found = false
 	for _, g := range h.cfg.Groups {
-		if g.Name == groupName {
+		if strings.EqualFold(g.Name, groupName) {
 			found = true
 			group = g
 		}
@@ -295,7 +295,7 @@ func (h configHandler) FindUser(userName string) (f bool, u config.User, err err
 	user := config.User{}
 	found := false
 	for _, u := range h.cfg.Users {
-		if u.Name == userName {
+		if strings.EqualFold(u.Name, userName) {
 			found = true
 			user = u
 		}
