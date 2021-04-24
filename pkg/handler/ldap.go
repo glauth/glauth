@@ -152,7 +152,22 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCod
 
 //
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	h.log.V(6).Info("Search request", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+	wantAttributes := true
+	wantTypesOnly := false
+
+	h.log.V(6).Info("Search request for sure", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+	// "1.1" has special meaning: it does what an empty attribute list would do
+	// if it didn't already mean "return all attributes"
+	if len(searchReq.Attributes) == 1 && searchReq.Attributes[0] == "1.1" {
+		wantAttributes = false
+		searchReq.Attributes = searchReq.Attributes[:0]
+	}
+	// TypesOnly cannot be true: if it were, glauth would not be able to
+	// match the returned valuea against the query
+	if searchReq.TypesOnly == true {
+		wantTypesOnly = true
+		searchReq.TypesOnly = false
+	}
 	stats.Frontend.Add("search_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
@@ -174,6 +189,21 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	h.log.V(6).Info("Search request to backend", "request", search)
 	sr, err := s.ldap.Search(search)
 	h.log.V(6).Info("Backend Search result", "result", sr)
+
+	if !wantAttributes {
+		for _, entry := range sr.Entries {
+			entry.Attributes = entry.Attributes[:0]
+		}
+	}
+
+	if wantTypesOnly {
+		for _, entry := range sr.Entries {
+			for _, attribute := range entry.Attributes {
+				attribute.Values = attribute.Values[:0]
+			}
+		}
+	}
+
 	ssr := ldap.ServerSearchResult{
 		Entries:   sr.Entries,
 		Referrals: sr.Referrals,
