@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,9 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+// global matcher
+var ldapattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
+
 type ldapHandler struct {
 	backend  config.Backend
 	handlers HandlerWrapper
@@ -30,6 +34,7 @@ type ldapHandler struct {
 	sessions map[string]ldapSession
 	servers  []ldapBackend
 	helper   Handler
+	attm     *regexp.Regexp
 }
 
 // global lock for ldapHandler sessions & servers manipulation
@@ -67,6 +72,7 @@ func NewLdapHandler(opts ...Option) Handler {
 		cfg:      options.Config,
 		helper:   options.Helper,
 		lock:     &ldaplock,
+		attm:     ldapattributematcher,
 	}
 	// parse LDAP URLs
 	for _, ldapurl := range handler.backend.Servers {
@@ -155,19 +161,22 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	wantAttributes := true
 	wantTypesOnly := false
 
-	h.log.V(6).Info("Search request for sure", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+
 	// "1.1" has special meaning: it does what an empty attribute list would do
 	// if it didn't already mean "return all attributes"
 	if len(searchReq.Attributes) == 1 && searchReq.Attributes[0] == "1.1" {
 		wantAttributes = false
 		searchReq.Attributes = searchReq.Attributes[:0]
 	}
+
 	// TypesOnly cannot be true: if it were, glauth would not be able to
 	// match the returned valuea against the query
 	if searchReq.TypesOnly == true {
 		wantTypesOnly = true
 		searchReq.TypesOnly = false
 	}
+
 	stats.Frontend.Add("search_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
@@ -191,16 +200,56 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	h.log.V(6).Info("Backend Search result", "result", sr)
 
 	if !wantAttributes {
+		h.log.V(6).Info("AP: Search Info", "type", "No attributes")
 		for _, entry := range sr.Entries {
 			entry.Attributes = entry.Attributes[:0]
 		}
 	}
 
 	if wantTypesOnly {
+		h.log.V(6).Info("AP: Search Info", "type", "Types only")
 		for _, entry := range sr.Entries {
 			for _, attribute := range entry.Attributes {
 				attribute.Values = attribute.Values[:0]
 			}
+		}
+	}
+
+	// WART used to debug when testing special cases against
+	// glauth acting as a backend, where it may have
+	// the same workaround thus hiding the issue
+	/*
+		for _, entry := range sr.Entries {
+			for _, attribute := range entry.Attributes {
+				if attribute.Name == "objectclass" {
+					attribute.Name = "bogus"
+				}
+			}
+		}
+	*/
+
+	// If our original attribute is not present, either because:
+	// 1-This is a root query
+	// 2-We were asked not to return attributes
+	// 3-We were asked not to return values
+	// then we re-insert the correct values in there.
+	if searchReq.Scope == 0 && searchReq.BaseDN == "" {
+		h.log.V(6).Info("AP: Search Info", "type", "Root search detected")
+	}
+	attbits := h.attm.FindStringSubmatch(searchReq.Filter)
+	for _, entry := range sr.Entries {
+		foundattname := false
+		for _, attribute := range entry.Attributes {
+			if strings.ToLower(attribute.Name) == strings.ToLower(attbits[1]) {
+				foundattname = true
+				if len(attbits[2]) == 0 {
+					attribute.Values = []string{attbits[2]}
+				}
+				break
+			}
+		}
+		if !foundattname {
+			entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -16,11 +17,14 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
+
 type configHandler struct {
 	backend     config.Backend
 	log         logr.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
+	attmatcher  *regexp.Regexp
 }
 
 // NewConfigHandler creates a new config backed handler
@@ -32,6 +36,7 @@ func NewConfigHandler(opts ...Option) Handler {
 		log:         options.Logger,
 		cfg:         options.Config,
 		yubikeyAuth: options.YubiAuth,
+		attmatcher:  configattributematcher,
 	}
 	return handler
 }
@@ -68,7 +73,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	user := config.User{}
 	found := false
 	for _, u := range h.cfg.Users {
-	    if strings.EqualFold(u.Name, userName) {
+		if strings.EqualFold(u.Name, userName) {
 			found = true
 			user = u
 		}
@@ -175,13 +180,50 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "searchbasedn", searchBaseDN, "src", conn.RemoteAddr(), "scope", searchReq.Scope, "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
 	// validate the user is authenticated and has appropriate access
 	if len(bindDN) < 1 {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
 	}
+
+	// for now, we are going to be dirty and assume that if scope==0 and dn=='' we are investigating the schema
+	if searchReq.Scope == 0 && searchBaseDN == "" {
+		entries := []*ldap.Entry{}
+		attrs := []*ldap.EntryAttribute{}
+		// unfortunately, objectClass is not to be included so we will respect that
+		// attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"*"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedSASLMechanisms", Values: []string{}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedLDAPVersion", Values: []string{"3"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedControl", Values: []string{}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedCapabilities", Values: []string{}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "subschemaSubentry", Values: []string{baseDN}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "serverName", Values: []string{"unknown"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "namingContexts", Values: []string{baseDN}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "defaultNamingContext", Values: []string{baseDN}})
+		// ah, but you see, this is not enough because if your query is for, say 'objectClass', then our LDAP
+		// library will weed out this entry since it does *not* contain an objectclass attribute
+		attbits := h.attmatcher.FindStringSubmatch(searchReq.Filter)
+		if len(attbits) == 3 {
+			foundattname := false
+			for _, attr := range attrs {
+				if strings.ToLower(attr.Name) == strings.ToLower(attbits[1]) {
+					foundattname = true
+					break
+				}
+			}
+			// the ugly hack: we are going to pretend that the requested attribute is in there
+			if !foundattname {
+				attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+			}
+		}
+		entries = append(entries, &ldap.Entry{DN: "", Attributes: attrs})
+		stats.Frontend.Add("search_successes", 1)
+		h.log.V(6).Info("AP: Root Search OK", "filter", searchReq.Filter)
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	}
+
 	if !strings.HasSuffix(bindDN, baseDN) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
 	}
