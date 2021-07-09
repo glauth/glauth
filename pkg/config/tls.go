@@ -54,6 +54,12 @@ func (c *LDAPS) TLSConfig() (*tls.Config, error) {
 
 	tlsConfig := &tls.Config{}
 
+	if c.ServerName != "" {
+		tlsConfig.ServerName = c.ServerName
+	} else {
+		tlsConfig.ServerName = "localhost"
+	}
+
 	if len(c.AllowedCACerts) != 0 {
 		pool, err := makeCertPool(c.AllowedCACerts)
 		if err != nil {
