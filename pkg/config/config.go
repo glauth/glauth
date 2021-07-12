@@ -23,10 +23,15 @@ type LDAP struct {
 	Listen  string
 }
 type LDAPS struct {
-	Enabled bool
-	Listen  string
-	Cert    string
-	Key     string
+	Enabled        bool
+	Listen         string
+	Cert           string
+	Key            string
+	ServerName     string   `toml:"tls_server_name"`
+	AllowedCACerts []string `toml:"tls_allowed_cacerts"`
+	CipherSuites   []string `toml:"tls_cipher_suites"`
+	MinVersion     string   `toml:"tls_min_version"`
+	MaxVersion     string   `toml:"tls_max_version"`
 }
 type API struct {
 	Cert        string

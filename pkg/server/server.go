@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 
@@ -77,11 +78,17 @@ func (s *LdapSvc) ListenAndServe() error {
 // ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
 func (s *LdapSvc) ListenAndServeTLS() error {
 	s.log.V(3).Info("LDAPS server listening", "address", s.c.LDAPS.Listen)
-	return s.l.ListenAndServeTLS(
-		s.c.LDAPS.Listen,
-		s.c.LDAPS.Cert,
-		s.c.LDAPS.Key,
-	)
+
+	tlsConfig, err := s.c.LDAPS.TLSConfig()
+	if err != nil {
+		return fmt.Errorf("unable ton initialize tlsconfig: %w", err)
+	}
+	ln, err := tls.Listen("tcp", s.c.LDAPS.Listen, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("unable to initialize TLS listener: %w", err)
+	}
+
+	return s.l.Serve(ln)
 }
 
 // Shutdown ends listeners by sending true to the ldap serves quit channel
