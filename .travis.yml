@@ -1,12 +1,14 @@
+os: linux
+dist: xenial
 language: go
 
 # USE THIS alongside makefile tag detection: $TRAVIS_TAG
 
 # if you change the version here, also update the travis deploy condition
 go: 
- - 1.11.x      # older version
- - 1.12.x      # last version
- - 1.13.x      # current version
+ - 1.13.x      # older version
+ - 1.14.x      # last version
+ - 1.15.x      # current version
 
 # Speed up git clones
 git:
@@ -65,15 +67,15 @@ script:
 
 deploy:
   provider: releases
-  api_key:
+  token:
     secure: lPI5FftcQB1eHihN9daeFOT97vZcfq2w0hRb6amC6U4P+K7Ih23R9NmWhDuvGM9CPLaAqgOKiHWIUnP4q9EeBeAUMgg6FI2syr/0nDYz5cHqZMMPWFgeDvn+HqfMdFIVeiKT80+uGY/JNsMI8lsJ0eILEp0GpyIZkoAewCEyxJ/fcLM5htGnQIQ8mQ+2ZXflvPofv6/RPHgu3ryC0icJFVMREIivp2QIZBpFnawnI+OE8ZzxD5R05gfg3IJtYtc/4diX4RPyqVTCqljU/x7/g9KgNsnaLGEz37pBUS0IQcq4ITX/cm4y5LLWPV6JugxjyTq1SXKJnHEgfEFk5/hPM7Q1DMZJ5tGpb2B4aSMwB6YHwvVW83ih96Vw8ZgIrxWT9LyF4n9AHakLhDIiJieDXa3dvG7U5oTxlSP/RJkXlMZEJ3lS/1RZ9vvQ0EOEMAO6ePQzSZ4EM/UShFalBI+fqDtzqxFGeeCWw6lwiKLF2GF7enT8+wLsWOMI43JM5uPAq2g0KFMtJEEcK08IFraObvK5bcFH7snCDtsAaLyjdkVIIBteNtfDsXQ8PMi4bQpLr5kpY68dkyuxDr4IpL1GKqlpe2LbjkzsGrq5wifcHMFmUkEfY/6/ELFc9fL+1ZnMAe7YiW41AvX+hrgVmc3M8zp1kVvy2oERV4LfV1vfaEU=
   file_glob: true 
   file: bin/*
   draft: true
   name: "DRAFT RELEASE: $TRAVIS_TAG"
-  skip_cleanup: true
+  cleanup: true
   on:
     branch: master
     tags: true
-    condition: $TRAVIS_GO_VERSION =~ ^1\.13
+    condition: $TRAVIS_GO_VERSION =~ ^1\.15
     repo: glauth/glauth
