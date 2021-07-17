@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/GeertJohan/yubigo"
+	"github.com/davecgh/go-spew/spew"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
@@ -19,6 +20,7 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 // Set with buildtime vars
@@ -234,9 +236,6 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	// setup defaults
 	cfg.LDAP.Enabled = false
 	cfg.LDAPS.Enabled = true
-	cfg.Backend.NameFormat = "cn"
-	cfg.Backend.GroupFormat = "ou"
-	cfg.Backend.SSHKeyAttr = "sshPublicKey"
 
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
@@ -276,6 +275,30 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 			return &cfg, err
 		}
 	}
+
+	// Backward Compability
+	if cfg.Backend.Datastore != "" {
+		if cfg.Backends != nil {
+			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+		} else {
+			cfg.Backends = append(cfg.Backends, cfg.Backend)
+		}
+	}
+	spew.Dump(cfg.Backends)
+
+	// Patch with default values where not specified
+	for i := range cfg.Backends {
+		if cfg.Backends[i].NameFormat == "" {
+			cfg.Backends[i].NameFormat = "cn"
+		}
+		if cfg.Backends[i].GroupFormat == "" {
+			cfg.Backends[i].GroupFormat = "ou"
+		}
+		if cfg.Backends[i].SSHKeyAttr == "" {
+			cfg.Backends[i].SSHKeyAttr = "sshPublicKey"
+		}
+	}
+	//
 
 	return &cfg, nil
 }
@@ -354,14 +377,18 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 		}
 	}
 
-	switch cfg.Backend.Datastore {
-	case "":
-		cfg.Backend.Datastore = "config"
-	case "config":
-	case "ldap":
-	case "owncloud":
-	default:
-		return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap' or 'owncloud", cfg.Backend.Datastore)
+	//spew.Dump(cfg)
+	for i := range cfg.Backends {
+		switch cfg.Backends[i].Datastore {
+		case "":
+			cfg.Backends[i].Datastore = "config"
+		case "config":
+		case "ldap":
+		case "owncloud":
+		case "plugin":
+		default:
+			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backends[i].Datastore)
+		}
 	}
 	return &cfg, nil
 }

@@ -18,6 +18,9 @@ BUILD_VARS=-s -w -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH}
 BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
 
+# Plugins
+include pkg/plugins/Makefile
+
 #####################
 # High level commands
 #####################
@@ -67,7 +70,6 @@ format:
 
 devrun:
 	go run ${BUILD_FILES} -c sample-simple.cfg
-
 
 linux32:
 	GOOS=linux GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth32 ${BUILD_FILES} && cd bin && sha256sum glauth32 > glauth32.sha256

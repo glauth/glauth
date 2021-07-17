@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,15 +18,23 @@ import (
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
+	"github.com/pquerna/otp/totp"
 )
 
+// global matcher
+var ldapattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
+
 type ldapHandler struct {
+	backend  config.Backend
+	handlers HandlerWrapper
 	doPing   chan bool
 	log      logr.Logger
 	cfg      *config.Config
 	lock     *sync.Mutex // for sessions and servers
 	sessions map[string]ldapSession
 	servers  []ldapBackend
+	helper   Handler
+	attm     *regexp.Regexp
 }
 
 // global lock for ldapHandler sessions & servers manipulation
@@ -55,19 +64,22 @@ func NewLdapHandler(opts ...Option) Handler {
 	options := newOptions(opts...)
 
 	handler := ldapHandler{ // set non-zero-value defaults here
+		backend:  options.Backend,
+		handlers: options.Handlers,
 		sessions: make(map[string]ldapSession),
 		doPing:   make(chan bool),
 		log:      options.Logger,
 		cfg:      options.Config,
+		helper:   options.Helper,
 		lock:     &ldaplock,
+		attm:     ldapattributematcher,
 	}
 	// parse LDAP URLs
-	for _, ldapurl := range handler.cfg.Backend.Servers {
+	for _, ldapurl := range handler.backend.Servers {
 		l, err := parseURL(ldapurl)
 		if err != nil {
 			handler.log.Error(err, "could not parse url")
 			os.Exit(1)
-			// TODO log error and os exit
 		}
 		handler.servers = append(handler.servers, l)
 	}
@@ -81,6 +93,51 @@ func NewLdapHandler(opts ...Option) Handler {
 //
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	h.log.V(6).Info("Bind request", "binddn", bindDN, "src", conn.RemoteAddr())
+
+	//	if h.helper != nil {
+	if true {
+
+		lowerBindDN := strings.ToLower(bindDN)
+		baseDN := strings.ToLower("," + h.backend.BaseDN)
+		parts := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")
+		userName := strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
+
+		validotp := false
+
+		// Find the user
+		// We are going to go through all backends and ask
+		// until we find our user or die of boredom.
+		user := config.User{}
+		found := false
+		for i, handler := range h.handlers.Handlers {
+			found, user, _ = handler.FindUser(userName)
+			if found {
+				break
+			}
+			if i >= *h.handlers.Count {
+				break
+			}
+		}
+
+		if !found {
+			validotp = true
+		} else {
+			if len(user.OTPSecret) == 0 {
+				validotp = true
+			} else {
+				if len(bindSimplePw) > 6 {
+					otp := bindSimplePw[len(bindSimplePw)-6:]
+					bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
+					validotp = totp.Validate(otp, user.OTPSecret)
+				}
+			}
+		}
+
+		if !validotp {
+			h.log.V(6).Info(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+	}
 
 	stats.Frontend.Add("bind_reqs", 1)
 	s, err := h.getSession(conn)
@@ -101,7 +158,25 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCod
 
 //
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	wantAttributes := true
+	wantTypesOnly := false
+
 	h.log.V(6).Info("Search request", "binddn", boundDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
+
+	// "1.1" has special meaning: it does what an empty attribute list would do
+	// if it didn't already mean "return all attributes"
+	if len(searchReq.Attributes) == 1 && searchReq.Attributes[0] == "1.1" {
+		wantAttributes = false
+		searchReq.Attributes = searchReq.Attributes[:0]
+	}
+
+	// TypesOnly cannot be true: if it were, glauth would not be able to
+	// match the returned valuea against the query
+	if searchReq.TypesOnly == true {
+		wantTypesOnly = true
+		searchReq.TypesOnly = false
+	}
+
 	stats.Frontend.Add("search_reqs", 1)
 	s, err := h.getSession(conn)
 	if err != nil {
@@ -123,6 +198,61 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	h.log.V(6).Info("Search request to backend", "request", search)
 	sr, err := s.ldap.Search(search)
 	h.log.V(6).Info("Backend Search result", "result", sr)
+
+	if !wantAttributes {
+		h.log.V(6).Info("AP: Search Info", "type", "No attributes")
+		for _, entry := range sr.Entries {
+			entry.Attributes = entry.Attributes[:0]
+		}
+	}
+
+	if wantTypesOnly {
+		h.log.V(6).Info("AP: Search Info", "type", "Types only")
+		for _, entry := range sr.Entries {
+			for _, attribute := range entry.Attributes {
+				attribute.Values = attribute.Values[:0]
+			}
+		}
+	}
+
+	// WART used to debug when testing special cases against
+	// glauth acting as a backend, where it may have
+	// the same workaround thus hiding the issue
+	/*
+		for _, entry := range sr.Entries {
+			for _, attribute := range entry.Attributes {
+				if attribute.Name == "objectclass" {
+					attribute.Name = "bogus"
+				}
+			}
+		}
+	*/
+
+	// If our original attribute is not present, either because:
+	// 1-This is a root query
+	// 2-We were asked not to return attributes
+	// 3-We were asked not to return values
+	// then we re-insert the correct values in there.
+	if searchReq.Scope == 0 && searchReq.BaseDN == "" {
+		h.log.V(6).Info("AP: Search Info", "type", "Root search detected")
+	}
+	attbits := h.attm.FindStringSubmatch(searchReq.Filter)
+	for _, entry := range sr.Entries {
+		foundattname := false
+		for _, attribute := range entry.Attributes {
+			if strings.ToLower(attribute.Name) == strings.ToLower(attbits[1]) {
+				foundattname = true
+				if len(attbits[2]) == 0 {
+					attribute.Values = []string{attbits[2]}
+				}
+				break
+			}
+		}
+		if !foundattname {
+			entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+		}
+	}
+
 	ssr := ldap.ServerSearchResult{
 		Entries:   sr.Entries,
 		Referrals: sr.Referrals,
@@ -154,6 +284,10 @@ func (h ldapHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Con
 // Delete is not yet supported for the ldap backend
 func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
 	return ldap.LDAPResultInsufficientAccessRights, nil
+}
+
+func (h ldapHandler) FindUser(userName string) (found bool, user config.User, err error) {
+	return false, config.User{}, nil
 }
 
 func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
@@ -213,7 +347,7 @@ func (h ldapHandler) getSession(conn net.Conn) (ldapSession, error) {
 		dest := fmt.Sprintf("%s:%d", server.Hostname, server.Port)
 		if server.Scheme == "ldaps" {
 			tlsCfg := &tls.Config{}
-			if h.cfg.Backend.Insecure {
+			if h.backend.Insecure {
 				tlsCfg.InsecureSkipVerify = true
 			}
 			l, err = ldap.DialTLS("tcp", dest, tlsCfg)
@@ -245,7 +379,7 @@ func (h ldapHandler) ping() error {
 		start := time.Now()
 		if h.servers[0].Scheme == "ldaps" {
 			tlsCfg := &tls.Config{}
-			if h.cfg.Backend.Insecure {
+			if h.backend.Insecure {
 				tlsCfg.InsecureSkipVerify = true
 			}
 			l, err = ldap.DialTLS("tcp", dest, tlsCfg)
