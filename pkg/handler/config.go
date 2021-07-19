@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -178,7 +182,8 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 // Search implements a search request against the config file
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.backend.BaseDN)
+	baseDN := strings.ToLower(h.backend.BaseDN)
+	delimitedBaseDN := "," + baseDN
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 	h.log.V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "searchbasedn", searchBaseDN, "src", conn.RemoteAddr(), "scope", searchReq.Scope, "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
@@ -188,8 +193,9 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
 	}
 
-	// for now, we are going to be dirty and assume that if scope==0 and dn=='' we are investigating the schema
-	if searchReq.Scope == 0 && searchBaseDN == "" {
+	// special case: querying the root DSE
+	if searchReq.Scope == 0 && (searchBaseDN == "" || searchBaseDN == baseDN) {
+		h.log.V(6).Info("Search request", "special case", "root DSE")
 		entries := []*ldap.Entry{}
 		attrs := []*ldap.EntryAttribute{}
 		// unfortunately, objectClass is not to be included so we will respect that
@@ -198,7 +204,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedLDAPVersion", Values: []string{"3"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedControl", Values: []string{}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedCapabilities", Values: []string{}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "subschemaSubentry", Values: []string{baseDN}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "subschemaSubentry", Values: []string{"cn=schema"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "serverName", Values: []string{"unknown"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "namingContexts", Values: []string{baseDN}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "defaultNamingContext", Values: []string{baseDN}})
@@ -218,13 +224,58 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 				attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
 			}
 		}
-		entries = append(entries, &ldap.Entry{DN: "", Attributes: attrs})
+		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
 		stats.Frontend.Add("search_successes", 1)
 		h.log.V(6).Info("AP: Root Search OK", "filter", searchReq.Filter)
 		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 	}
 
-	if !strings.HasSuffix(bindDN, baseDN) {
+	if searchBaseDN == "cn=schema" {
+		h.log.V(6).Info("Search request", "special case", "schema discovery")
+		entries := []*ldap.Entry{}
+		attrs := []*ldap.EntryAttribute{}
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{"schema"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "hasSubordinates", Values: []string{"false"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "modifiersName", Values: []string{"cn=Directory Manager"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "modifyTimeStamp", Values: []string{"Mar 8, 2021, 12:46:29 PM PST (20210308204629Z)"}})
+		// Iterate through schema attributes provided in schema/ directory
+		filenames, _ := ioutil.ReadDir("schema")
+		for _, filename := range filenames {
+			file, err := os.Open(filepath.Join("schema", filename.Name()))
+			if err != nil {
+				return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Schema Error: attribute %s cannot be read", filename)
+			}
+			defer file.Close()
+			values := []string{}
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := scanner.Text()
+				values = append(values, line)
+			}
+			attrs = append(attrs, &ldap.EntryAttribute{Name: filename.Name(), Values: values})
+		}
+		// This hack again. One more time, and it gets its own function...
+		attbits := h.attmatcher.FindStringSubmatch(searchReq.Filter)
+		if len(attbits) == 3 {
+			foundattname := false
+			for _, attr := range attrs {
+				if strings.ToLower(attr.Name) == strings.ToLower(attbits[1]) {
+					foundattname = true
+					break
+				}
+			}
+			if !foundattname {
+				attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+			}
+		}
+		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
+		stats.Frontend.Add("search_successes", 1)
+		h.log.V(6).Info("AP: Schema Discovery OK", "filter", searchReq.Filter)
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	}
+
+	// TODO SHould I move this before our special cases handling (above?)
+	if !strings.HasSuffix(bindDN, delimitedBaseDN) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
 	}
 	if !strings.HasSuffix(searchBaseDN, h.backend.BaseDN) {
