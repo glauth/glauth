@@ -86,6 +86,9 @@ linuxarm64:
 darwin64:
 	GOOS=darwin GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX ${BUILD_FILES} && cd bin && sha256sum glauthOSX > glauthOSX.sha256
 
+darwinarm64:
+	GOOS=darwin GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX-arm64 ${BUILD_FILES} && cd bin && sha256sum glauthOSX-arm64 > glauthOSX-arm64.sha256
+
 win32:
 	GOOS=windows GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-win32 ${BUILD_FILES} && cd bin && sha256sum glauth-win32 > glauth-win32.sha256
 
