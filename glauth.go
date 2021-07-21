@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
@@ -133,8 +134,7 @@ func startService() {
 
 func startConfigWatcher() {
 	configFileLocation := getConfigLocation()
-
-	if strings.HasPrefix(configFileLocation, "s3://") {
+	if !activeConfig.WatchConfig || strings.HasPrefix(configFileLocation, "s3://") {
 		return
 	}
 
@@ -143,22 +143,36 @@ func startConfigWatcher() {
 		log.Fatalf("Could not start config-watcher: %s", err.Error())
 	}
 
+	ticker := time.NewTicker(2 * time.Second)
 	go func() {
+		isChanged, isRemoved := false, false
 		for {
 			select {
 			case event := <-watcher.Events:
-				if activeConfig.WatchConfig {
-					if event.Op.String() == "WRITE" {
-						if err := doConfig(); err != nil {
-							log.Warningf("Could not reload config: %sHolding on to old config", err.Error())
-						} else {
-							log.Notice("Config was reloaded")
-						}
-					}
+				//log.Debugf("watching got event: %v", event.Op)
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					isChanged = true
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
+					isChanged, isRemoved = true, true
 				}
 			case err := <-watcher.Errors:
-				if activeConfig.WatchConfig {
-					log.Info("Error!", err)
+				log.Warning("Error!", err)
+			case <-ticker.C:
+				// wakeup
+			}
+			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) {
+				if isRemoved {
+					log.Debugf("rewatching %s", configFileLocation)
+					watcher.Add(configFileLocation)
+					isChanged, isRemoved = true, false
+				}
+				if isChanged {
+					if err := doConfig(); err != nil {
+						log.Warningf("Could not reload config: %sHolding on to old config", err.Error())
+					} else {
+						log.Notice("Config was reloaded")
+					}
+					isChanged = false
 				}
 			}
 		}
