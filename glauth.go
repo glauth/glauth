@@ -160,7 +160,7 @@ func startConfigWatcher() {
 			case <-ticker.C:
 				// wakeup
 			}
-			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) {
+			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
 				if isRemoved {
 					log.Debugf("rewatching %s", configFileLocation)
 					watcher.Add(configFileLocation)
