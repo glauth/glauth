@@ -187,34 +187,34 @@ func startConfigWatcher() {
 		log.Error(err, "Could not start config-watcher")
 	}
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		isChanged, isRemoved := false, false
 		for {
 			select {
 			case event := <-watcher.Events:
-				//log.Debugf("watching got event: %v", event.Op)
+				log.V(6).Info("watcher got event", "e", event.Op.String())
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					isChanged = true
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
 					isChanged, isRemoved = true, true
 				}
 			case err := <-watcher.Errors:
-				log.Warning("Error!", err)
+				log.Error(err, "Error!")
 			case <-ticker.C:
-				// wakeup
+				// wakeup, try finding removed config
 			}
 			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
 				if isRemoved {
-					log.Debugf("rewatching %s", configFileLocation)
-					watcher.Add(configFileLocation)
+					log.V(6).Info("rewatching config", "file", configFileLocation)
+					watcher.Add(configFileLocation)  // overwrite
 					isChanged, isRemoved = true, false
 				}
 				if isChanged {
 					if err := doConfig(); err != nil {
-						log.Warningf("Could not reload config: %sHolding on to old config", err.Error())
+						log.V(2).Info("Could not reload config. Holding on to old config", "error", err.Error())
 					} else {
-						log.Notice("Config was reloaded")
+						log.V(3).Info("Config was reloaded")
 					}
 					isChanged = false
 				}
