@@ -18,16 +18,23 @@ ENV GOARCH=amd64
 ENV CGO_ENABLED=0
 
 # Only needed for alpine builds
-RUN apk add --no-cache git bzr make
+RUN apk add --no-cache git make go-bindata
+
+# Run go-bindata to embed data for API
+RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
+RUN gofmt -w pkg/assets/bindata.go
 
 # Install deps
 RUN go get -d -v ./...
 
-# Run go-bindata to embed data for API
-RUN go get -u github.com/jteeuwen/go-bindata/... && $GOPATH/bin/go-bindata -pkg=assets -o=pkg/assets/bindata.go assets && gofmt -w pkg/assets/bindata.go
-
 # Build and copy final result
-RUN make linux64 && cp ./bin/glauth64 /app/glauth
+RUN uname -a
+RUN if [ $(uname -m) == x86_64 ]; then make linux64 && cp ./bin/glauth64 /app/glauth; fi
+RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; fi
+RUN if [ $(uname -m) == armv7l ]; then make linuxarm32 && cp ./bin/glauth-arm32 /app/glauth; fi
+
+# Check glauth works
+RUN /app/glauth --version
 
 #################
 # Run Step

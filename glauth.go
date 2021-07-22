@@ -6,18 +6,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
+	"github.com/davecgh/go-spew/spew"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
 	"github.com/glauth/glauth/pkg/frontend"
+	gologgingr "github.com/glauth/glauth/pkg/gologgingr"
 	"github.com/glauth/glauth/pkg/server"
 	"github.com/glauth/glauth/pkg/stats"
+	"github.com/go-logr/logr"
+	"github.com/hydronica/toml"
 	"github.com/jinzhu/copier"
 	logging "github.com/op/go-logging"
-	"gopkg.in/amz.v1/aws"
-	"gopkg.in/amz.v1/s3"
+	"gopkg.in/amz.v3/aws"
+	"gopkg.in/amz.v3/s3"
+	// "github.com/davecgh/go-spew/spew"
 )
 
 // Set with buildtime vars
@@ -42,12 +46,16 @@ Options:
   -K <aws_key_id>           AWS Key ID.
   -S <aws_secret_key>       AWS Secret Key.
   -r <aws_region>           AWS Region [default: us-east-1].
+  --ldap <address>          Listen address for the LDAP server.
+  --ldaps <address>         Listen address for the LDAPS server.
+  --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
+  --ldaps-key <key-file>    Path to key file for the LDAPS server.
   -h, --help                Show this screen.
   --version                 Show version.
 `
 
 var (
-	log      *logging.Logger
+	log      logr.Logger
 	args     map[string]interface{}
 	stderr   *logging.LogBackend
 	yubiAuth *yubigo.YubiAuth
@@ -99,13 +107,15 @@ func getVersionString() string {
 
 func main() {
 	stderr = initLogging()
-	log.Debug("AP start")
+	log.V(6).Info("AP start")
 
 	if err := parseArgs(); err != nil {
-		log.Fatalf("Could not parse command-line arguments", err.Error())
+		log.Error(err, "Could not parse command-line arguments")
+		os.Exit(1)
 	}
 	if err := doConfig(); err != nil {
-		log.Fatalf("Configuration file error: %s", err.Error())
+		log.Error(err, "Configuration file error")
+		os.Exit(1)
 	}
 
 	startService()
@@ -117,19 +127,53 @@ func startService() {
 
 	// web API
 	if activeConfig.API.Enabled {
-		log.Debug("Web API enabled")
-		go frontend.RunAPI(log, activeConfig)
+		log.V(6).Info("Web API enabled")
+		go frontend.RunAPI(
+			frontend.Logger(log),
+			frontend.Config(&activeConfig.API),
+		)
 	}
 
 	startConfigWatcher()
 
-	s, err := server.NewServer(log, activeConfig)
+	s, err := server.NewServer(
+		server.Logger(log),
+		server.Config(activeConfig),
+	)
 	if err != nil {
-		log.Fatalf("Could not start server: %s", err.Error())
+		log.Error(err, "Could not create server")
+		os.Exit(1)
 	}
-	s.ListenAndServe()
 
-	log.Critical("AP exit")
+	if activeConfig.LDAP.Enabled {
+		// Don't block if also starting a LDAPS server afterwards
+		shouldBlock := !activeConfig.LDAPS.Enabled
+
+		if shouldBlock {
+			if err := s.ListenAndServe(); err != nil {
+				log.Error(err, "Could not start LDAP server")
+				os.Exit(1)
+			}
+		} else {
+			go func() {
+				if err := s.ListenAndServe(); err != nil {
+					log.Error(err, "Could not start LDAP server")
+					os.Exit(1)
+				}
+			}()
+		}
+	}
+
+	if activeConfig.LDAPS.Enabled {
+		// Always block here
+		if err := s.ListenAndServeTLS(); err != nil {
+			log.Error(err, "Could not start LDAPS server")
+			os.Exit(1)
+		}
+	}
+
+	log.V(0).Info("AP exit")
+	os.Exit(1)
 }
 
 func startConfigWatcher() {
@@ -140,7 +184,7 @@ func startConfigWatcher() {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatalf("Could not start config-watcher: %s", err.Error())
+		log.Error(err, "Could not start config-watcher")
 	}
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -200,9 +244,6 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	// setup defaults
 	cfg.LDAP.Enabled = false
 	cfg.LDAPS.Enabled = true
-	cfg.Backend.NameFormat = "cn"
-	cfg.Backend.GroupFormat = "ou"
-	cfg.Backend.SSHKeyAttr = "sshPublicKey"
 
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
@@ -226,7 +267,10 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		if len(parts) != 2 {
 			return &cfg, fmt.Errorf("Invalid S3 URL: %s", s3url)
 		}
-		b := s3.New(auth, region).Bucket(parts[0])
+		b, err := s3.New(auth, region).Bucket(parts[0])
+		if err != nil {
+			return &cfg, err
+		}
 		tomlData, err := b.Get(parts[1])
 		if err != nil {
 			return &cfg, err
@@ -240,10 +284,56 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		}
 	}
 
+	// Backward Compability
+	if cfg.Backend.Datastore != "" {
+		if cfg.Backends != nil {
+			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+		} else {
+			cfg.Backends = append(cfg.Backends, cfg.Backend)
+		}
+	}
+	spew.Dump(cfg.Backends)
+
+	// Patch with default values where not specified
+	for i := range cfg.Backends {
+		if cfg.Backends[i].NameFormat == "" {
+			cfg.Backends[i].NameFormat = "cn"
+		}
+		if cfg.Backends[i].GroupFormat == "" {
+			cfg.Backends[i].GroupFormat = "ou"
+		}
+		if cfg.Backends[i].SSHKeyAttr == "" {
+			cfg.Backends[i].SSHKeyAttr = "sshPublicKey"
+		}
+	}
+	//
+
 	return &cfg, nil
 }
 
-func handleConfig(cfg config.Config) (*config.Config, error) {
+func handleArgs(cfg config.Config) (*config.Config, error) {
+	// LDAP flags
+	if ldap, ok := args["--ldap"].(string); ok && ldap != "" {
+		cfg.LDAP.Enabled = true
+		cfg.LDAP.Listen = ldap
+	}
+
+	// LDAPS flags
+	if ldaps, ok := args["--ldaps"].(string); ok && ldaps != "" {
+		cfg.LDAPS.Enabled = true
+		cfg.LDAPS.Listen = ldaps
+	}
+	if ldapsCert, ok := args["--ldaps-cert"].(string); ok && ldapsCert != "" {
+		cfg.LDAPS.Cert = ldapsCert
+	}
+	if ldapsKey, ok := args["--ldaps-key"].(string); ok && ldapsKey != "" {
+		cfg.LDAPS.Key = ldapsKey
+	}
+
+	return &cfg, nil
+}
+
+func handleLegacyConfig(cfg config.Config) (*config.Config, error) {
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
 		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
@@ -251,7 +341,7 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 
 	if len(cfg.Frontend.Listen) > 0 {
 		// We're going with old format - parse it into new
-		log.Warning("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
+		log.V(2).Info("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
 
 		cfg.LDAP.Enabled = !cfg.Frontend.TLS
 		cfg.LDAPS.Enabled = cfg.Frontend.TLS
@@ -269,6 +359,9 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 			cfg.LDAPS.Key = cfg.Frontend.Key
 		}
 	}
+	return &cfg, nil
+}
+func validateConfig(cfg config.Config) (*config.Config, error) {
 
 	if !cfg.LDAP.Enabled && !cfg.LDAPS.Enabled {
 		return &cfg, fmt.Errorf("No server configuration found: please provide either LDAP or LDAPS configuration")
@@ -292,14 +385,18 @@ func handleConfig(cfg config.Config) (*config.Config, error) {
 		}
 	}
 
-	switch cfg.Backend.Datastore {
-	case "":
-		cfg.Backend.Datastore = "config"
-	case "config":
-	case "ldap":
-	case "owncloud":
-	default:
-		return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap' or 'owncloud", cfg.Backend.Datastore)
+	//spew.Dump(cfg)
+	for i := range cfg.Backends {
+		switch cfg.Backends[i].Datastore {
+		case "":
+			cfg.Backends[i].Datastore = "config"
+		case "config":
+		case "ldap":
+		case "owncloud":
+		case "plugin":
+		default:
+			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backends[i].Datastore)
+		}
 	}
 	return &cfg, nil
 }
@@ -312,8 +409,19 @@ func doConfig() error {
 		return err
 	}
 
-	// Handle validation and parsing of old [frontend] section into [ldap] and/or [ldaps] sections
-	cfg, err = handleConfig(*cfg)
+	// Handle parsed flags
+	cfg, err = handleArgs(*cfg)
+	if err != nil {
+		return err
+	}
+
+	// Handle parsing of legacy [frontend] section into [ldap] and/or [ldaps] sections
+	cfg, err = handleLegacyConfig(*cfg)
+	if err != nil {
+		return err
+	}
+
+	cfg, err = validateConfig(*cfg)
 	if err != nil {
 		return err
 	}
@@ -342,7 +450,7 @@ func doConfig() error {
 
 	if activeConfig.Debug {
 		logging.SetLevel(logging.DEBUG, programName)
-		log.Debug("Debugging enabled")
+		log.V(6).Info("Debugging enabled")
 	}
 	if activeConfig.Syslog {
 		enableSyslog(stderr)
@@ -353,7 +461,14 @@ func doConfig() error {
 
 // initLogging sets up logging to stderr
 func initLogging() *logging.LogBackend {
-	log = logging.MustGetLogger(programName)
+
+	l := logging.MustGetLogger(programName)
+	l.ExtraCalldepth = 2 // add extra call depth for the logr wrapper
+
+	log = gologgingr.New(
+		gologgingr.Logger(l),
+	)
+	gologgingr.SetVerbosity(10) // do not filter by verbosity. glauth uses the go-logging lib to filter the levels
 
 	format := "%{color}%{time:15:04:05.000000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}"
 	logBackend := logging.NewLogBackend(os.Stderr, "", 0)
@@ -370,10 +485,11 @@ func enableSyslog(stderrBackend *logging.LogBackend) {
 	logging.SetFormatter(logging.MustStringFormatter(format))
 	syslogBackend, err := logging.NewSyslogBackend("")
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err, "Could not create new syslog backend")
+		os.Exit(1)
 	}
 
 	logging.SetBackend(stderrBackend, syslogBackend)
 
-	log.Debug("Syslog enabled")
+	log.V(6).Info("Syslog enabled")
 }
