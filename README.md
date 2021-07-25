@@ -150,10 +150,8 @@ More configuration options are documented here: https://github.com/glauth/glauth
    * Example: cccjgjgkhcbb
    * default = blank
 
-
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
-
 
 ### Two Factor Authentication
 GLAuth can be configured to accept OTP tokens as appended to a users password. Support is added for both **TOTP tokens** (often known by it's most prominent implementation, "Google Authenticator") and **Yubikey OTP tokens**.
@@ -216,6 +214,28 @@ make all
   - 10 I would like to performance test your log collection stack
 - errors really are errors that cannot be handled or returned
   - returning a proper LDAP error code is handling an error
+
+# Compatiblity
+
+While our stated goal for GLAuth is to provide the simplest possible authentication server, we keep finding an increasing number of client appliances that are asking fairly "existential" questions of the server. We have been working on providing answers these clients will find satisfactory.
+
+### Root DSE
+
+RFC 4512: "An LDAP server SHALL provide information about itself and other information that is specific to each server.  This is represented as a group of attributes located in the root DSE"
+
+Test: `ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -s base "(objectclass=*)"`
+
+### Subschema Discovery
+
+RFC 4512: "To read schema attributes from the subschema (sub)entry, clients MUST issue a Search operation [RFC4511] where baseObject is the DN of the subschema (sub)entry..."
+
+Test: `ldapsearch -LLL -o ldif-wrap=no -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bcn=schema -s base`
+
+By default, this query will return a very minimal schema (~5 objects) -- you can ask GLAuth to return more comprehensive schemas by unpacking, in the `schema/` directory, the OpenLDAP or FreeIPA schema archives found in the `assets/` directory.
+
+### LDAP Backend: "1.1" attribute
+
+RFC 4511: "A list containing only the OID "1.1" indicates that no attributes are to be returned."
 
 ## Stargazers over time
 
