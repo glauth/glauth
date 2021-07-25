@@ -1,26 +1,28 @@
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
-[![Travis Build - Master](https://img.shields.io/travis/glauth/glauth.svg)](https://travis-ci.org/glauth/glauth)
-[![Last Commit](https://img.shields.io/github/last-commit/glauth/glauth.svg)](https://github.com/glauth/glauth/graphs/commit-activity)
+![Travis (.com) branch](https://img.shields.io/travis/com/glauth/glauth/dev)
+![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
 
-[![](https://img.shields.io/docker/build/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
-[![DockerHub Image Size](https://img.shields.io/microbadger/image-size/glauth/glauth.svg)](https://hub.docker.com/r/glauth/glauth/)
+![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
+![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
 
-[![Maintainability](https://img.shields.io/codeclimate/maintainability/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/maintainability)
-[![Test Coverage](https://img.shields.io/codeclimate/coverage/glauth/glauth.svg)](https://codeclimate.com/github/glauth/glauth/test_coverage)
 
-[![Donate via Paypal](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/benyanke)
+![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/dev)
+![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/glauth/glauth)
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
 * Lightweight alternative to OpenLDAP and Active Directory for development, or a homelab.
-* Store your user directory in a local file, S3 or proxy to existing LDAP servers.
+* Store your user directory in a file, local or in S3; SQL database; or proxy to existing LDAP servers.
+* Two Factor Authentication (transparent to applications)
+* Multiple backends can be chained to inject features
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
 ### Contributing
-Please base all PRs on [dev](https://github.com/nmcclain/glauth/tree/dev), not master.
+- Please base all Pull Requests on [dev](https://github.com/glauth/glauth/tree/dev), not master.
+- Format your code autonmatically using `gofmt -d ./` before committing
 
 ### Quickstart
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
@@ -41,6 +43,8 @@ Note - makefile uses git data to inject build-time variables. For best results, 
 *make fast* - run build for only linux 64 bit
 
 *make run* - wrapper for the 'go run' command, setting up the needed tooling
+
+*make plugins* - build additional (SQL) plugin backends
 
 *make test* - run the integration test on linux64 binary
 
@@ -97,6 +101,26 @@ In order to use S3, you must set your AWS credentials.  Either:
 2. set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.
 
 More configuration options are documented here: https://github.com/glauth/glauth/blob/master/sample-simple.cfg
+
+### Chaining backends
+
+This can be used, for instance, to inject support for Two Factor Authentication for backends that do not support the feature natively:
+
+```
+[[backends]]
+  datastore = "ldap"
+  servers = ["ldap:s//localhost:390"]
+
+[[backends]]
+  datastore = "config"
+
+...
+
+[[users]]
+  name = "hackers"
+  otpsecret = "................"
+```
+
 
 ### Required Fields
  * Name
@@ -169,7 +193,7 @@ However, app passwords can be used without OTP as well.
 #### Yubikey Configuration
 For Yubikey OTP token authentication, first [configure your Yubikey](https://www.yubico.com/products/services-software/personalization-tools/yubikey-otp/). After this, make sure to [request a `Client ID` and `Secret key` pair](https://upgrade.yubico.com/getapikey/).
 
-Now configure the the `yubikeyclientid` and `yubikeysecret` fields in the general section in the configuration file.
+Now configure the `yubikeyclientid` and `yubikeysecret` fields in the general section in the configuration file.
 
 To enable Yubikey OTP authentication for a user, you must specify their Yubikey ID on the users `yubikey` field. The Yubikey ID is the first 12 characters of the Yubikey OTP, as explained in the below chart.
 
