@@ -22,7 +22,7 @@ import (
 )
 
 // global matcher
-var ldapattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
+var ldapattributematcher = regexp.MustCompile(`(?i)(?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)`)
 
 type ldapHandler struct {
 	backend  config.Backend
@@ -236,20 +236,25 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	if searchReq.Scope == 0 && searchReq.BaseDN == "" {
 		h.log.V(6).Info("AP: Search Info", "type", "Root search detected")
 	}
-	attbits := h.attm.FindStringSubmatch(searchReq.Filter)
-	for _, entry := range sr.Entries {
-		foundattname := false
-		for _, attribute := range entry.Attributes {
-			if strings.ToLower(attribute.Name) == strings.ToLower(attbits[1]) {
-				foundattname = true
-				if len(attbits[2]) == 0 {
-					attribute.Values = []string{attbits[2]}
+
+	filters := h.buildReqAttributesList(searchReq.Filter, []string{})
+
+	for _, filter := range filters {
+		attbits := h.attm.FindStringSubmatch(filter)
+		for _, entry := range sr.Entries {
+			foundattname := false
+			for _, attribute := range entry.Attributes {
+				if strings.ToLower(attribute.Name) == strings.ToLower(attbits[1]) {
+					foundattname = true
+					if len(attbits[2]) == 0 {
+						attribute.Values = []string{attbits[2]}
+					}
+					break
 				}
-				break
 			}
-		}
-		if !foundattname {
-			entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+			if !foundattname {
+				entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+			}
 		}
 	}
 
@@ -269,6 +274,29 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	stats.Frontend.Add("search_successes", 1)
 	h.log.V(6).Info("AP: Search OK", "filter", search.Filter, "numentries", len(ssr.Entries))
 	return ssr, nil
+}
+
+func (h ldapHandler) buildReqAttributesList(filter string, filters []string) []string {
+	maxp := len(filter)
+	start := -1
+	descended := false
+	for p, c := range filter {
+		if c == '(' {
+			if p+1 < maxp {
+				start = p + 1
+			}
+		} else if c == ')' {
+			if start > -1 {
+				descended = true
+				filters = h.buildReqAttributesList(filter[start:p], filters)
+			}
+			start = -1
+		}
+	}
+	if !descended {
+		filters = append(filters, filter)
+	}
+	return filters
 }
 
 // Add is not yet supported for the ldap backend

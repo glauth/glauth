@@ -12,6 +12,12 @@ make plugin_name
 ```
 where 'name' is the plugin's name; so, for instance: `make plugin_sqlite`
 
+To build back-ends for specific architectures, specify `PLUGIN_OS` and `PLUGIN_ARCH` --
+ For instance, to build the sqlite plugin for the new Mac M1s:
+ ```
+make plugin_sqlite PLUGIN_OS=darwin PLUGIN_ARCH=arm64
+ ```
+
 ## Database Plugins
 
 To use a database plugin, edit the configuration file (see pkg/plugins/sample-database.cfg) so that:
