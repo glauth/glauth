@@ -51,7 +51,9 @@ type User struct {
 	Name          string
 	OtherGroups   []int
 	PassSHA256    string
+	PassBcrypt    string
 	PassAppSHA256 []string
+	PassAppBcrypt []string
 	PrimaryGroup  int
 	SSHKeys       []string
 	OTPSecret     string
