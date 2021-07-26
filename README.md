@@ -1,12 +1,14 @@
 # GLAuth: LDAP authentication server for developers
 Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
-![Travis (.com) branch](https://img.shields.io/travis/com/glauth/glauth/dev)
-![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
+[![Gitter](https://badges.gitter.im/glauth/community.svg)](https://gitter.im/glauth/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Matrix](https://img.shields.io/badge/chat-%2fjoin%20%23glauth_community:gitter.im-green)](hey)
 
 ![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
 ![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
 
+![Travis (.com) branch](https://img.shields.io/travis/com/glauth/glauth/dev)
+![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
 
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/dev)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/glauth/glauth)
@@ -86,6 +88,11 @@ Here's a sample config wth hardcoded users and groups:
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a"   # dogood
   sshkeys = [ "ssh-dss AAAAB3..." ]
+[[users]]
+  name = "uberhackers"
+  unixid = 5006
+  primarygroup = 5501
+  passbcrypt = "243261243130244B62463462656F7265504F762E794F324957746D656541326B4B46596275674A79336A476845764B616D65446169784E41384F4432"   # dogood
 [[groups]]
   name = "superheros"
   unixid = 5501
@@ -165,6 +172,10 @@ This can be used, for instance, to inject support for Two Factor Authentication 
    * Specify OTP secret used to validate OTP passcode
    * Example: 3hnvnk4ycv44glzigd6s25j4dougs3rk
    * default = blank
+ * passappbcrypt
+   * Specify an array of app passwords which can also succesfully bind - these bypass the OTP check. Hash the same way as password.
+   * Example: ["c32255dbf6fd6b64883ec8801f793bccfa2a860f2b1ae1315cd95cdac1338efa","4939efa7c87095dacb5e7e8b8cfb3a660fa1f5edcc9108f6d7ec20ea4d6b3a88"]
+   * default = blank
  * passappsha256
    * Specify an array of app passwords which can also succesfully bind - these bypass the OTP check. Hash the same way as password.
    * Example: ["c32255dbf6fd6b64883ec8801f793bccfa2a860f2b1ae1315cd95cdac1338efa","4939efa7c87095dacb5e7e8b8cfb3a660fa1f5edcc9108f6d7ec20ea4d6b3a88"]
@@ -176,6 +187,9 @@ This can be used, for instance, to inject support for Two Factor Authentication 
 
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
+
+### Strong Passwords
+If you are currently using sha256 passwords (`passsha256` or `passappsha256`) moving to strong, salted paswords is recommended. Simply switch to `passbcrypt` and/or `passappbcrypt` password types. Currently (2021) 2<sup>12</sup> is a reasonably good value, depending our your server's CPU.
 
 ### Two Factor Authentication
 GLAuth can be configured to accept OTP tokens as appended to a users password. Support is added for both **TOTP tokens** (often known by it's most prominent implementation, "Google Authenticator") and **Yubikey OTP tokens**.
