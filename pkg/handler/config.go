@@ -19,6 +19,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 	"github.com/pquerna/otp/totp"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
@@ -129,9 +130,7 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 
 	// Store the full bind password provided before possibly modifying
 	// in the otp check
-	// Generate a hash of the provided password
-	hashFull := sha256.New()
-	hashFull.Write([]byte(bindSimplePw))
+	untouchedBindSimplePw := bindSimplePw
 
 	// Test OTP if exists
 	if len(user.OTPSecret) > 0 && !validotp {
@@ -146,21 +145,33 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 	// finally, validate user's pw
 
 	// check app passwords first
-	for index, appPw := range user.PassAppSHA256 {
-
-		if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-			h.log.V(6).Info("Attempt to bind app pw failed", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
-		} else {
-			stats.Frontend.Add("bind_successes", 1)
-			h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
-			return ldap.LDAPResultSuccess, nil
+	if user.PassAppBcrypt != nil {
+		for index, appPw := range user.PassAppBcrypt {
+			decoded, err := hex.DecodeString(appPw)
+			if err != nil {
+				h.log.V(6).Info("invalid app credentials", "incorrect stored hash", "(omitted)")
+			} else {
+				if bcrypt.CompareHashAndPassword(decoded, []byte(untouchedBindSimplePw)) == nil {
+					stats.Frontend.Add("bind_successes", 1)
+					h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
+					return ldap.LDAPResultSuccess, nil
+				}
+			}
 		}
-
 	}
-
-	// then check main password with the hash
-	hash := sha256.New()
-	hash.Write([]byte(bindSimplePw))
+	if user.PassAppSHA256 != nil {
+		hashFull := sha256.New()
+		hashFull.Write([]byte(untouchedBindSimplePw))
+		for index, appPw := range user.PassAppSHA256 {
+			if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
+				h.log.V(6).Info("Attempt to bind app pw failed", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
+			} else {
+				stats.Frontend.Add("bind_successes", 1)
+				h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
+				return ldap.LDAPResultSuccess, nil
+			}
+		}
+	}
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {
@@ -168,10 +179,25 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
-	// Now, check the hash
-	if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
-		h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
-		return ldap.LDAPResultInvalidCredentials, nil
+	// Now, check the pasword hash
+	if user.PassBcrypt != "" {
+		decoded, err := hex.DecodeString(user.PassBcrypt)
+		if err != nil {
+			h.log.V(2).Info("invalid credentials", "incorrect stored hash", "(omitted)")
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+		if bcrypt.CompareHashAndPassword(decoded, []byte(bindSimplePw)) != nil {
+			h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+	}
+	if user.PassSHA256 != "" {
+		hash := sha256.New()
+		hash.Write([]byte(bindSimplePw))
+		if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
+			h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
 	}
 
 	stats.Frontend.Add("bind_successes", 1)

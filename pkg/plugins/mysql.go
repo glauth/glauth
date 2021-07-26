@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
 	homedirectory VARCHAR(64) DEFAULT '',
 	disabled SMALLINT  DEFAULT 0,
 	passsha256 VARCHAR(64) DEFAULT '',
+	passbcrypt VARCHAR(64) DEFAULT '',
 	otpsecret VARCHAR(64) DEFAULT '',
 	yubikey VARCHAR(128) DEFAULT '')
 `)
