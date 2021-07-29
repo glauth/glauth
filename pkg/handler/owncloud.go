@@ -30,7 +30,6 @@ type ownCloudSession struct {
 type ownCloudHandler struct {
 	backend  config.Backend
 	log      logr.Logger
-	cfg      *config.Config
 	client   *http.Client
 	sessions map[string]ownCloudSession
 	lock     *sync.Mutex
@@ -188,6 +187,7 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
+// FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
 func (h ownCloudHandler) FindUser(userName string) (found bool, user config.User, err error) {
 	return false, config.User{}, nil
 }
@@ -355,7 +355,6 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 	return ownCloudHandler{
 		backend:  options.Backend,
 		log:      options.Logger,
-		cfg:      options.Config,
 		sessions: make(map[string]ownCloudSession),
 		lock:     &ownCloudLock,
 		client: &http.Client{

@@ -29,7 +29,6 @@ type ldapHandler struct {
 	handlers HandlerWrapper
 	doPing   chan bool
 	log      logr.Logger
-	cfg      *config.Config
 	lock     *sync.Mutex // for sessions and servers
 	sessions map[string]ldapSession
 	servers  []ldapBackend
@@ -69,7 +68,6 @@ func NewLdapHandler(opts ...Option) Handler {
 		sessions: make(map[string]ldapSession),
 		doPing:   make(chan bool),
 		log:      options.Logger,
-		cfg:      options.Config,
 		helper:   options.Helper,
 		lock:     &ldaplock,
 		attm:     ldapattributematcher,

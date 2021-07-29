@@ -89,20 +89,18 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Backend(backend),
 				handler.Handlers(allHandlers),
 				handler.Logger(s.log),
-				handler.Config(s.c),
 				handler.Helper(helper),
 			)
 		case "owncloud":
 			h = handler.NewOwnCloudHandler(
 				handler.Backend(backend),
 				handler.Logger(s.log),
-				handler.Config(s.c),
 			)
 		case "config":
 			h = handler.NewConfigHandler(
 				handler.Backend(backend),
 				handler.Logger(s.log),
-				handler.Config(s.c),
+				handler.Config(s.c), // TODO only used to access Users and Groups, move that to dedicated options
 				handler.YubiAuth(s.yubiAuth),
 			)
 		case "plugin":
@@ -124,7 +122,6 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			h = initFunc(
 				handler.Backend(backend),
 				handler.Logger(s.log),
-				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 			)
 		default:
