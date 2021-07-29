@@ -73,7 +73,7 @@ type Group struct {
 }
 type Config struct {
 	API                API
-	Backend            Backend
+	Backend            Backend // Deprecated
 	Backends           []Backend
 	Helper             Helper
 	Debug              bool
