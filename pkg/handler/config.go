@@ -39,7 +39,7 @@ func NewConfigHandler(opts ...Option) Handler {
 	handler := configHandler{
 		backend:     options.Backend,
 		log:         options.Logger,
-		cfg:         options.Config,
+		cfg:         options.Config, // TODO only used to access Users and Groups, move that to dedicated options
 		yubikeyAuth: options.YubiAuth,
 		attmatcher:  configattributematcher,
 	}

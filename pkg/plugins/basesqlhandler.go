@@ -39,7 +39,6 @@ type database struct {
 type databaseHandler struct {
 	backend     config.Backend
 	log         logr.Logger
-	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 	sqlBackend  SqlBackend
 	database    database
@@ -70,7 +69,6 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	handler := databaseHandler{
 		backend:     options.Backend,
 		log:         options.Logger,
-		cfg:         options.Config,
 		yubikeyAuth: options.YubiAuth,
 		sqlBackend:  sqlBackend,
 		database:    dbInfo}

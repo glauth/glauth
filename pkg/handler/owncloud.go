@@ -30,11 +30,13 @@ type ownCloudSession struct {
 type ownCloudHandler struct {
 	backend  config.Backend
 	log      logr.Logger
-	cfg      *config.Config
 	client   *http.Client
 	sessions map[string]ownCloudSession
-	lock     sync.Mutex
+	lock     *sync.Mutex
 }
+
+// global lock for ownCloudHandler sessions & servers manipulation
+var ownCloudLock sync.Mutex
 
 func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	bindDN = strings.ToLower(bindDN)
@@ -62,9 +64,9 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
+	// TODO reuse HTTP connection
 	id := connID(conn)
-	h.lock.Lock()
-	h.sessions[id] = ownCloudSession{
+	s := ownCloudSession{
 		log:         h.log,
 		user:        userName,
 		password:    bindSimplePw,
@@ -72,6 +74,8 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 		useGraphAPI: h.backend.UseGraphAPI,
 		client:      h.client,
 	}
+	h.lock.Lock()
+	h.sessions[id] = s
 	h.lock.Unlock()
 
 	stats.Frontend.Add("bind_successes", 1)
@@ -183,6 +187,7 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
+// FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
 func (h ownCloudHandler) FindUser(userName string) (found bool, user config.User, err error) {
 	return false, config.User{}, nil
 }
@@ -350,8 +355,8 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 	return ownCloudHandler{
 		backend:  options.Backend,
 		log:      options.Logger,
-		cfg:      options.Config,
 		sessions: make(map[string]ownCloudSession),
+		lock:     &ownCloudLock,
 		client: &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
