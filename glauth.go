@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/davecgh/go-spew/spew"
@@ -177,8 +178,7 @@ func startService() {
 
 func startConfigWatcher() {
 	configFileLocation := getConfigLocation()
-
-	if strings.HasPrefix(configFileLocation, "s3://") {
+	if !activeConfig.WatchConfig || strings.HasPrefix(configFileLocation, "s3://") {
 		return
 	}
 
@@ -187,28 +187,36 @@ func startConfigWatcher() {
 		log.Error(err, "Could not start config-watcher")
 	}
 
+	ticker := time.NewTicker(1 * time.Second)
 	go func() {
+		isChanged, isRemoved := false, false
 		for {
 			select {
 			case event := <-watcher.Events:
-				if activeConfig.WatchConfig {
-					if event.Op&fsnotify.Remove == fsnotify.Remove {
-						// Ensure we still watch when symlinks are updated
-						watcher.Remove(event.Name)
-						watcher.Add(configFileLocation)
-					}
-
-					if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
-						if err := doConfig(); err != nil {
-							log.V(2).Info("Could not reload config.Holding on to old config", "error", err.Error())
-						} else {
-							log.V(3).Info("Config was reloaded")
-						}
-					}
+				log.V(6).Info("watcher got event", "e", event.Op.String())
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					isChanged = true
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
+					isChanged, isRemoved = true, true
 				}
 			case err := <-watcher.Errors:
-				if activeConfig.WatchConfig {
-					log.Error(err, "Error!")
+				log.Error(err, "Error!")
+			case <-ticker.C:
+				// wakeup, try finding removed config
+			}
+			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
+				if isRemoved {
+					log.V(6).Info("rewatching config", "file", configFileLocation)
+					watcher.Add(configFileLocation)  // overwrite
+					isChanged, isRemoved = true, false
+				}
+				if isChanged {
+					if err := doConfig(); err != nil {
+						log.V(2).Info("Could not reload config. Holding on to old config", "error", err.Error())
+					} else {
+						log.V(3).Info("Config was reloaded")
+					}
+					isChanged = false
 				}
 			}
 		}
