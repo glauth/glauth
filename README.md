@@ -84,18 +84,18 @@ Here's a sample config wth hardcoded users and groups:
   baseDN = "dc=glauth,dc=com"
 [[users]]
   name = "hackers"
-  unixid = 5001
+  uidnumber = 5001
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a"   # dogood
   sshkeys = [ "ssh-dss AAAAB3..." ]
 [[users]]
   name = "uberhackers"
-  unixid = 5006
+  uidnumber = 5006
   primarygroup = 5501
   passbcrypt = "243261243130244B62463462656F7265504F762E794F324957746D656541326B4B46596275674A79336A476845764B616D65446169784E41384F4432"   # dogood
 [[groups]]
   name = "superheros"
-  unixid = 5501
+  gidnumber = 5501
 ```
 To create the password SHA hash, use this command: `echo -n "mysecret" | openssl dgst -sha256`
 Instead of a local configuration file, GLAuth can fetch its configuration from S3.  This is an easy way to ensure redundant GLAuth servers are always in-sync.

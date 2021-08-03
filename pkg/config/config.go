@@ -59,7 +59,8 @@ type User struct {
 	OTPSecret     string
 	Yubikey       string
 	Disabled      bool
-	UnixID        int
+	UnixID        int // TODO: remove after deprecating UnixID on User and Group
+	UIDNumber     int
 	Mail          string
 	LoginShell    string
 	GivenName     string
@@ -68,7 +69,8 @@ type User struct {
 }
 type Group struct {
 	Name          string
-	UnixID        int
+	UnixID        int // TODO: remove after deprecating UnixID on User and Group
+	GIDNumber     int
 	IncludeGroups []int
 }
 type Config struct {

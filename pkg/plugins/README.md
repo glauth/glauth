@@ -42,70 +42,70 @@ Tables:
 Here is how to insert example data using your database's REPL (more detailed information can be found in pkg/plugins/sample-database.cfg)
 
 ```sql
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('hackers', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO groups(name, unixid) VALUES('superheros', 5501);
-INSERT INTO groups(name, unixid) VALUES('crusaders', 5502);
-INSERT INTO groups(name, unixid) VALUES('civilians', 5503);
-INSERT INTO groups(name, unixid) VALUES('caped', 5504);
-INSERT INTO groups(name, unixid) VALUES('lovesailing', 5505);
-INSERT INTO groups(name, unixid) VALUES('smoker', 5506);
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('hackers', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO groups(name, gidnumber) VALUES('superheros', 5501);
+INSERT INTO groups(name, gidnumber) VALUES('crusaders', 5502);
+INSERT INTO groups(name, gidnumber) VALUES('civilians', 5503);
+INSERT INTO groups(name, gidnumber) VALUES('caped', 5504);
+INSERT INTO groups(name, gidnumber) VALUES('lovesailing', 5505);
+INSERT INTO groups(name, gidnumber) VALUES('smoker', 5506);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5503, 5501);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5502);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5501);
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user1', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user2', 5002, 5502, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user3', 5003, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a', '5505,5506');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('user1', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('user2', 5002, 5502, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('user3', 5003, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a', '5505,5506');
 ```
 This should be equivalent to this configuration:
 ```text
 [[users]]
   name = "hackers"
-  unixid = 5001
+  uidnumber = 5001
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[users]]
   name = "user1"
-  unixid = 5001
+  uidnumber = 5001
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[users]]
   name = "user2"
-  unixid = 5002
+  uidnumber = 5002
   primarygroup = 5502
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[users]]
   name = "user3"
-  unixid = 5003
+  uidnumber = 5003
   primarygroup = 5504
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[users]]
   name = "user4"
-  unixid = 5003
+  uidnumber = 5003
   primarygroup = 5504
   othergroups = [5505, 5506]
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[groups]]
   name = "superheros"
-  unixid = 5501
+  gidnumber = 5501
 
 [[groups]]
   name = "crusaders"
-  unixid = 5502
+  gidnumber = 5502
 
 [[groups]]
   name = "civilians"
-  unixid = 5503
+  gidnumber = 5503
   includegroups = [ 5501 ]
 
 [[groups]]
   name = "caped"
-  unixid = 5504
+  gidnumber = 5504
   includegroups = [ 5502, 5501 ]
 ```
 and LDAP should return these `memberOf` values:

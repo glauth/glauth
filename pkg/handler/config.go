@@ -101,8 +101,8 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultC
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// validate group membership
-	if user.PrimaryGroup != group.UnixID {
-		h.log.V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.UnixID)
+	if user.PrimaryGroup != group.GIDNumber {
+		h.log.V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -322,10 +322,10 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{g.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.UnixID)}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMembers(g.UnixID)})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.UnixID)})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMembers(g.GIDNumber)})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
 			dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
@@ -344,7 +344,7 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			}
 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(u.PrimaryGroup)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{fmt.Sprintf("%d", u.UnixID)}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{fmt.Sprintf("%d", u.UIDNumber)}})
 
 			if u.Disabled {
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "accountStatus", Values: []string{"inactive"}})
@@ -445,7 +445,7 @@ func (h configHandler) getGroupMembers(gid int) []string {
 	}
 
 	for _, g := range h.cfg.Groups {
-		if gid == g.UnixID {
+		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
 					includegroupmembers := h.getGroupMembers(includegroupid)
@@ -483,7 +483,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 	}
 
 	for _, g := range h.cfg.Groups {
-		if gid == g.UnixID {
+		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
 					h.log.V(2).Info("Ignoring myself as included group", "groupid", includegroupid)
@@ -513,14 +513,14 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	groups := make(map[string]bool)
 	for _, gid := range gids {
 		for _, g := range h.cfg.Groups {
-			if g.UnixID == gid {
+			if g.GIDNumber == gid {
 				dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
 				groups[dn] = true
 			}
 
 			for _, includegroupid := range g.IncludeGroups {
-				if includegroupid == gid && g.UnixID != gid {
-					includegroupdns := h.getGroupDNs([]int{g.UnixID})
+				if includegroupid == gid && g.GIDNumber != gid {
+					includegroupdns := h.getGroupDNs([]int{g.GIDNumber})
 
 					for _, includegroupdn := range includegroupdns {
 						groups[includegroupdn] = true
@@ -542,7 +542,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 
 func (h configHandler) getGroupName(gid int) string {
 	for _, g := range h.cfg.Groups {
-		if g.UnixID == gid {
+		if g.GIDNumber == gid {
 			return g.Name
 		}
 	}
