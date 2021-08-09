@@ -185,6 +185,7 @@ func startConfigWatcher() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Error(err, "Could not start config-watcher")
+		return
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -207,7 +208,7 @@ func startConfigWatcher() {
 			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
 				if isRemoved {
 					log.V(6).Info("rewatching config", "file", configFileLocation)
-					watcher.Add(configFileLocation)  // overwrite
+					watcher.Add(configFileLocation) // overwrite
 					isChanged, isRemoved = true, false
 				}
 				if isChanged {

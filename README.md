@@ -98,6 +98,7 @@ Here's a sample config wth hardcoded users and groups:
   gidnumber = 5501
 ```
 To create the password SHA hash, use this command: `echo -n "mysecret" | openssl dgst -sha256`
+
 Instead of a local configuration file, GLAuth can fetch its configuration from S3.  This is an easy way to ensure redundant GLAuth servers are always in-sync.
 ```unix
 glauth -c s3://bucketname/glauth.cfg
