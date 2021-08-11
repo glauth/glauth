@@ -221,22 +221,7 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "serverName", Values: []string{"unknown"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "namingContexts", Values: []string{baseDN}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "defaultNamingContext", Values: []string{baseDN}})
-		// ah, but you see, this is not enough because if your query is for, say 'objectClass', then our LDAP
-		// library will weed out this entry since it does *not* contain an objectclass attribute
-		attbits := configattributematcher.FindStringSubmatch(searchReq.Filter)
-		if len(attbits) == 3 {
-			foundattname := false
-			for _, attr := range attrs {
-				if strings.ToLower(attr.Name) == strings.ToLower(attbits[1]) {
-					foundattname = true
-					break
-				}
-			}
-			// the ugly hack: we are going to pretend that the requested attribute is in there
-			if !foundattname {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
-			}
-		}
+		attrs = l.collectRequestedAttributesBack(attrs, searchReq)
 		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
 		stats.Frontend.Add("search_successes", 1)
 		h.GetLog().V(6).Info("AP: Root Search OK", "filter", searchReq.Filter)
@@ -272,20 +257,7 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 			}
 			attrs = append(attrs, &ldap.EntryAttribute{Name: filename.Name(), Values: values})
 		}
-		// This hack again. One more time, and it gets its own function...
-		attbits := configattributematcher.FindStringSubmatch(searchReq.Filter)
-		if len(attbits) == 3 {
-			foundattname := false
-			for _, attr := range attrs {
-				if strings.ToLower(attr.Name) == strings.ToLower(attbits[1]) {
-					foundattname = true
-					break
-				}
-			}
-			if !foundattname {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
-			}
-		}
+		attrs = l.collectRequestedAttributesBack(attrs, searchReq)
 		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
 		stats.Frontend.Add("search_successes", 1)
 		h.GetLog().V(6).Info("AP: Schema Discovery OK", "filter", searchReq.Filter)
@@ -323,4 +295,25 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	stats.Frontend.Add("search_successes", 1)
 	h.GetLog().V(6).Info("AP: Search OK", "filter", searchReq.Filter)
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+}
+
+// If your query is for, say 'objectClass', then our LDAP
+// library will weed out this entry since it does *not* contain an objectclass attribute
+// so we are going to re-inject it to keep the LDAP library happy
+func (l LDAPOpsHelper) collectRequestedAttributesBack(attrs []*ldap.EntryAttribute, searchReq ldap.SearchRequest) []*ldap.EntryAttribute {
+	attbits := configattributematcher.FindStringSubmatch(searchReq.Filter)
+	if len(attbits) == 3 {
+		foundattname := false
+		for _, attr := range attrs {
+			if strings.ToLower(attr.Name) == strings.ToLower(attbits[1]) {
+				foundattname = true
+				break
+			}
+		}
+		// the ugly hack: we are going to pretend that the requested attribute is in there
+		if !foundattname {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: attbits[1], Values: []string{attbits[2]}})
+		}
+	}
+	return attrs
 }
