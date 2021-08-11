@@ -13,13 +13,14 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
-	Backend  config.Backend
-	Handlers HandlerWrapper
-	Logger   logr.Logger
-	Config   *config.Config
-	Context  *context.Context
-	YubiAuth *yubigo.YubiAuth
-	Helper   Handler
+	Backend    config.Backend
+	Handlers   HandlerWrapper
+	Logger     logr.Logger
+	Config     *config.Config
+	Context    *context.Context
+	YubiAuth   *yubigo.YubiAuth
+	Helper     Handler
+	LDAPHelper LDAPOpsHelper
 }
 
 // newOptions initializes the available default options.
@@ -90,5 +91,12 @@ func YubiAuth(val *yubigo.YubiAuth) Option {
 func Helper(val Handler) Option {
 	return func(o *Options) {
 		o.Helper = val
+	}
+}
+
+// Global LDAP Handler
+func LDAPHelper(val LDAPOpsHelper) Option {
+	return func(o *Options) {
+		o.LDAPHelper = val
 	}
 }

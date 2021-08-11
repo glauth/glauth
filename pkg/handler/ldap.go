@@ -316,6 +316,10 @@ func (h ldapHandler) FindUser(userName string) (found bool, user config.User, er
 	return false, config.User{}, nil
 }
 
+func (h ldapHandler) FindGroup(groupName string) (found bool, group config.Group, err error) {
+	return false, config.Group{}, nil
+}
+
 func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()

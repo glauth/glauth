@@ -12,7 +12,8 @@ type Backend struct {
 	UseGraphAPI   bool   // For ownCloud backend only
 	Plugin        string // Path to plugin library, for plugin backend only
 	PluginHandler string // Name of plugin's main handler function
-	Database      string // For MySQL backend only TODO REname to match plugin
+	Database      string // For Database backends only
+	AnonymousDSE  bool   // For Config and Database backends only
 }
 type Helper struct {
 	Enabled       bool

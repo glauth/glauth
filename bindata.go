@@ -228,10 +228,10 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"assets": &bintree{nil, map[string]*bintree{
-		"glauth.css": &bintree{assetsGlauthCss, map[string]*bintree{}},
-		"glauth.js":  &bintree{assetsGlauthJs, map[string]*bintree{}},
-		"index.html": &bintree{assetsIndexHtml, map[string]*bintree{}},
+	"assets": {nil, map[string]*bintree{
+		"glauth.css": {assetsGlauthCss, map[string]*bintree{}},
+		"glauth.js":  {assetsGlauthJs, map[string]*bintree{}},
+		"index.html": {assetsIndexHtml, map[string]*bintree{}},
 	}},
 }}
 
