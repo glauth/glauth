@@ -7,6 +7,7 @@ import (
 
 type HelperMaker interface {
 	FindUser(userName string) (bool, config.User, error)
+	FindGroup(groupName string) (bool, config.Group, error)
 }
 
 // Handler is the common interface for all datastores

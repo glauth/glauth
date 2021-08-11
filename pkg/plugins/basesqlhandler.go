@@ -1,13 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,9 +17,9 @@ import (
 	"github.com/glauth/glauth/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
-	"github.com/pquerna/otp/totp"
-	"golang.org/x/crypto/bcrypt"
 )
+
+var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
 
 type SqlBackend interface {
 	// Name used by database/sql when loading the driver
@@ -39,10 +38,13 @@ type database struct {
 type databaseHandler struct {
 	backend     config.Backend
 	log         logr.Logger
+	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 	sqlBackend  SqlBackend
 	database    database
 	MemGroups   []config.Group
+	ldohelper   handler.LDAPOpsHelper
+	attmatcher  *regexp.Regexp
 }
 
 // func NewDatabaseHandler_deprecated(log *logging.Logger, cfg *config.Config, yubikeyAuth *yubigo.YubiAuth, sqlBackend SqlBackend) handler.Handler {
@@ -69,9 +71,12 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	handler := databaseHandler{
 		backend:     options.Backend,
 		log:         options.Logger,
+		cfg:         options.Config,
 		yubikeyAuth: options.YubiAuth,
 		sqlBackend:  sqlBackend,
-		database:    dbInfo}
+		database:    dbInfo,
+		ldohelper:   options.LDAPHelper,
+		attmatcher:  configattributematcher}
 
 	sqlBackend.CreateSchema(db)
 
@@ -80,223 +85,25 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	return handler
 }
 
+func (h databaseHandler) GetBackend() config.Backend {
+	return h.backend
+}
+func (h databaseHandler) GetLog() logr.Logger {
+	return h.log
+}
+func (h databaseHandler) GetCfg() *config.Config {
+	return h.cfg
+}
+func (h databaseHandler) GetYubikeyAuth() *yubigo.YubiAuth {
+	return h.yubikeyAuth
+}
+
 func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
-	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.backend.BaseDN)
-
-	h.log.V(3).Info(fmt.Sprintf("Bind request: bindDN: %s, BaseDN: %s, source: %s", bindDN, h.backend.BaseDN, conn.RemoteAddr().String()))
-
-	stats.Frontend.Add("bind_reqs", 1)
-
-	// parse the bindDN - ensure that the bindDN ends with the BaseDN
-	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, h.backend.BaseDN))
-		// h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
-	groupName := ""
-	userName := ""
-	if len(parts) == 1 {
-		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
-	} else if len(parts) == 2 {
-		userName = strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
-		groupName = strings.TrimPrefix(parts[1], h.backend.GroupFormat+"=")
-	} else {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: BindDN %s should have only one or two parts (has %d)", bindDN, len(parts)))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
-	// find the user
-	user := config.User{}
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE lower(u.name)=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
-		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
-	if err != nil {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: User %s not found.", userName))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	// find the group
-	group := config.Group{}
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT g.gidnumber FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
-		&group.GIDNumber)
-	if err != nil {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: Group %s not found.", userName))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	// validate group membership
-	if user.PrimaryGroup != group.GIDNumber {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: User %s primary group is not %s.", userName, groupName))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
-	validotp := false
-
-	if len(user.Yubikey) == 0 && len(user.OTPSecret) == 0 {
-		validotp = true
-	}
-
-	if len(user.Yubikey) > 0 && h.yubikeyAuth != nil {
-		if len(bindSimplePw) > 44 {
-			otp := bindSimplePw[len(bindSimplePw)-44:]
-			yubikeyid := otp[0:12]
-			bindSimplePw = bindSimplePw[:len(bindSimplePw)-44]
-
-			if user.Yubikey == yubikeyid {
-				_, ok, _ := h.yubikeyAuth.Verify(otp)
-
-				if ok {
-					validotp = true
-				}
-			}
-		}
-	}
-
-	// Store the full bind password provided before possibly modifying
-	// in the otp check
-	untouchedBindSimplePw := bindSimplePw
-
-	// Test OTP if exists
-	if len(user.OTPSecret) > 0 && !validotp {
-		if len(bindSimplePw) > 6 {
-			otp := bindSimplePw[len(bindSimplePw)-6:]
-			bindSimplePw = bindSimplePw[:len(bindSimplePw)-6]
-
-			validotp = totp.Validate(otp, user.OTPSecret)
-		}
-	}
-
-	// finally, validate user's pw
-
-	// check app passwords first
-	if user.PassAppBcrypt != nil {
-		for index, appPw := range user.PassAppBcrypt {
-			decoded, err := hex.DecodeString(appPw)
-			if err != nil {
-				h.log.V(6).Info("invalid app credentials", "incorrect stored hash", "(omitted)")
-			} else {
-				if bcrypt.CompareHashAndPassword(decoded, []byte(untouchedBindSimplePw)) == nil {
-					stats.Frontend.Add("bind_successes", 1)
-					h.log.V(6).Info("Bind success using app pw", "index", index, "binddn", bindDN, "src", conn.RemoteAddr())
-					return ldap.LDAPResultSuccess, nil
-				}
-			}
-		}
-	}
-	if user.PassAppSHA256 != nil {
-		hashFull := sha256.New()
-		hashFull.Write([]byte(untouchedBindSimplePw))
-		for index, appPw := range user.PassAppSHA256 {
-			if appPw != hex.EncodeToString(hashFull.Sum(nil)) {
-				h.log.V(2).Info(fmt.Sprintf("Attempted to bind app pw #%d - failure as %s from %s", index, bindDN, conn.RemoteAddr().String()))
-			} else {
-				stats.Frontend.Add("bind_successes", 1)
-				h.log.V(3).Info("Bind success using app pw #%d as %s from %s", index, bindDN, conn.RemoteAddr().String())
-				return ldap.LDAPResultSuccess, nil
-			}
-		}
-	}
-
-	// Then ensure the OTP is valid before checking
-	if !validotp {
-		h.log.V(2).Info(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
-	// Now, check the password hash
-	if user.PassBcrypt != "" {
-		decoded, err := hex.DecodeString(user.PassBcrypt)
-		if err != nil {
-			h.log.V(2).Info("invalid credentials", "incorrect stored hash", "(omitted)")
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-		if bcrypt.CompareHashAndPassword(decoded, []byte(bindSimplePw)) != nil {
-			h.log.V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-	}
-	if user.PassSHA256 != "" {
-		hash := sha256.New()
-		hash.Write([]byte(bindSimplePw))
-		if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
-			h.log.V(2).Info(fmt.Sprintf("Bind Error: invalid credentials as %s from %s", bindDN, conn.RemoteAddr().String()))
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-	}
-
-	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(3).Info(fmt.Sprintf("Bind success as %s from %s", bindDN, conn.RemoteAddr().String()))
-	return ldap.LDAPResultSuccess, nil
+	return h.ldohelper.Bind(h, bindDN, bindSimplePw, conn)
 }
 
 func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.backend.BaseDN)
-	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(3).Info(fmt.Sprintf("Search request as %s from %s for %s", bindDN, conn.RemoteAddr().String(), searchReq.Filter))
-	stats.Frontend.Add("search_reqs", 1)
-
-	// validate the user is authenticated and has appropriate access
-	if len(bindDN) < 1 {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
-	}
-	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.backend.BaseDN)
-	}
-	if !strings.HasSuffix(searchBaseDN, h.backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.backend.BaseDN)
-	}
-	// return all users in the config file - the LDAP library will filter results for us
-	entries := []*ldap.Entry{}
-	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
-	if err != nil {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter)
-	}
-	switch filterEntity {
-	default:
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
-	case "posixgroup":
-		h.MemGroups, err = h.memoizeGroups()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to memoize groups [%s]", err.Error())
-		}
-
-		for _, g := range h.MemGroups {
-			entries = append(entries, h.getGroup(g))
-		}
-	case "posixaccount", "":
-		h.MemGroups, err = h.memoizeGroups()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to memoize groups [%s]", err.Error())
-		}
-
-		rows, err := h.database.cnx.Query(`
-			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled 
-			FROM users u`)
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to retrieve data [%s]", err.Error())
-		}
-		defer rows.Close()
-
-		var otherGroups string
-		var disabled int
-		u := config.User{}
-		for rows.Next() {
-			err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled)
-			if err != nil {
-				return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to retrieve data [%s]", err.Error())
-			}
-			u.OtherGroups = h.commaListToTable(otherGroups)
-			u.Disabled = h.intToBool(disabled)
-
-			entries = append(entries, h.getAccount(u))
-		}
-	}
-	stats.Frontend.Add("search_successes", 1)
-	h.log.V(3).Info(fmt.Sprintf("AP: Search OK: %s", searchReq.Filter))
-	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	return h.ldohelper.Search(h, bindDN, searchReq, conn)
 }
 
 // Add is not yet supported for the sql backend
@@ -327,6 +134,68 @@ func (h databaseHandler) FindUser(userName string) (f bool, u config.User, err e
 	}
 
 	return found, user, err
+}
+
+func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, err error) {
+	group := config.Group{}
+	found := false
+
+	err = h.database.cnx.QueryRow(fmt.Sprintf(`
+			SELECT g.gidnumber FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
+		&group.GIDNumber)
+	if err == nil {
+		found = true
+	}
+
+	return found, group, err
+}
+
+func (h databaseHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) {
+	entries := []*ldap.Entry{}
+
+	h.MemGroups, err = h.memoizeGroups()
+	if err != nil {
+		return entries, err
+	}
+
+	rows, err := h.database.cnx.Query(`
+		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled 
+		FROM users u`)
+	if err != nil {
+		return entries, err
+	}
+	defer rows.Close()
+
+	var otherGroups string
+	var disabled int
+	u := config.User{}
+	for rows.Next() {
+		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled)
+		if err != nil {
+			return entries, err
+		}
+		u.OtherGroups = h.commaListToTable(otherGroups)
+		u.Disabled = h.intToBool(disabled)
+
+		entries = append(entries, h.getAccount(u))
+	}
+
+	return entries, nil
+}
+
+func (h databaseHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
+	entries := []*ldap.Entry{}
+
+	h.MemGroups, err = h.memoizeGroups()
+	if err != nil {
+		return entries, err
+	}
+
+	for _, g := range h.MemGroups {
+		entries = append(entries, h.getGroup(g))
+	}
+
+	return entries, nil
 }
 
 func (h databaseHandler) Close(boundDn string, conn net.Conn) error {
