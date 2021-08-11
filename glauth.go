@@ -207,7 +207,7 @@ func startConfigWatcher() {
 			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
 				if isRemoved {
 					log.V(6).Info("rewatching config", "file", configFileLocation)
-					watcher.Add(configFileLocation)  // overwrite
+					watcher.Add(configFileLocation) // overwrite
 					isChanged, isRemoved = true, false
 				}
 				if isChanged {

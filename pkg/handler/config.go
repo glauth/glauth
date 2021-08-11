@@ -224,7 +224,7 @@ func (h configHandler) getGroupMembers(gid int) []string {
 	}
 
 	m := []string{}
-	for k, _ := range members {
+	for k := range members {
 		m = append(m, k)
 	}
 
@@ -264,7 +264,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 	}
 
 	m := []string{}
-	for k, _ := range members {
+	for k := range members {
 		m = append(m, k)
 	}
 
@@ -296,7 +296,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	}
 
 	g := []string{}
-	for k, _ := range groups {
+	for k := range groups {
 		g = append(g, k)
 	}
 

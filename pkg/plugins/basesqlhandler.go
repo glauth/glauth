@@ -315,7 +315,7 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 	}
 
 	m := []string{}
-	for k, _ := range members {
+	for k := range members {
 		m = append(m, k)
 	}
 
@@ -372,7 +372,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 	}
 
 	m := []string{}
-	for k, _ := range members {
+	for k := range members {
 		m = append(m, k)
 	}
 
@@ -404,7 +404,7 @@ func (h databaseHandler) getGroupDNs(gids []int) []string {
 	}
 
 	g := []string{}
-	for k, _ := range groups {
+	for k := range groups {
 		g = append(g, k)
 	}
 
