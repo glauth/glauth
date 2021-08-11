@@ -306,5 +306,5 @@ RFC 4511: "A list containing only the OID "1.1" indicates that no attributes are
 
 ## Stargazers over time
 
-[![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
+[![Stargazers over time](https://starchart.cc/glauth/glauth.svg)](https://starchart.cc/glauth/glauth)
 

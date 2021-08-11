@@ -77,21 +77,27 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 	}
 
 	// find the user
-	found, user, _ := h.FindUser(userName)
-	if !found {
+	foundUser, user, _ := h.FindUser(userName)
+	if !foundUser {
 		h.GetLog().V(2).Info("User not found", "username", userName)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	// find the group
-	found, group, _ := h.FindGroup(groupName)
-	if !found {
-		h.GetLog().V(2).Info("Group not found", "groupname", groupName)
-		return ldap.LDAPResultInvalidCredentials, nil
+	var group config.Group // = nil
+	var foundGroup bool    // = false
+	if groupName != "" {
+		foundGroup, group, _ = h.FindGroup(groupName)
+		if !foundGroup {
+			h.GetLog().V(2).Info("Group not found", "groupname", groupName)
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
 	}
 	// validate group membership
-	if user.PrimaryGroup != group.GIDNumber {
-		h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
-		return ldap.LDAPResultInvalidCredentials, nil
+	if foundGroup {
+		if user.PrimaryGroup != group.GIDNumber {
+			h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
 	}
 
 	validotp := false

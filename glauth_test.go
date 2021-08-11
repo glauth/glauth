@@ -13,6 +13,7 @@ type testEnv struct {
 	checkanonymousrootDSE bool
 	checkTOTP             bool
 	svcdn                 string
+	svcdnnogroup          string
 	otpdn                 string
 	expectedinfo          string
 	expectedaccount       string
@@ -31,6 +32,7 @@ func TestIntegerStuff(t *testing.T) {
 				checkTOTP:             true,
 				expectedinfo:          "supportedLDAPVersion: 3",
 				svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+				svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
 				otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
 				expectedaccount:       "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
 				expectedfirstaccount:  "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
@@ -50,6 +52,7 @@ func TestIntegerStuff(t *testing.T) {
 					checkTOTP:             false,
 					expectedinfo:          "supportedLDAPVersion: 3",
 					svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+					svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
 					otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
 					expectedaccount:       "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
 					expectedfirstaccount:  "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
@@ -70,6 +73,7 @@ func TestIntegerStuff(t *testing.T) {
 					checkTOTP:             true,
 					expectedinfo:          "objectClass: top",
 					svcdn:                 "cn=serviceuser,cn=svcaccts,ou=users,dc=glauth,dc=com",
+					svcdnnogroup:          "", // ignore
 					otpdn:                 "cn=otpuser,cn=superheros,ou=users,dc=glauth,dc=com",
 					expectedaccount:       "dn: cn=hackers,cn=superheros,ou=users,dc=glauth,dc=com",
 					expectedfirstaccount:  "dn: cn=johndoe,cn=superheros,ou=users,dc=glauth,dc=com",
@@ -87,6 +91,15 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 			So(out, ShouldEqual, env.expectedaccount)
 		})
 	})
+
+	if env.svcdnnogroup != "" {
+		Convey("When searching for the 'hackers' user without binding with a group", func() {
+			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdnnogroup, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+			Convey("We should find them in the 'superheros' group", func() {
+				So(out, ShouldEqual, env.expectedaccount)
+			})
+		})
+	}
 
 	Convey("When querying the root SDE", func() {
 		out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-s", "base", "(objectclass=*)")
