@@ -108,7 +108,7 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCod
 		user := config.User{}
 		found := false
 		for i, handler := range h.handlers.Handlers {
-			found, user, _ = handler.FindUser(userName)
+			found, user, _ = handler.FindUser(userName, false)
 			if found {
 				break
 			}
@@ -312,7 +312,7 @@ func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (res
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h ldapHandler) FindUser(userName string) (found bool, user config.User, err error) {
+func (h ldapHandler) FindUser(userName string, searchByUPN bool) (found bool, user config.User, err error) {
 	return false, config.User{}, nil
 }
 

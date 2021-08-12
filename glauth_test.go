@@ -12,6 +12,7 @@ import (
 type testEnv struct {
 	checkanonymousrootDSE bool
 	checkTOTP             bool
+	checkbindUPN          bool
 	svcdn                 string
 	svcdnnogroup          string
 	otpdn                 string
@@ -30,6 +31,7 @@ func TestIntegerStuff(t *testing.T) {
 			svc, testEnv{
 				checkanonymousrootDSE: true,
 				checkTOTP:             true,
+				checkbindUPN:          true,
 				expectedinfo:          "supportedLDAPVersion: 3",
 				svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
 				svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
@@ -50,6 +52,7 @@ func TestIntegerStuff(t *testing.T) {
 				svc, testEnv{
 					checkanonymousrootDSE: true,
 					checkTOTP:             false,
+					checkbindUPN:          true,
 					expectedinfo:          "supportedLDAPVersion: 3",
 					svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
 					svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
@@ -71,6 +74,7 @@ func TestIntegerStuff(t *testing.T) {
 				svc, testEnv{
 					checkanonymousrootDSE: false,
 					checkTOTP:             true,
+					checkbindUPN:          false,
 					expectedinfo:          "objectClass: top",
 					svcdn:                 "cn=serviceuser,cn=svcaccts,ou=users,dc=glauth,dc=com",
 					svcdnnogroup:          "", // ignore
@@ -95,6 +99,15 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 	if env.svcdnnogroup != "" {
 		Convey("When searching for the 'hackers' user without binding with a group", func() {
 			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdnnogroup, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+			Convey("We should find them in the 'superheros' group", func() {
+				So(out, ShouldEqual, env.expectedaccount)
+			})
+		})
+	}
+
+	if env.checkbindUPN {
+		Convey("When searching for the 'hackers' user after binding using the account's UPN", func() {
+			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", "serviceuser@example.com", "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
 			Convey("We should find them in the 'superheros' group", func() {
 				So(out, ShouldEqual, env.expectedaccount)
 			})

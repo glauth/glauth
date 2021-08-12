@@ -76,15 +76,24 @@ func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (r
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h configHandler) FindUser(userName string) (f bool, u config.User, err error) {
+func (h configHandler) FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error) {
 	user := config.User{}
 	found := false
+
 	for _, u := range h.cfg.Users {
-		if strings.EqualFold(u.Name, userName) {
-			found = true
-			user = u
+		if searchByUPN {
+			if strings.EqualFold(u.Mail, userName) {
+				found = true
+				user = u
+			}
+		} else {
+			if strings.EqualFold(u.Name, userName) {
+				found = true
+				user = u
+			}
 		}
 	}
+
 	return found, user, nil
 }
 
@@ -129,6 +138,7 @@ func (h configHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) 
 
 		if len(u.Mail) > 0 {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "mail", Values: []string{u.Mail}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "userPrincipalName", Values: []string{u.Mail}})
 		}
 
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount", "shadowAccount"}})

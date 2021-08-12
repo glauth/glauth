@@ -188,7 +188,7 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 }
 
 // FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
-func (h ownCloudHandler) FindUser(userName string) (found bool, user config.User, err error) {
+func (h ownCloudHandler) FindUser(userName string, searchByUPN bool) (found bool, user config.User, err error) {
 	return false, config.User{}, nil
 }
 

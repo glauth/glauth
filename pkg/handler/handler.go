@@ -6,7 +6,7 @@ import (
 )
 
 type HelperMaker interface {
-	FindUser(userName string) (bool, config.User, error)
+	FindUser(userName string, searchByUPN bool) (bool, config.User, error)
 	FindGroup(groupName string) (bool, config.Group, error)
 }
 

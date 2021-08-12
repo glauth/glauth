@@ -121,13 +121,22 @@ func (h databaseHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h databaseHandler) FindUser(userName string) (f bool, u config.User, err error) {
+func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error) {
+	var criterion string
+	if searchByUPN {
+		criterion = "lower(u.mail)"
+	} else {
+		criterion = "lower(u.name)"
+	}
+
 	user := config.User{}
 	found := false
 
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
 			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE lower(u.name)=%s`, h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+			FROM users u WHERE %s=%s`,
+		criterion,
+		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
 		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err == nil {
 		found = true
@@ -460,6 +469,7 @@ func (h databaseHandler) getAccount(u config.User) *ldap.Entry {
 
 	if len(u.Mail) > 0 {
 		attrs = append(attrs, &ldap.EntryAttribute{"mail", []string{u.Mail}})
+		attrs = append(attrs, &ldap.EntryAttribute{"userPrincipalName", []string{u.Mail}})
 	}
 
 	attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixAccount"}})
