@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/pkg/config"
@@ -36,15 +37,34 @@ type LDAPOpsHandler interface {
 	FindPosixGroups() (entrylist []*ldap.Entry, err error)
 }
 
+type failedBind struct {
+	ts time.Time
+}
+
+type sourceInfo struct {
+	lastSeen  time.Time
+	failures  chan failedBind
+	waitUntil time.Time
+}
+
 type LDAPOpsHelper struct {
+	sources     map[string]*sourceInfo
+	nextPruning time.Time
 }
 
 func NewLDAPOpsHelper() LDAPOpsHelper {
-	helper := LDAPOpsHelper{}
+	helper := LDAPOpsHelper{
+		sources:     make(map[string]*sourceInfo),
+		nextPruning: time.Now(),
+	}
 	return helper
 }
 
 func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+	if l.isInTimeout(h, conn) {
+		return ldap.LDAPResultUnwillingToPerform, nil
+	}
+
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.GetBackend().BaseDN)
 
@@ -198,6 +218,7 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 		}
 		if bcrypt.CompareHashAndPassword(decoded, []byte(bindSimplePw)) != nil {
 			h.GetLog().V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
+			l.maybePutInTimeout(h, conn, true)
 			return ldap.LDAPResultInvalidCredentials, nil
 		}
 	}
@@ -206,6 +227,7 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 		hash.Write([]byte(bindSimplePw))
 		if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
 			h.GetLog().V(2).Info("invalid credentials", "binddn", bindDN, "src", conn.RemoteAddr())
+			l.maybePutInTimeout(h, conn, true)
 			return ldap.LDAPResultInvalidCredentials, nil
 		}
 	}
@@ -216,6 +238,10 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 }
 
 func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	if l.isInTimeout(h, conn) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultUnwillingToPerform}, fmt.Errorf("Source is in a timeout")
+	}
+
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower(h.GetBackend().BaseDN)
 	delimitedBaseDN := "," + baseDN
@@ -351,4 +377,85 @@ func (l LDAPOpsHelper) collectRequestedAttributesBack(attrs []*ldap.EntryAttribu
 		}
 	}
 	return attrs
+}
+
+// return true if we should not process the current operation
+func (l LDAPOpsHelper) isInTimeout(handler LDAPOpsHandler, conn net.Conn) bool {
+	cfg := handler.GetCfg()
+	if !cfg.Behaviors.LimitFailedBinds {
+		return false
+	}
+
+	remoteAddr := l.getAddr(conn)
+	now := time.Now()
+	info, ok := l.sources[remoteAddr]
+	if !ok {
+		l.sources[remoteAddr] = &sourceInfo{
+			lastSeen:  now,
+			failures:  make(chan failedBind, cfg.Behaviors.NumberOfFailedBinds),
+			waitUntil: now,
+		}
+		handler.GetLog().V(6).Info("CFRDBG: Created Struct", "remoteAddr", remoteAddr)
+		return false
+	}
+	// update so that this source does not get pruned
+	info.lastSeen = now
+	// if we are in a time out...
+	if cfg.Behaviors.LimitFailedBinds && info.waitUntil.After(now) {
+		handler.GetLog().V(6).Info("CFRDBG: Time Out")
+		return true
+	}
+	return false
+}
+
+func (l LDAPOpsHelper) maybePutInTimeout(handler LDAPOpsHandler, conn net.Conn, noteFailure bool) bool {
+	cfg := handler.GetCfg()
+	if !cfg.Behaviors.LimitFailedBinds {
+		return false
+	}
+
+	remoteAddr := l.getAddr(conn)
+	now := time.Now()
+	info, _ := l.sources[remoteAddr]
+	// if we have a failed bind...
+	if noteFailure {
+		info.failures <- failedBind{ts: time.Now()}
+		handler.GetLog().V(6).Info("CFRDBG: Failed Bind", "Count", len(info.failures))
+		// if we now have 3 failed binds in a row
+		if len(info.failures) == cfg.Behaviors.NumberOfFailedBinds {
+			handler.GetLog().V(6).Info("CFRDBG: 3 Failures")
+			// we cannot have more than 3 failed binds in our channel so pop the oldest one
+			pruned := <-info.failures
+			// if we have 3 failed bind in a row in less than 3 seconds
+			if pruned.ts.Add(cfg.Behaviors.PeriodOfFailedBinds * time.Second).After(now) {
+				handler.GetLog().V(6).Info("CFRDBG: 3 Rapid Failures")
+				// we will wait for 'n' seconds no matter what happens next
+				info.waitUntil = time.Now().Add(cfg.Behaviors.BlockFailedBindsFor * time.Second)
+				// purge our failure queue until we resume accepting operations
+				for len(info.failures) > 0 {
+					<-info.failures
+				}
+			}
+		}
+	}
+	// Prune old IPs
+	// TODO We should ensure that the time between prunings is bigger than the time to determine rapid failed binds
+	if l.nextPruning.Before(now) {
+		for sourceIP, sourceInfo := range l.sources {
+			if sourceInfo.lastSeen.Add(cfg.Behaviors.PruneSourcesOlderThan * time.Second).Before(now) {
+				delete(l.sources, sourceIP)
+			}
+		}
+		l.nextPruning = time.Now().Add(cfg.Behaviors.PruneSourceTableEvery * time.Second)
+	}
+	return false
+}
+
+func (l LDAPOpsHelper) getAddr(conn net.Conn) string {
+	fullAddr := conn.RemoteAddr().String()
+	sep := strings.LastIndex(fullAddr, ":")
+	if sep == -1 {
+		return fullAddr
+	}
+	return fullAddr[0:sep]
 }

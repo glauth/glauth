@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // config file
 type Backend struct {
 	BaseDN        string
@@ -48,6 +50,14 @@ type API struct {
 	SecretToken string
 	TLS         bool
 }
+type Behaviors struct {
+	LimitFailedBinds      bool
+	NumberOfFailedBinds   int
+	PeriodOfFailedBinds   time.Duration
+	BlockFailedBindsFor   time.Duration
+	PruneSourceTableEvery time.Duration
+	PruneSourcesOlderThan time.Duration
+}
 type User struct {
 	Name          string
 	OtherGroups   []int
@@ -79,6 +89,7 @@ type Config struct {
 	Backend            Backend // Deprecated
 	Backends           []Backend
 	Helper             Helper
+	Behaviors          Behaviors
 	Debug              bool
 	WatchConfig        bool
 	YubikeyClientID    string
