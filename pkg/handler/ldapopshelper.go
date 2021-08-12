@@ -22,6 +22,7 @@ import (
 )
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
+var emailmatcher = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 type LDAPOpsHandler interface {
 	GetBackend() config.Backend
@@ -29,7 +30,7 @@ type LDAPOpsHandler interface {
 	GetCfg() *config.Config
 	GetYubikeyAuth() *yubigo.YubiAuth
 
-	FindUser(userName string) (f bool, u config.User, err error)
+	FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error)
 	FindGroup(groupName string) (f bool, g config.Group, err error)
 	FindPosixAccounts() (entrylist []*ldap.Entry, err error)
 	FindPosixGroups() (entrylist []*ldap.Entry, err error)
@@ -51,52 +52,67 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 
 	stats.Frontend.Add("bind_reqs", 1)
 
+	// Special Case: bind as anonymous
 	if bindDN == "" && bindSimplePw == "" {
 		stats.Frontend.Add("bind_successes", 1)
 		h.GetLog().V(6).Info("Anonymous Bind success", "src", conn.RemoteAddr())
 		return ldap.LDAPResultSuccess, nil
 	}
 
-	// parse the bindDN - ensure that the bindDN ends with the BaseDN
-	if !strings.HasSuffix(bindDN, baseDN) {
-		h.GetLog().V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.GetBackend().BaseDN)
-		// h.GetLog().Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
-	groupName := ""
-	userName := ""
-	if len(parts) == 1 {
-		userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-	} else if len(parts) == 2 {
-		userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-		groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
-	} else {
-		h.GetLog().V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
+	var user config.User
 
-	// find the user
-	foundUser, user, _ := h.FindUser(userName)
-	if !foundUser {
-		h.GetLog().V(2).Info("User not found", "username", userName)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	// find the group
-	var group config.Group // = nil
-	var foundGroup bool    // = false
-	if groupName != "" {
-		foundGroup, group, _ = h.FindGroup(groupName)
-		if !foundGroup {
-			h.GetLog().V(2).Info("Group not found", "groupname", groupName)
+	// Special Case: bind using UPN
+	// Not using mail.ParseAddress/1 because we would allow incorrectly formatted UPNs
+	if emailmatcher.MatchString(bindDN) {
+		var foundUser bool // = false
+		foundUser, user, _ = h.FindUser(bindDN, true)
+		if !foundUser {
+			h.GetLog().V(2).Info("User not found", "userprincipalname", bindDN)
 			return ldap.LDAPResultInvalidCredentials, nil
 		}
-	}
-	// validate group membership
-	if foundGroup {
-		if user.PrimaryGroup != group.GIDNumber {
-			h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
+	} else {
+		// parse the bindDN - ensure that the bindDN ends with the BaseDN
+		if !strings.HasSuffix(bindDN, baseDN) {
+			h.GetLog().V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.GetBackend().BaseDN)
+			// h.GetLog().Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
 			return ldap.LDAPResultInvalidCredentials, nil
+		}
+		parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
+		groupName := ""
+		userName := ""
+		if len(parts) == 1 {
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
+		} else if len(parts) == 2 {
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
+			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
+		} else {
+			h.GetLog().V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+
+		// find the user
+		var foundUser bool // = false
+		foundUser, user, _ = h.FindUser(userName, false)
+		if !foundUser {
+			h.GetLog().V(2).Info("User not found", "username", userName)
+			return ldap.LDAPResultInvalidCredentials, nil
+		}
+		// find the group
+		var group config.Group // = nil
+		var foundGroup bool    // = false
+		if groupName != "" {
+			foundGroup, group, _ = h.FindGroup(groupName)
+			if !foundGroup {
+				h.GetLog().V(2).Info("Group not found", "groupname", groupName)
+				return ldap.LDAPResultInvalidCredentials, nil
+			}
+		}
+		// validate group membership
+		if foundGroup {
+			if user.PrimaryGroup != group.GIDNumber {
+				h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
+				return ldap.LDAPResultInvalidCredentials, nil
+			}
 		}
 	}
 
@@ -204,6 +220,19 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	baseDN := strings.ToLower(h.GetBackend().BaseDN)
 	delimitedBaseDN := "," + baseDN
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
+
+	// What if this user was bound using their UPN? We still want to enforce baseDN etc so we
+	// have to rewire them to their original DN which is of course a waste of cycles.
+	// TODO Down the road we would want to perform lightweight memoization of DNs to UPNs
+	if emailmatcher.MatchString(bindDN) {
+		foundUser, userInfo, _ := h.FindUser(bindDN, true)
+		if !foundUser {
+			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: UPN %s could not be resolved to a DN", bindDN)
+		}
+		// cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+		bindDN = fmt.Sprintf("cn=%s,%s", userInfo.Name, baseDN)
+	}
+
 	h.GetLog().V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "searchbasedn", searchBaseDN, "src", conn.RemoteAddr(), "scope", searchReq.Scope, "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
