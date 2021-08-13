@@ -1,8 +1,8 @@
 VERSION=$(shell bin/glauth64 --version)
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
-BUILD_TIME=$(shell date --utc +%Y%m%d_%H%M%SZ)
-GIT_CLEAN=$(shell git status | grep -E "working (tree|directory) clean" | wc -l)
+BUILD_TIME=$(shell date -u +%Y%m%d_%H%M%SZ)
+GIT_CLEAN=$(shell git status | grep -E "working (tree|directory) clean" | wc -l | sed 's/^[ ]*//')
 
 # Last git tag
 LAST_GIT_TAG=$(shell git describe --abbrev=0 --tags 2> /dev/null)
@@ -14,9 +14,12 @@ GIT_IS_TAG_COMMIT=$(shell git describe --abbrev=0 --tags > /dev/null 2> /dev/nul
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 # Build variables
-BUILD_VARS=-X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH} -X main.BuildTime=${BUILD_TIME} -X main.GitClean=${GIT_CLEAN} -X main.LastGitTag=${LAST_GIT_TAG} -X main.GitTagIsCommit=${GIT_IS_TAG_COMMIT}
+BUILD_VARS=-s -w -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH} -X main.BuildTime=${BUILD_TIME} -X main.GitClean=${GIT_CLEAN} -X main.LastGitTag=${LAST_GIT_TAG} -X main.GitTagIsCommit=${GIT_IS_TAG_COMMIT}
 BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
+
+# Plugins
+include pkg/plugins/Makefile
 
 #####################
 # High level commands
@@ -38,7 +41,7 @@ fast: setup linux64 verify cleanup
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 
 # Setup commands to always run
-setup: getdeps bindata format
+setup: bindata getdeps format
 
 #####################
 # Subcommands
@@ -66,8 +69,7 @@ format:
 	go fmt
 
 devrun:
-	go run ${BUILD_FILES} -c glauth.cfg
-
+	go run ${BUILD_FILES} -c sample-simple.cfg
 
 linux32:
 	GOOS=linux GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth32 ${BUILD_FILES} && cd bin && sha256sum glauth32 > glauth32.sha256
@@ -83,6 +85,9 @@ linuxarm64:
 
 darwin64:
 	GOOS=darwin GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX ${BUILD_FILES} && cd bin && sha256sum glauthOSX > glauthOSX.sha256
+
+darwinarm64:
+	GOOS=darwin GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX-arm64 ${BUILD_FILES} && cd bin && sha256sum glauthOSX-arm64 > glauthOSX-arm64.sha256
 
 win32:
 	GOOS=windows GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-win32 ${BUILD_FILES} && cd bin && sha256sum glauth-win32 > glauth-win32.sha256

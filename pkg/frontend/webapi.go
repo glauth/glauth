@@ -8,48 +8,54 @@ import (
 	"strings"
 
 	"github.com/glauth/glauth/pkg/assets"
-	"github.com/glauth/glauth/pkg/config"
-	logging "github.com/op/go-logging"
+	"github.com/go-logr/logr"
 )
 
 // RunAPI provides a basic REST API
-func RunAPI(log *logging.Logger, cfg *config.Config) {
+func RunAPI(opts ...Option) {
+	options := newOptions(opts...)
+	log := options.Logger
+	cfg := options.Config
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Debug(fmt.Sprintf("Web: %s", r.URL.Path))
+		log.V(6).Info("Web", "path", r.URL.Path)
 		if r.URL.Path != "/" {
-			log.Debug("Web 404")
+			log.V(6).Info("Web 404")
 			http.NotFound(w, r)
 			return
 		}
 		pageTemplate, err := assets.Asset("assets/index.html")
 		if err != nil {
-			log.Fatal(fmt.Sprintf("Error with HTTP server template asset: %s", err.Error()))
+			log.Error(err, "Error with HTTP server template asset")
+			return
 		}
 		fmt.Fprintf(w, string(pageTemplate))
 	})
 	http.HandleFunc("/assets/", webStaticHandler(log))
-	if cfg.API.TLS {
-		log.Notice(fmt.Sprintf("Starting HTTPS server on %s", cfg.API.Listen))
-		err := http.ListenAndServeTLS(cfg.API.Listen, cfg.API.Cert, cfg.API.Key, nil)
+	if cfg.TLS {
+		log.V(3).Info("Starting HTTPS server", "address", cfg.Listen)
+		err := http.ListenAndServeTLS(cfg.Listen, cfg.Cert, cfg.Key, nil)
 		if err != nil {
-			log.Fatal(fmt.Sprintf("Error starting HTTPS server: %s", err.Error()))
+			log.Error(err, "Error starting HTTPS server")
+			return
 		}
 	} else {
-		log.Notice(fmt.Sprintf("Starting HTTP server on %s", cfg.API.Listen))
-		err := http.ListenAndServe(cfg.API.Listen, nil)
+		log.V(3).Info("Starting HTTP server", "address", cfg.Listen)
+		err := http.ListenAndServe(cfg.Listen, nil)
 		if err != nil {
-			log.Fatal(fmt.Sprintf("Error starting HTTP server: %s", err.Error()))
+			log.Error(err, "Error starting HTTP server")
+			return
 		}
 	}
 }
 
 // webStaticHandler serves embedded static web files (js&css)
-func webStaticHandler(log *logging.Logger) func(http.ResponseWriter, *http.Request) {
+func webStaticHandler(log logr.Logger) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		assetPath := r.URL.Path[1:]
 		staticAsset, err := assets.Asset(assetPath)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error(err, "Cannot access asset")
 			http.NotFound(w, r)
 			return
 		}

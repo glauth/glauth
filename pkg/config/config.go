@@ -1,15 +1,29 @@
 package config
 
+import "time"
+
 // config file
 type Backend struct {
-	BaseDN      string
-	Datastore   string
-	Insecure    bool     // For LDAP backend only
-	Servers     []string // For LDAP backend only
-	NameFormat  string
-	GroupFormat string
-	SSHKeyAttr  string
-	UseGraphAPI bool // For ownCloud backend only
+	BaseDN        string
+	Datastore     string
+	Insecure      bool     // For LDAP and owncloud backend only
+	Servers       []string // For LDAP and owncloud backend only
+	NameFormat    string
+	GroupFormat   string
+	SSHKeyAttr    string
+	UseGraphAPI   bool   // For ownCloud backend only
+	Plugin        string // Path to plugin library, for plugin backend only
+	PluginHandler string // Name of plugin's main handler function
+	Database      string // For Database backends only
+	AnonymousDSE  bool   // For Config and Database backends only
+}
+type Helper struct {
+	Enabled       bool
+	BaseDN        string
+	Datastore     string
+	Plugin        string // Path to plugin library, for plugin backend only
+	PluginHandler string // Name of plugin's main handler function
+	Database      string // For MySQL backend only TODO REname to match plugin
 }
 type Frontend struct {
 	AllowedBaseDNs []string // For LDAP backend only
@@ -36,17 +50,28 @@ type API struct {
 	SecretToken string
 	TLS         bool
 }
+type Behaviors struct {
+	LimitFailedBinds      bool
+	NumberOfFailedBinds   int
+	PeriodOfFailedBinds   time.Duration
+	BlockFailedBindsFor   time.Duration
+	PruneSourceTableEvery time.Duration
+	PruneSourcesOlderThan time.Duration
+}
 type User struct {
 	Name          string
 	OtherGroups   []int
 	PassSHA256    string
+	PassBcrypt    string
 	PassAppSHA256 []string
+	PassAppBcrypt []string
 	PrimaryGroup  int
 	SSHKeys       []string
 	OTPSecret     string
 	Yubikey       string
 	Disabled      bool
-	UnixID        int
+	UnixID        int // TODO: remove after deprecating UnixID on User and Group
+	UIDNumber     int
 	Mail          string
 	LoginShell    string
 	GivenName     string
@@ -55,12 +80,16 @@ type User struct {
 }
 type Group struct {
 	Name          string
-	UnixID        int
+	UnixID        int // TODO: remove after deprecating UnixID on User and Group
+	GIDNumber     int
 	IncludeGroups []int
 }
 type Config struct {
 	API                API
-	Backend            Backend
+	Backend            Backend // Deprecated
+	Backends           []Backend
+	Helper             Helper
+	Behaviors          Behaviors
 	Debug              bool
 	WatchConfig        bool
 	YubikeyClientID    string
