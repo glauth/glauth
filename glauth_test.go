@@ -154,21 +154,21 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 	if env.checkTOTP {
 		Convey("When searching for the 'hacker' user using a TOTP-enabled account", func() {
 			otpvalue := doRunGetFirst(RD, "oathtool", "--totp", "-b", "-d", "6", "3hnvnk4ycv44glzigd6s25j4dougs3rk")
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bdc=glauth,dc=com", "cn=hackers")
+			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 			Convey("We should find them in in the 'superheros' group", func() {
 				So(out, ShouldEqual, env.expectedaccount)
 			})
 		})
 
 		Convey("When searching for the 'hacker' user using a TOTP-enabled account and no value", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 			Convey("We should get 'Invalid credentials(49)'", func() {
 				So(out, ShouldEqual, "exit status 49")
 			})
 		})
 
 		Convey("When searching for the 'hacker' user using a TOTP-enabled account and the wrong value", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 			Convey("We should get 'Invalid credentials(49)'", func() {
 				So(out, ShouldEqual, "exit status 49")
 			})
