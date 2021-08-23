@@ -51,17 +51,12 @@ type API struct {
 	TLS         bool
 }
 type Behaviors struct {
-	IgnoreCapabilities    bool
 	LimitFailedBinds      bool
 	NumberOfFailedBinds   int
 	PeriodOfFailedBinds   time.Duration
 	BlockFailedBindsFor   time.Duration
 	PruneSourceTableEvery time.Duration
 	PruneSourcesOlderThan time.Duration
-}
-type Capability struct {
-	Action string
-	Object string
 }
 type User struct {
 	Name          string
@@ -71,7 +66,6 @@ type User struct {
 	PassAppSHA256 []string
 	PassAppBcrypt []string
 	PrimaryGroup  int
-	Capabilities  []Capability
 	SSHKeys       []string
 	OTPSecret     string
 	Yubikey       string

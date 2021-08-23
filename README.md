@@ -186,40 +186,6 @@ This can be used, for instance, to inject support for Two Factor Authentication 
    * Example: cccjgjgkhcbb
    * default = blank
 
-### Capabilities
-
-Introduced in 2.1.0, this feature continues improving the intrinsic security model of GLAuth.
-
-While some level of access control is already enforced when using an LDAP backend, Capabilities are now part of the Config and Database backends.
-
-Currently, one capability is recognized: "search" -- here is how to configure it in a Config yaml file:
-
-```
-...
-[behaviors]
-  # Ignore all capabilities restrictions, for instance allowing every user to perform a search
-  IgnoreCapabilities = false
-...
-[[users]]
-  name = "hackers"
-    [[users.capabilities]]
-    action = "search"
-    object = "ou=superheros,dc=glauth,dc=com"
-    [[users.capabilities]]
-    action = "search"
-    object = "ou=someotherdn,dc=glauth,dc=com"
-...
-[[users]]
-  name = "serviceuser"
-    [[users.capabilities]]
-    action = "search"
-    object = "*"
-...
-```
-For backward compatibility, you can set `IgnoreCapabilities` to "true"
-
-If you are using a Database backend, check the plugins README for configuration information.
-
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
 
@@ -295,13 +261,6 @@ Of course, a core set of tests is being run by Travis CI. However, when developi
 You can run `go test` to execute the tests found in `glauth_test.go` -- better, if it is installed, you can run [goconvey](https://github.com/smartystreets/goconvey)
 
 Since some tests cover TOTP, you will first need to install `oathtool` in your environment.
-
-You also must create a symbolink link called `glauth` to make it easy for the test framework to find the executable. For instance:
-
-```
-cd bin
-ln -s glauth64 glauth
-```
 
 In order to test GLAuth against an LDAP backend, you will need docker. Run this command:
 ```

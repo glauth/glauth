@@ -18,6 +18,3 @@ pkg/assets/bindata.go
 *travis.log
 
 certs/
-
-# Local files
-local/
