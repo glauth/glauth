@@ -53,4 +53,6 @@ CREATE TABLE IF NOT EXISTS users (
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS includegroups (id INTEGER AUTO_INCREMENT PRIMARY KEY, parentgroupid INTEGER NOT NULL, includegroupid INTEGER NOT NULL)")
 	statement.Exec()
+	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS capabilities (id INTEGER AUTO_INCREMENT PRIMARY KEY, userid INTEGER NOT NULL, action VARCHAR(128) NOT NULL, object VARCHAR(128) NOT NULL)")
+	statement.Exec()
 }
