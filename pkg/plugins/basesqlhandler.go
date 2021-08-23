@@ -140,6 +140,23 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err == nil {
 		found = true
+
+		if !h.cfg.Behaviors.IgnoreCapabilities {
+			capability := config.Capability{}
+			rows, err := h.database.cnx.Query(fmt.Sprintf(`
+				SELECT c.action,c.object
+				FROM capabilities c WHERE userid=%s`,
+				h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
+			if err == nil {
+				for rows.Next() {
+					err := rows.Scan(&capability.Action, &capability.Object)
+					if err == nil {
+						user.Capabilities = append(user.Capabilities, capability)
+					}
+				}
+			}
+			defer rows.Close()
+		}
 	}
 
 	return found, user, err
