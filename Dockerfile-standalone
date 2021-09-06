@@ -3,7 +3,7 @@
 #################
 
 FROM golang:alpine as build
-MAINTAINER Ben Yanke <ben@benyanke.com>
+LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Setup work env
 RUN mkdir /app /tmp/gocode
@@ -41,7 +41,7 @@ RUN /app/glauth --version
 #################
 
 FROM alpine as run
-MAINTAINER Ben Yanke <ben@benyanke.com>
+LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Copies a sample config to be used if a volume isn't mounted with user's config
 ADD sample-simple.cfg /app/config/config.cfg
@@ -50,8 +50,8 @@ ADD sample-simple.cfg /app/config/config.cfg
 COPY --from=build /app/glauth /app/glauth
 
 # Copy docker specific scripts from build container
-COPY --from=build /app/scripts/docker/start.sh /app/docker/
-COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
+COPY --from=build /app/scripts/docker/start-standalone.sh /app/docker/
+COPY --from=build /app/scripts/docker/default-config-standalone.cfg /app/docker/
 
 # Install ldapsearch for container health checks, then ensure ldapsearch is installed
 RUN apk update && apk add --no-cache dumb-init openldap-clients && which ldapsearch && rm -rf /var/cache/apk/*

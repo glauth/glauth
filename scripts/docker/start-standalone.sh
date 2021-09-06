@@ -4,7 +4,7 @@
 if [ ! -f /app/config/config.cfg ] ; then
   echo "Config file not found at /app/config/config.cfg"
   echo "Copying example configuration file to run."
-  cp /app/docker/default-config.cfg /app/config/config.cfg || exit 1
+  cp /app/docker/default-config-standalone.cfg /app/config/config.cfg || exit 1
  fi
 
 
