@@ -1,44 +1,63 @@
 #!/bin/bash
 
+inform() {
+    echo "--------------------------------------------------------------------------------"
+    echo "$@"
+    echo "--------------------------------------------------------------------------------"
+}
+
 image_name() {
     [[ "$1" == "plugins" ]] && { echo "glauth-plugins"; } || { echo "glauth"; }
+}
+
+ldap_port() {
+    [[ "$1" == "plugins" ]] && { echo "3893"; } || { echo "3893"; }
 }
 
 prepare_image() {
     profile="$1"
     img="localhost/$(image_name $profile)"
 
+    inform "Building profile: $profile container: $img"
     podman build --security-opt seccomp=scripts/docker/fastat-workaround.json -f Dockerfile-$profile -t $img
 
+    inform "Starting registry"
     podman run -d --name registry -p 5000:5000 -v ./local/registry:/var/lib/registry --restart=unless-stopped registry:2
 
+    inform "Pushing image to container"
     podman tag $img localhost:5000/$(image_name $profile)
     podman push --tls-verify=false localhost:5000/$(image_name $profile)
 
     if command -v ldapsearch &> /dev/null; then
-      podman run -d --name checkglauth -p 3893:3893 localhost:5000/$(image_name $profile)
+      inform "Running image"
+      podman run -d --name checkglauth -p $(ldap_port $profile):$(ldap_port $profile) localhost:5000/$(image_name $profile)
         sleep 3
+        inform "Testing image"
         checkfailed=0
-        if (ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers | grep posixAccoun) &> /dev/null; then
+        if (ldapsearch -LLL -H ldap://localhost:$(ldap_port $profile) -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers | grep posixAccoun) &> /dev/null; then
             echo "Checked glauth is responding properly to ldapsearch query."
         else
             checkfailed=1
             echo "glauth check did not pass. Aborting."
         fi
+        inform "Stopping image"
         podman stop checkglauth && podman rm checkglauth
         if [[ checkfailed -eq 1 ]]; then
+            # Note that we are not removing the registry so that
+            # we can manually check why we failed.
             exit 1
         fi
     else
         echo "Skipping ldapsearch sanity check. Command not present."
     fi
 
+    inform "Stopping registry"
     podman stop registry && podman rm registry
 }
 
 prepare_images() {
     prepare_image standalone
-    #prepare_image plugins
+    prepare_image plugins
 }
 
 push_profile_to_docker() {
