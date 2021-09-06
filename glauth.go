@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/GeertJohan/yubigo"
-	"github.com/davecgh/go-spew/spew"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
@@ -21,7 +20,6 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 // Set with buildtime vars
@@ -293,7 +291,6 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 			cfg.Backends = append(cfg.Backends, cfg.Backend)
 		}
 	}
-	spew.Dump(cfg.Backends)
 
 	// Patch with default values where not specified
 	for i := range cfg.Backends {
