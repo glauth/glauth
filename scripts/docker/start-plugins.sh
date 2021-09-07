@@ -4,7 +4,10 @@
 if [ ! -f /app/config/config.cfg ] ; then
   echo "Config file not found at /app/config/config.cfg"
   echo "Copying example configuration file to run."
-  cp /app/docker/default-config.cfg /app/config/config.cfg || exit 1
+  mkdir -p /app/config
+  cp /app/docker/default-config-plugins.cfg /app/config/config.cfg || exit 1
+  # This file will be ignored when switching away from the default (sqlite)
+  cp /app/docker/gl.db /app/config/gl.db || exit 1
  fi
 
 
@@ -21,6 +24,7 @@ echo "Starting GLauth now.";
 echo "";
 
 # Run app
+cd /app/glauth
 /app/glauth -c /app/config/config.cfg
 
 echo ""
