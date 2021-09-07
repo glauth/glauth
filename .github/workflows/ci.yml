@@ -24,8 +24,8 @@ jobs:
         run: sudo apt-get install -y go-bindata
       - name: Env
         run: env
-      - name: Path
-        run: echo $path
+      - name: LS
+        run: ls
       - name: Make Bindata
         run: make bindata
       - name: Fetch Go dependencies
