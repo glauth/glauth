@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+jobs:
+  Run-Travis-File:
+    steps:
+      - name: Run .travis.yml build script
+        uses: ktomk/run-travis-yml@v1
+        with:
+          file: .travis.yml
+          steps: |
+            before_script
+            script
+          allow-failure: false
+        env:
+          TRAVIS_PHP_VERSION: ${{ matrix.php-versions }}
