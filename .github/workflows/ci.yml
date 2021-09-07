@@ -12,7 +12,7 @@ jobs:
       - name: Run .travis.yml build script
         uses: ktomk/run-travis-yml@v1
         with:
-          file: .travis.yml
+          file: ../../.travis.yml
           steps: |
             before_script
             script
