@@ -4,17 +4,33 @@ on:
   pull_request:
   push:
     branches:
-      - dev
+     - dev
 jobs:
-  Run-Travis-File:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        go-version: [1.15.x, 1.16.x]
     steps:
-      - name: Run .travis.yml build script
-        uses: ktomk/run-travis-yml@v1
+      - name: Install Go
+        uses: actions/setup-go@v2
         with:
-          file: .travis.yml
-          steps: |
-            before_script
-            script
-          allow-failure: false
-        env:
-          TRAVIS_PHP_VERSION: ${{ matrix.php-versions }}
+          go-version: ${{ matrix.go-version }}
+      - name: Updating packages database
+        run: sudo apt-get -qq update
+      - name: Install CLI Dependencies
+        run: sudo apt-get install -y ldap-utils oathtool go-bindata
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Make Bindata
+        run: make bindata
+      - name: Fetch Go dependencies
+        run: go get -t -v ./...
+      - name: Fail if a .go file hasn't been formatted with 'go fmt'
+        run: diff -u <(echo -n) <(gofmt -d ./)
+      - name: Full compile test
+        run: make all
+      - name: Output hashes to the build log
+        run: cat bin/*.sha256
+      - name: Integration test with compiled binary
+        run: make test
