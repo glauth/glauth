@@ -22,6 +22,10 @@ jobs:
         run: sudo apt-get install -y ldap-utils oathtool
       - name: Install CLI Dependencies -- Bindata
         run: sudo apt-get install -y go-bindata
+      - name: Env
+        run: env
+      - name: Path
+        run: echo $path
       - name: Make Bindata
         run: make bindata
       - name: Fetch Go dependencies
