@@ -62,5 +62,4 @@ RUN apk update && apk add --no-cache dumb-init openldap-clients && which ldapsea
 EXPOSE 389 636 5555
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/bin/sh", "/app/docker/start.sh"]
-
+CMD ["/app/docker/start.sh"]
