@@ -2,7 +2,7 @@
 # Build Step
 #################
 
-FROM golang:alpine as build
+FROM golang:buster as build
 LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Setup work env
@@ -10,15 +10,14 @@ RUN mkdir /app /tmp/gocode
 ADD . /app/
 WORKDIR /app
 
-
 # Required envs for GO
 ENV GOPATH=/tmp/gocode
 ENV GOOS=linux
 ENV GOARCH=amd64
-ENV CGO_ENABLED=1
+ENV GO_ENABLED=1
 
-# Only needed for alpine builds
-RUN apk add --no-cache git make go-bindata alpine-sdk
+# Only needed for alpine builds // also: busybox
+RUN apt -qq update && apt -qq install -y git make go-bindata build-essential busybox-static dumb-init
 
 # Run go-bindata to embed data for API
 RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
@@ -29,8 +28,9 @@ RUN go get -d -v ./...
 
 # Build and copy final result
 RUN uname -a
-RUN if [ $(uname -m) == x86_64 ]; then make linux64 && cp ./bin/glauth64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=amd64; make bin/sqlite.so bin/postgres.so bin/mysql.so; cp ./bin/*.so /app/; fi
-RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=arm64; make bin/sqlite.so bin/postgres.so bin/mysql.so; cp ./bin/*.so /app/; fi
+RUN uname -m
+RUN bash -c '[[ $(uname -m) == x86_64 ]] && { make linux64 && cp ./bin/glauth64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=amd64; make bin/sqlite.so bin/postgres.so bin/mysql.so && cp ./bin/*.so /app/; } || { true; }'
+RUN bash -c '[[ $(uname -m) == aarch64 ]] && { make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=arm64; make bin/sqlite.so bin/postgres.so bin/mysql.so && cp ./bin/*.so /app/; } || { true; }'
 
 # Check glauth works
 RUN /app/glauth --version
@@ -39,7 +39,7 @@ RUN /app/glauth --version
 # Run Step
 #################
 
-FROM alpine as run
+FROM gcr.io/distroless/base-debian10 as run
 LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Copy binary from build container
@@ -51,8 +51,13 @@ COPY --from=build /app/scripts/docker/start-plugins.sh /app/docker/
 COPY --from=build /app/scripts/docker/default-config-plugins.cfg /app/docker/
 COPY --from=build /app/scripts/docker/gl.db /app/docker/
 
-# Install ldapsearch for container health checks, then ensure ldapsearch is installed
-RUN apk update && apk add --no-cache dumb-init openldap-clients && which ldapsearch && rm -rf /var/cache/apk/*
+# Just what we need
+COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=build /bin/busybox /bin/sh
+COPY --from=build /bin/busybox /bin/ln
+COPY --from=build /bin/busybox /bin/rm
+# Debug env: COPY --from=build /bin/busybox /bin/busybox
+RUN ln /bin/sh /usr/bin/cp && ln /bin/sh /usr/bin/mkdir && rm /bin/ln /bin/rm
 
 # Install init
 
@@ -61,4 +66,3 @@ EXPOSE 389 636 5555
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/bin/sh", "/app/docker/start-plugins.sh"]
-

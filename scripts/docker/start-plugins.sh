@@ -24,7 +24,7 @@ echo "Starting GLauth now.";
 echo "";
 
 # Run app
-cd /app/glauth
+cd /app
 /app/glauth -c /app/config/config.cfg
 
 echo ""
