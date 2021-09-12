@@ -7,7 +7,6 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 ![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
 ![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
 
-![Travis (.com) branch](https://img.shields.io/travis/com/glauth/glauth/dev)
 ![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
 
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/dev)
@@ -290,7 +289,7 @@ make all
 
 # Testing
 
-Of course, a core set of tests is being run by Travis CI. However, when developing new features/refactoring, a more comprehensive regression testing suite is needed.
+Of course, a core set of tests is being run by Github Actions CI. However, when developing new features/refactoring, a more comprehensive regression testing suite is needed.
 
 You can run `go test` to execute the tests found in `glauth_test.go` -- better, if it is installed, you can run [goconvey](https://github.com/smartystreets/goconvey)
 

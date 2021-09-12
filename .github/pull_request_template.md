@@ -14,9 +14,9 @@ new functionality, consider adding tests covering your feature.
 
 ## CI
 Each push to a branch connected to a PR will be run through GLAuth's 
-CI system. Please use these to your advantage. In particular, the Travis 
+CI system. Please use these to your advantage. In particular, the Github Actions 
 integration tests rely on the LDAP queries returning with a set result, 
-so if your changes will change the output, Travis will likely fail.
+so if your changes will change the output, CI will likely fail.
 
 To update, run `make fast && make updatetest && make test`. This will 
 delete the output snapshots provided and make new ones. You can then 
