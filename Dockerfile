@@ -50,8 +50,7 @@ ADD sample-simple.cfg /app/config/config.cfg
 COPY --from=build /app/glauth /app/glauth
 
 # Copy docker specific scripts from build container
-COPY --from=build /app/scripts/docker/start.sh /app/docker/
-COPY --from=build /app/scripts/docker/default-config.cfg /app/docker/
+COPY --from=build /app/scripts/docker/ /app/docker/
 
 # Install ldapsearch for container health checks, then ensure ldapsearch is installed
 RUN apk update && apk add --no-cache dumb-init openldap-clients && which ldapsearch && rm -rf /var/cache/apk/*
