@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
 
@@ -20,8 +21,32 @@ func (b MysqlBackend) GetDriverName() string {
 	return "mysql"
 }
 
-func (b MysqlBackend) GetPrepareSymbol() string {
-	return "?"
+func (b MysqlBackend) FindUserQuery(criterion string) string {
+	return fmt.Sprintf("SELECT uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey FROM users WHERE %s=?", criterion)
+}
+
+func (b MysqlBackend) FindGroupQuery() string {
+	return "SELECT gidnumber FROM groups WHERE lower(name)=?"
+}
+
+func (b MysqlBackend) FindPosixAccountsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups,givenname,sn,mail,loginshell,homedirectory,disabled FROM users"
+}
+
+func (b MysqlBackend) MemoizeGroupsQuery() string {
+	return `
+		SELECT g1.name,g1.gidnumber,ig.includegroupid
+		FROM groups g1
+		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid
+		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`
+}
+
+func (b MysqlBackend) GetGroupMembersQuery() string {
+	return "SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups FROM users u WHERE lower(u.name)=?"
+}
+
+func (b MysqlBackend) GetGroupMemberIDsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups FROM users"
 }
 
 // Create db/schema if necessary
