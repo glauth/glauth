@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/lib/pq"
 
@@ -20,8 +21,32 @@ func (b PostgresBackend) GetDriverName() string {
 	return "postgres"
 }
 
-func (b PostgresBackend) GetPrepareSymbol() string {
-	return "$1"
+func (b PostgresBackend) FindUserQuery(criterion string) string {
+	return fmt.Sprintf("SELECT uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey FROM users WHERE %s=$1", criterion)
+}
+
+func (b PostgresBackend) FindGroupQuery() string {
+	return "SELECT gidnumber FROM groups WHERE lower(name)=$1"
+}
+
+func (b PostgresBackend) FindPosixAccountsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups,givenname,sn,mail,loginshell,homedirectory,disabled FROM users"
+}
+
+func (b PostgresBackend) MemoizeGroupsQuery() string {
+	return `
+		SELECT g1.name,g1.gidnumber,ig.includegroupid
+		FROM groups g1
+		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid
+		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`
+}
+
+func (b PostgresBackend) GetGroupMembersQuery() string {
+	return "SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups FROM users u WHERE lower(u.name)=$1"
+}
+
+func (b PostgresBackend) GetGroupMemberIDsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups FROM users"
 }
 
 // Create db/schema if necessary
