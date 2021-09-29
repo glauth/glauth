@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -26,8 +25,18 @@ type SqlBackend interface {
 	GetDriverName() string
 	// Create db/schema if necessary
 	CreateSchema(db *sql.DB)
-	//
-	GetPrepareSymbol() string
+	// Find user query
+	FindUserQuery(criterion string) string
+	// Find group query
+	FindGroupQuery() string
+	// Find posix users query
+	FindPosixAccountsQuery() string
+	// Memoize all groups query
+	MemoizeGroupsQuery() string
+	// Get group members query
+	GetGroupMembersQuery() string
+	// Get group member IDs query
+	GetGroupMemberIDsQuery() string
 }
 
 type database struct {
@@ -132,11 +141,7 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	user := config.User{}
 	found := false
 
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey 
-			FROM users u WHERE %s=%s`,
-		criterion,
-		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+	err = h.database.cnx.QueryRow(h.sqlBackend.FindUserQuery(criterion), userName).Scan(
 		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
 	if err == nil {
 		found = true
@@ -158,7 +163,6 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 			defer rows.Close()
 		}
 	}
-
 	return found, user, err
 }
 
@@ -166,8 +170,7 @@ func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, er
 	group := config.Group{}
 	found := false
 
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT g.gidnumber FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
+	err = h.database.cnx.QueryRow(h.sqlBackend.FindGroupQuery(), groupName).Scan(
 		&group.GIDNumber)
 	if err == nil {
 		found = true
@@ -184,9 +187,7 @@ func (h databaseHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error
 		return entries, err
 	}
 
-	rows, err := h.database.cnx.Query(`
-		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled 
-		FROM users u`)
+	rows, err := h.database.cnx.Query(h.sqlBackend.FindPosixAccountsQuery())
 	if err != nil {
 		return entries, err
 	}
@@ -254,13 +255,9 @@ func (h databaseHandler) commaListToTable(commaList string) []int {
 
 func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	workMemGroups := make([]*config.Group, 0)
-	rows, err := h.database.cnx.Query(`
-		SELECT g1.name,g1.gidnumber,ig.includegroupid
-		FROM groups g1 
-		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
-		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`)
+	rows, err := h.database.cnx.Query(h.sqlBackend.MemoizeGroupsQuery())
 	if err != nil {
-		return nil, errors.New("Unable to memoize groups list")
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -272,7 +269,7 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	for rows.Next() {
 		err := rows.Scan(&groupName, &groupId, &includeId)
 		if err != nil {
-			return nil, errors.New("Unable to memoize groups list")
+			return nil, err
 		}
 		if recentId != groupId {
 			recentId = groupId
@@ -295,10 +292,7 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 func (h databaseHandler) getGroupMembers(gid int) []string {
 	members := make(map[string]bool)
 
-	rows, err := h.database.cnx.Query(`
-			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
-			FROM users u WHERE lower(u.name)=?`,
-	)
+	rows, err := h.database.cnx.Query(h.sqlBackend.GetGroupMembersQuery(), gid)
 	if err != nil {
 		// Silent fail... for now
 		return []string{}
@@ -346,16 +340,13 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 	}
 
 	sort.Strings(m)
-
 	return m
 }
 
 // Used exclusively when looking up Posix Groups
 func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 	members := make(map[string]bool)
-	rows, err := h.database.cnx.Query(`
-			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
-			FROM users u`)
+	rows, err := h.database.cnx.Query(h.sqlBackend.GetGroupMemberIDsQuery())
 	if err != nil {
 		// Silent fail... for now
 		return []string{}
