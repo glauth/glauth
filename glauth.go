@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/GeertJohan/yubigo"
+	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
@@ -126,6 +128,15 @@ func startService() {
 	// web API
 	if activeConfig.API.Enabled {
 		log.V(6).Info("Web API enabled")
+
+		if activeConfig.API.Internals {
+			statsviz.Register(
+				http.DefaultServeMux,
+				statsviz.Root("/internals"),
+				statsviz.SendFrequency(1000*time.Millisecond),
+			)
+		}
+
 		go frontend.RunAPI(
 			frontend.Logger(log),
 			frontend.Config(&activeConfig.API),
