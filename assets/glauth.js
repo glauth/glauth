@@ -7,7 +7,7 @@ $(function() {
     internalsEnabled = true;
   })
   .always(function() {
-    updateMetrics(internalsEnabled);
+    updateMetrics();
     //updateTail();
   })
 });
