@@ -10,15 +10,14 @@ RUN mkdir /app /tmp/gocode
 ADD . /app/
 WORKDIR /app
 
-
 # Required envs for GO
 ENV GOPATH=/tmp/gocode
 ENV GOOS=linux
 ENV GOARCH=amd64
 ENV CGO_ENABLED=0
 
-# Only needed for alpine builds
-RUN apk add --no-cache git make go-bindata
+# Only needed for alpine builds // also: busybox
+RUN apk add --no-cache git make go-bindata busybox-static dumb-init
 
 # Run go-bindata to embed data for API
 RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
@@ -40,7 +39,7 @@ RUN /app/glauth --version
 # Run Step
 #################
 
-FROM alpine as run
+FROM gcr.io/distroless/base-debian10 as run
 LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Copy binary from build container
@@ -50,8 +49,12 @@ COPY --from=build /app/glauth /app/glauth
 COPY --from=build /app/scripts/docker/start-standalone.sh /app/docker/
 COPY --from=build /app/scripts/docker/default-config-standalone.cfg /app/docker/
 
-# Install ldapsearch for container health checks, then ensure ldapsearch is installed
-RUN apk update && apk add --no-cache dumb-init openldap-clients && which ldapsearch && rm -rf /var/cache/apk/*
+# Just what we need
+COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=build /bin/busybox.static /bin/sh
+COPY --from=build /bin/busybox.static /bin/ln
+COPY --from=build /bin/busybox.static /bin/rm
+RUN ln /bin/sh /usr/bin/cp && ln /bin/sh /usr/bin/mkdir && rm /bin/ln /bin/rm
 
 # Install init
 
@@ -60,4 +63,3 @@ EXPOSE 389 636 5555
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/bin/sh", "/app/docker/start-standalone.sh"]
-
