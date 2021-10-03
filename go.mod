@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/GeertJohan/yubigo v0.0.0-20190917122436-175bc097e60e
+	github.com/arl/statsviz v0.4.0 // indirect
 	github.com/boombuler/barcode v1.0.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815

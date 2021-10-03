@@ -45,6 +45,7 @@ type LDAPS struct {
 type API struct {
 	Cert        string
 	Enabled     bool
+	Internals   bool
 	Key         string
 	Listen      string
 	SecretToken string

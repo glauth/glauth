@@ -1,14 +1,32 @@
 var interval = 2000;
 
+var internalsEnabled = false;
+
 $(function() {
-  updateMetrics();
-  //updateTail();
+  $.get("/internals", function() {
+    internalsEnabled = true;
+  })
+  .always(function() {
+    updateMetrics(internalsEnabled);
+    //updateTail();
+  })
 });
 
 var tailId = 0;
 
 function updateMetrics() {
   var metrics = $.getJSON( "/debug/vars", function(d) {
+    var template = Handlebars.compile( $("#header-messages-template").html() );
+    var messages = [];
+    if(internalsEnabled) {
+      messages.push({"message": "Also available: <a href='/internals'>Internals: heap, cache, objects, etc.</a>"});
+    }
+    var html    = template({
+      "header": {
+        "messages": messages
+      }
+    });
+    $("#headerpanel").html(html);
     var template = Handlebars.compile( $("#statspanel-template").html() );
     var html    = template(d);
     $("#statspanel").html(html);
