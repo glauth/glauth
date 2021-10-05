@@ -29,25 +29,30 @@
           <div id="statspanel" class="panel panel-default pull-right">
           </div>
         <h1>GLAuth</h1>
-        <p>This tool is in development - not quite ready for production!</p>
-
+          <div id="headerpanel"></div>
       </div>
 
       <div class="row">
         <div class="col-xs-12 col-sm-6">
-          <h2>stats</h2>
+          <h2>frontend stats</h2>
           <div id="stats" class="jumbotron">
           </div>
         </div>
 
         <div class="col-xs-12 col-sm-6">
-          <h2>backend servers</h2>
+          <h2>backend (LDAP) servers</h2>
           <div id="servers" class="jumbotron">
           </div>
         </div>
       </div>
 
     </div> <!-- /container -->
+
+    <script id="header-messages-template" type="text/x-handlebars-template">
+      {{#each header.messages}}
+        <span>{{{message}}}</span><br>
+      {{/each}}
+    </script>
 
     <script id="statspanel-template" type="text/x-handlebars-template">
         <div class="panel-body">
