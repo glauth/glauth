@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -299,30 +298,52 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		if err != nil {
 			return &cfg, fmt.Errorf("Non-existent config path: %s", configFileLocation)
 		}
-		if fInfo.IsDir() {
+		if fInfo.IsDir() { // multiple files in a directory
+			rawCfgStruct := make(map[string]interface{})
+
+			// To keep things simple, we are not going to use the default values built in Cfg
+			// so far (LDAP.Enabled, LDAPS.Enabled, etc) so do not forget to specify them!
+			/*
+				sourcebuf := new(bytes.Buffer)
+				err = toml.NewEncoder(sourcebuf).Encode(cfg)
+				if err != nil {
+					return &cfg, err
+				}
+				var initialRawCfgStruct interface{}
+				if err := toml.Unmarshal(sourcebuf.Bytes(), &initialRawCfgStruct); err != nil {
+					return &cfg, err
+				}
+				if err = mergeConfigs(&rawCfgStruct, initialRawCfgStruct); err != nil {
+					return &cfg, err
+				}
+			*/
+
 			files, _ := ioutil.ReadDir(configFileLocation)
 			for _, f := range files {
 				canonicalName := filepath.Join(configFileLocation, f.Name())
-				tmpCfg := config.Config{}
 
-				/*
-					bs, _ := ioutil.ReadFile(canonicalName)
-					var rawCfgStruct interface{}
-					toml.Unmarshal(bs, &rawCfgStruct)
-					fmt.Println("AAAAAAAAAAAAA")
-					spew.Dump(rawCfgStruct)
-					fmt.Println("BBBBBBBBBBBB")
-				*/
-
-				if _, err := toml.DecodeFile(canonicalName, &tmpCfg); err != nil {
-					return &tmpCfg, err
-				} else {
-					fmt.Println(fmt.Sprintf("++++ Loaded config file: %s ++++", canonicalName))
-					if cfg, err = mergeConfigs(cfg, tmpCfg); err != nil {
-						return &cfg, err
-					}
+				bs, _ := ioutil.ReadFile(canonicalName)
+				var curRawCfgStruct interface{}
+				if err := toml.Unmarshal(bs, &curRawCfgStruct); err != nil {
+					return &cfg, err
+				}
+				if err = mergeConfigs(&rawCfgStruct, curRawCfgStruct); err != nil {
+					return &cfg, err
 				}
 			}
+
+			destbuf := new(bytes.Buffer)
+			err = toml.NewEncoder(destbuf).Encode(rawCfgStruct)
+			if err != nil {
+				return &cfg, err
+			}
+			fmt.Println(destbuf.String())
+			merged := config.Config{}
+			if _, err := toml.Decode(destbuf.String(), &merged); err != nil {
+				return &cfg, err
+			}
+			return &merged, nil
+
 		} else {
 			if _, err := toml.DecodeFile(configFileLocation, &cfg); err != nil {
 				return &cfg, err
@@ -356,7 +377,96 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	return &cfg, nil
 }
 
-func mergeConfigs(config1 config.Config, config2 config.Config) (config.Config, error) {
+func mergeConfigs(config1 interface{}, config2 interface{}) error {
+	var merger func(int, string, interface{}, interface{}) error
+	merger = func(depth int, keyName string, cfg1 interface{}, cfg2 interface{}) error {
+		//fmt.Println(strings.Repeat("    ", depth), "Handling element: ", keyName, " for: ", cfg2)
+		switch element2 := cfg2.(type) {
+		case map[string]interface{}:
+			//fmt.Println(strings.Repeat("     ", depth), " - A map")
+			element2, ok := cfg2.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("Config source: %s is not a map", keyName)
+			}
+			element1, ok := cfg1.(*map[string]interface{})
+			if !ok {
+				return fmt.Errorf("Config dest: %s is not a map", keyName)
+			}
+			for k, _ := range element2 {
+				//fmt.Println(strings.Repeat("     ", depth), "  - key: ", k)
+				_, ok := (*element1)[k]
+				if !ok {
+					(*element1)[k] = element2[k]
+				} else {
+					//fmt.Println(strings.Repeat("     ", depth), "  - merging: ", element2[k])
+					asanarrayptr, ok := (*element1)[k].([]map[string]interface{})
+					if ok {
+						if err := merger(depth+1, k, &asanarrayptr, element2[k]); err != nil {
+							return err
+						}
+						(*element1)[k] = asanarrayptr
+					} else {
+						asamapptr, ok := (*element1)[k].(map[string]interface{})
+						if ok {
+							if err := merger(depth+1, k, &asamapptr, element2[k]); err != nil {
+								return err
+							}
+							(*element1)[k] = asamapptr
+						} else {
+							return fmt.Errorf("Config dest: %s does not make a valid map/array ptr", keyName)
+						}
+					}
+				}
+			}
+		case []map[string]interface{}:
+			//fmt.Println(strings.Repeat("     ", depth), " - An array")
+			element2, ok := cfg2.([]map[string]interface{})
+			if !ok {
+				return fmt.Errorf("Config source: %s is not a map array", keyName)
+			}
+			//fmt.Println(strings.Repeat("     ", depth), "  - element2: ", element2)
+			element1, ok := cfg1.(*[]map[string]interface{})
+			if !ok {
+				return fmt.Errorf("Config dest: %s is not a map array", keyName)
+			}
+			//fmt.Println(strings.Repeat("     ", depth), "  - element1: ", element1)
+			for index, _ := range element2 {
+				*element1 = append(*element1, element2[index])
+			}
+		case string:
+			//fmt.Println(strings.Repeat("     ", depth), " - A string")
+			element2, ok := cfg2.(string)
+			if !ok {
+				return fmt.Errorf("Config: %s is not a string", keyName)
+			}
+		case bool:
+			//fmt.Println(strings.Repeat("     ", depth), " - A boolean")
+			element2, ok := cfg2.(bool)
+			if !ok {
+				return fmt.Errorf("Config: %s is not a boolean value", keyName)
+			}
+		case float64:
+			//fmt.Println(strings.Repeat("     ", depth), " - A float64")
+			element2, ok := cfg2.(float64)
+			if !ok {
+				return fmt.Errorf("Config: %s is not a float64 value", keyName)
+			}
+		case nil:
+			//fmt.Println(strings.Repeat("     ", depth), " - Nil")
+		default:
+			log.V(2).Info("Unknown element type found in configuration file. Ignoring.", "type", reflect.TypeOf(element2))
+		}
+		return nil
+	}
+
+	err := merger(0, "TOP", config1, config2)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error) {
 	var merger func(int, string, interface{}, interface{}) (interface{}, error)
 	merger = func(depth int, keyName string, cfg1 interface{}, cfg2 interface{}) (interface{}, error) {
 		var returnElement interface{}
@@ -431,30 +541,39 @@ func mergeConfigs(config1 config.Config, config2 config.Config) (config.Config, 
 		return returnElement, nil
 	}
 
-	flattenedConfig1, _ := json.Marshal(config1)
-	var jsonConfig1 interface{}
-	//json.Unmarshal(flattenedConfig1, &jsonConfig1)
-	d1 := json.NewDecoder(bytes.NewReader(flattenedConfig1))
-	d1.UseNumber()
-	if err := d1.Decode(&jsonConfig1); err != nil {
-		return config1, err
-	}
+	/*
+		flattenedConfig1, _ := json.Marshal(config1)
+		var jsonConfig1 interface{}
+		//json.Unmarshal(flattenedConfig1, &jsonConfig1)
+		d1 := json.NewDecoder(bytes.NewReader(flattenedConfig1))
+		d1.UseNumber()
+		if err := d1.Decode(&jsonConfig1); err != nil {
+			return config1, err
+		}
 
-	flattenedConfig2, _ := json.Marshal(config2)
-	var jsonConfig2 interface{}
-	//json.Unmarshal(flattenedConfig2, &jsonConfig2)
-	//spew.Dump(jsonConfig2)
-	d2 := json.NewDecoder(bytes.NewReader(flattenedConfig2))
-	d2.UseNumber()
-	if err := d2.Decode(&jsonConfig2); err != nil {
-		return config1, err
-	}
+		flattenedConfig2, _ := json.Marshal(config2)
+		var jsonConfig2 interface{}
+		//json.Unmarshal(flattenedConfig2, &jsonConfig2)
+		//spew.Dump(jsonConfig2)
+		d2 := json.NewDecoder(bytes.NewReader(flattenedConfig2))
+		d2.UseNumber()
+		if err := d2.Decode(&jsonConfig2); err != nil {
+			return config1, err
+		}
+	*/
 
-	blocks, err := merger(0, "TOP", jsonConfig1, jsonConfig2)
+	blocks, err := merger(0, "TOP", config1, config2)
 	if err != nil {
 		return config1, err
 	}
+	fmt.Println("--- OUTPUT ---")
 	spew.Dump(blocks)
+	fmt.Println("--- NICE EH ---")
+	//
+	//
+	// TODO: return blocks... we will convert back to toml when we are done merging!
+
+	//
 	buf := new(bytes.Buffer)
 	err = toml.NewEncoder(buf).Encode(blocks)
 	if err != nil {
