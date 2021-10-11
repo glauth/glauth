@@ -37,6 +37,8 @@ type SqlBackend interface {
 	GetGroupMembersQuery() string
 	// Get group member IDs query
 	GetGroupMemberIDsQuery() string
+	// Get User Capabilities Query
+	GetUserCapabilitiesQuery() string
 }
 
 type database struct {
@@ -148,10 +150,7 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 
 		if !h.cfg.Behaviors.IgnoreCapabilities {
 			capability := config.Capability{}
-			rows, err := h.database.cnx.Query(fmt.Sprintf(`
-				SELECT c.action,c.object
-				FROM capabilities c WHERE userid=%s`,
-				h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
+			rows, err := h.database.cnx.Query(h.sqlBackend.GetUserCapabilitiesQuery(), user.UIDNumber)
 			if err == nil {
 				for rows.Next() {
 					err := rows.Scan(&capability.Action, &capability.Object)

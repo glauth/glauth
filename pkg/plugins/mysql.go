@@ -49,6 +49,10 @@ func (b MysqlBackend) GetGroupMemberIDsQuery() string {
 	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups FROM users"
 }
 
+func (b MysqlBackend) GetUserCapabilitiesQuery() string {
+	return "SELECT action,object FROM capabilities WHERE userid=?"
+}
+
 // Create db/schema if necessary
 func (b MysqlBackend) CreateSchema(db *sql.DB) {
 	statement, _ := db.Prepare(`

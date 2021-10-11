@@ -49,6 +49,10 @@ func (b SqliteBackend) GetGroupMemberIDsQuery() string {
 	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups FROM users"
 }
 
+func (b SqliteBackend) GetUserCapabilitiesQuery() string {
+	return "SELECT action,object FROM capabilities WHERE userid=?"
+}
+
 // Create db/schema if necessary
 func (b SqliteBackend) CreateSchema(db *sql.DB) {
 	statement, _ := db.Prepare(`
