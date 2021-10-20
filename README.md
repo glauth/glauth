@@ -268,11 +268,6 @@ A small note about other architectures: while I expect the code is, for the most
 We will accept PRs which fix bugs on these platforms, but be aware these binaries will not be tested regularly, and instead are provided for the convenience of those who feel comfortable with this.
 
 ### Building:
-You'll need go-bindata to build GLAuth. Then use the Makefile.
-```unix
-go get github.com/jteeuwen/go-bindata/...
-make all
-```
 
 # Logging
 - using logr with increasing verbosity

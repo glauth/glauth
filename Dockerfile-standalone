@@ -17,11 +17,7 @@ ENV GOARCH=amd64
 ENV CGO_ENABLED=0
 
 # Only needed for alpine builds // also: busybox
-RUN apk add --no-cache git make go-bindata busybox-static dumb-init
-
-# Run go-bindata to embed data for API
-RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
-RUN gofmt -w pkg/assets/bindata.go
+RUN apk add --no-cache git make busybox-static dumb-init
 
 # Install deps
 RUN go get -d -v ./...

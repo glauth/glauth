@@ -17,11 +17,7 @@ ENV GOARCH=amd64
 ENV GO_ENABLED=1
 
 # Only needed for alpine builds // also: busybox
-RUN apt -qq update && apt -qq install -y git make go-bindata build-essential busybox-static dumb-init
-
-# Run go-bindata to embed data for API
-RUN go-bindata -pkg=assets -o=pkg/assets/bindata.go assets
-RUN gofmt -w pkg/assets/bindata.go
+RUN apt -qq update && apt -qq install -y git make build-essential busybox-static dumb-init
 
 # Install deps
 RUN go get -d -v ./...
