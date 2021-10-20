@@ -16,8 +16,10 @@ fi
 # Get the git working directory base if CI build dir isn't set
 if [[ "$CI_BUILD_DIR" == "" ]] ; then
   export CI_BUILD_DIR="$(git rev-parse --show-toplevel)/v2"
-  echo "Adjusted CI_BUILD_DIR to $CI_BUILD_DIR"
 fi
+
+# Fix semantic version naming
+[[ $CI_BUILD_DIR == */v2 ]] || export CI_BUILD_DIR=$CI_BUILD_DIR/v2
 
 # This script requires that "$CI_BUILD_DIR" is set to the repo root
 
