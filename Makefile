@@ -41,7 +41,7 @@ fast: setup linux64 verify cleanup
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 
 # Setup commands to always run
-setup: bindata getdeps format
+setup: getdeps format
 
 #####################
 # Subcommands
@@ -57,13 +57,6 @@ getdeps:
 
 updatetest:
 	./scripts/ci/integration-test.sh
-
-bindata:
-	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=assets -o=pkg/assets/bindata.go assets && gofmt -w pkg/assets/bindata.go
-
-
-cleanup:
-	rm pkg/assets/bindata.go
 
 format:
 	go fmt
