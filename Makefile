@@ -26,16 +26,16 @@ include pkg/plugins/Makefile
 #####################
 
 # Build and run - used for development
-run: setup devrun cleanup
+run: setup devrun
 
 # Run the integration test on linux64 (eventually allow the binary to be set)
 test: runtest
 
 # Run build process for all binaries
-all: setup binaries verify cleanup
+all: setup binaries verify
 
 # Run build process for only linux64
-fast: setup linux64 verify cleanup
+fast: setup linux64 verify
 
 # list of binary formats to build
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
