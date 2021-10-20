@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        go-version: [1.15.x, 1.16.x]
+        go-version: [1.16.x, 1.17.x]
     steps:
       - name: Install Go
         uses: actions/setup-go@v2
@@ -19,11 +19,9 @@ jobs:
       - name: Updating packages database
         run: sudo apt-get -qq update
       - name: Install CLI Dependencies
-        run: sudo apt-get install -y ldap-utils oathtool go-bindata
+        run: sudo apt-get install -y ldap-utils oathtool
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Make Bindata
-        run: make bindata
       - name: Fetch Go dependencies
         run: go get -t -v ./...
       - name: Fail if a .go file hasn't been formatted with 'go fmt'
