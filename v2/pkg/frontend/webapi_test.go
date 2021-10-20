@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/glauth/glauth/pkg/assets"
+	"github.com/glauth/glauth/v2/pkg/assets"
 )
 
 // TestAPI is a small test to make sure that behavior didn't change for the

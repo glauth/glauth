@@ -5,7 +5,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/glauth/glauth/pkg/handler"
+	"github.com/glauth/glauth/v2/pkg/handler"
 )
 
 type PostgresBackend struct {

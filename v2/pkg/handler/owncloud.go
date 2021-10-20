@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/glauth/glauth/pkg/config"
-	"github.com/glauth/glauth/pkg/stats"
+	"github.com/glauth/glauth/v2/pkg/config"
+	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 	msgraph "github.com/yaegashi/msgraph.go/v1.0"

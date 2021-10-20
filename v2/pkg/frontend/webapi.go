@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/glauth/glauth/pkg/assets"
+	"github.com/glauth/glauth/v2/pkg/assets"
 )
 
 // RunAPI provides a basic REST API
