@@ -14,7 +14,7 @@ pkg/assets/bindata.go
 
 .*.swp
 
-# Ignoring travis CLI tool logs
-*travis.log
-
 certs/
+
+# Local files
+local/

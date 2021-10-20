@@ -1,0 +1,31 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 506f4bf6
+dn: olcDatabase={1}mdb
+objectClass: olcDatabaseConfig
+objectClass: olcMdbConfig
+olcDatabase: {1}mdb
+olcDbDirectory: /var/lib/ldap
+olcSuffix: dc=glauth,dc=com
+olcLastMod: TRUE
+olcRootDN: cn=admin,dc=glauth,dc=com
+olcDbCheckpoint: 512 30
+olcDbMaxSize: 1073741824
+structuralObjectClass: olcMdbConfig
+entryUUID: 5c2cdd40-7ddc-103b-9ec4-c740e015b81b
+creatorsName: cn=admin,cn=config
+createTimestamp: 20210720192809Z
+olcDbIndex: uid eq
+olcDbIndex: mail eq
+olcDbIndex: memberOf eq
+olcDbIndex: entryCSN eq
+olcDbIndex: entryUUID eq
+olcDbIndex: objectClass eq
+olcAccess: {0}to attrs=userPassword,shadowLastChange by self write by dn="cn
+ =serviceuser,cn=svcaccts,ou=users,dc=glauth,dc=com" write by anonymous auth
+  by * none
+olcAccess: {1}to * by self write by dn="cn=serviceuser,cn=svcaccts,ou=users,
+ dc=glauth,dc=com" write by users read by * none
+olcRootPW:: e1NTSEF9TzNabzVITEhzQXU1dkg5a0txNTlEVFhGclpPVDBPQUg=
+entryCSN: 20210812002157.895969Z#000000#000#000000
+modifiersName: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
+modifyTimestamp: 20210812002157Z

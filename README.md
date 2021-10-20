@@ -7,7 +7,6 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 ![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
 ![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
 
-![Travis (.com) branch](https://img.shields.io/travis/com/glauth/glauth/dev)
 ![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
 
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/dev)
@@ -84,20 +83,21 @@ Here's a sample config wth hardcoded users and groups:
   baseDN = "dc=glauth,dc=com"
 [[users]]
   name = "hackers"
-  unixid = 5001
+  uidnumber = 5001
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a"   # dogood
   sshkeys = [ "ssh-dss AAAAB3..." ]
 [[users]]
   name = "uberhackers"
-  unixid = 5006
+  uidnumber = 5006
   primarygroup = 5501
   passbcrypt = "243261243130244B62463462656F7265504F762E794F324957746D656541326B4B46596275674A79336A476845764B616D65446169784E41384F4432"   # dogood
 [[groups]]
   name = "superheros"
-  unixid = 5501
+  gidnumber = 5501
 ```
 To create the password SHA hash, use this command: `echo -n "mysecret" | openssl dgst -sha256`
+
 Instead of a local configuration file, GLAuth can fetch its configuration from S3.  This is an easy way to ensure redundant GLAuth servers are always in-sync.
 ```unix
 glauth -c s3://bucketname/glauth.cfg
@@ -185,6 +185,40 @@ This can be used, for instance, to inject support for Two Factor Authentication 
    * Example: cccjgjgkhcbb
    * default = blank
 
+### Capabilities
+
+Introduced in 2.1.0, this feature continues improving the intrinsic security model of GLAuth.
+
+While some level of access control is already enforced when using an LDAP backend, Capabilities are now part of the Config and Database backends.
+
+Currently, one capability is recognized: "search" -- here is how to configure it in a Config yaml file:
+
+```
+...
+[behaviors]
+  # Ignore all capabilities restrictions, for instance allowing every user to perform a search
+  IgnoreCapabilities = false
+...
+[[users]]
+  name = "hackers"
+    [[users.capabilities]]
+    action = "search"
+    object = "ou=superheros,dc=glauth,dc=com"
+    [[users.capabilities]]
+    action = "search"
+    object = "ou=someotherdn,dc=glauth,dc=com"
+...
+[[users]]
+  name = "serviceuser"
+    [[users.capabilities]]
+    action = "search"
+    object = "*"
+...
+```
+For backward compatibility, you can set `IgnoreCapabilities` to "true"
+
+If you are using a Database backend, check the plugins README for configuration information.
+
 ### OpenSSH keys:
 GLAuth can store a user's SSH authorized keys.  Add one or more keys per user as shown above, then setup the goklp helper: https://github.com/appliedtrust/goklp
 
@@ -253,7 +287,42 @@ make all
 - errors really are errors that cannot be handled or returned
   - returning a proper LDAP error code is handling an error
 
-# Compatiblity
+# Testing
+
+Of course, a core set of tests is being run by Github Actions CI. However, when developing new features/refactoring, a more comprehensive regression testing suite is needed.
+
+You can run `go test` to execute the tests found in `glauth_test.go` -- better, if it is installed, you can run [goconvey](https://github.com/smartystreets/goconvey)
+
+Since some tests cover TOTP, you will first need to install `oathtool` in your environment.
+
+You also must create a symbolink link called `glauth` to make it easy for the test framework to find the executable. For instance:
+
+```
+cd bin
+ln -s glauth64 glauth
+```
+
+In order to test GLAuth against an LDAP backend, you will need docker. Run this command:
+```
+docker run \
+    --rm \
+    -d \
+    -p 389:389 \
+    --name openldap-service \
+    --hostname ldap-service \
+    --env LDAP_ORGANISATION="GLauth" \
+    --env LDAP_DOMAIN="glauth.com" \
+    --env LDAP_ADMIN_PASSWORD="password" \
+    --env LDAP_CONFIG_PASSWORD="password" \
+    --env LDAP_BASE_DN="dc=glauth,dc=com" \
+    -v $PWD/misc/openldap/config:/etc/ldap/slapd.d \
+    -v $PWD/misc/openldap/db:/var/lib/ldap \
+    osixia/openldap:latest
+```
+
+Refer to [this page](https://github.com/glauth/glauth/wiki/Quick-openldap-setup-to-test-LDAP-backend) for a somewhat more in-depth overview of testing with OpenLDAP.
+
+# Compatibility
 
 While our stated goal for GLAuth is to provide the simplest possible authentication server, we keep finding an increasing number of client appliances that are asking fairly "existential" questions of the server. We have been working on providing answers these clients will find satisfactory.
 
@@ -277,5 +346,5 @@ RFC 4511: "A list containing only the OID "1.1" indicates that no attributes are
 
 ## Stargazers over time
 
-[![Stargazers over time](https://starcharts.herokuapp.com/glauth/glauth.svg)](https://starcharts.herokuapp.com/glauth/glauth)
+[![Stargazers over time](https://starchart.cc/glauth/glauth.svg)](https://starchart.cc/glauth/glauth)
 

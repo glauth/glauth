@@ -39,6 +39,8 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 
 	var helper handler.Handler
 
+	loh := handler.NewLDAPOpsHelper()
+
 	// instantiate the helper, if any
 	if s.c.Helper.Enabled {
 		switch s.c.Helper.Datastore {
@@ -47,6 +49,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Logger(s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
+				handler.LDAPHelper(loh),
 			)
 		case "plugin":
 			plug, err := plugin.Open(s.c.Helper.Plugin)
@@ -68,6 +71,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Logger(s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
+				handler.LDAPHelper(loh),
 			)
 		default:
 			return nil, fmt.Errorf("unsupported helper %s - must be one of 'config', 'plugin'", s.c.Helper.Datastore)
@@ -89,21 +93,20 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Backend(backend),
 				handler.Handlers(allHandlers),
 				handler.Logger(s.log),
-				handler.Config(s.c),
 				handler.Helper(helper),
 			)
 		case "owncloud":
 			h = handler.NewOwnCloudHandler(
 				handler.Backend(backend),
 				handler.Logger(s.log),
-				handler.Config(s.c),
 			)
 		case "config":
 			h = handler.NewConfigHandler(
 				handler.Backend(backend),
 				handler.Logger(s.log),
-				handler.Config(s.c),
+				handler.Config(s.c), // TODO only used to access Users and Groups, move that to dedicated options
 				handler.YubiAuth(s.yubiAuth),
+				handler.LDAPHelper(loh),
 			)
 		case "plugin":
 			plug, err := plugin.Open(backend.Plugin)
@@ -126,6 +129,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Logger(s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
+				handler.LDAPHelper(loh),
 			)
 		default:
 			return nil, fmt.Errorf("unsupported backend %s - must be one of 'config', 'ldap','owncloud' or 'plugin'", backend.Datastore)

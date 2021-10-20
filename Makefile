@@ -49,14 +49,14 @@ setup: getdeps format
 
 # Run integration test
 runtest:
-	./scripts/travis/integration-test.sh cleanup
+	./scripts/ci/integration-test.sh cleanup
 
 # Get all dependencies
 getdeps:
 	go get -d ./...
 
 updatetest:
-	./scripts/travis/integration-test.sh
+	./scripts/ci/integration-test.sh
 
 format:
 	go fmt

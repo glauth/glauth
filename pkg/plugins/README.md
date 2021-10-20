@@ -42,86 +42,88 @@ Tables:
 Here is how to insert example data using your database's REPL (more detailed information can be found in pkg/plugins/sample-database.cfg)
 
 ```sql
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('hackers', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO groups(name, unixid) VALUES('superheros', 5501);
-INSERT INTO groups(name, unixid) VALUES('crusaders', 5502);
-INSERT INTO groups(name, unixid) VALUES('civilians', 5503);
-INSERT INTO groups(name, unixid) VALUES('caped', 5504);
-INSERT INTO groups(name, unixid) VALUES('lovesailing', 5505);
-INSERT INTO groups(name, unixid) VALUES('smoker', 5506);
+INSERT INTO groups(name, gidnumber) VALUES('superheros', 5501);
+INSERT INTO groups(name, gidnumber) VALUES('svcaccts', 5502);
+INSERT INTO groups(name, gidnumber) VALUES('civilians', 5503);
+INSERT INTO groups(name, gidnumber) VALUES('caped', 5504);
+INSERT INTO groups(name, gidnumber) VALUES('lovesailing', 5505);
+INSERT INTO groups(name, gidnumber) VALUES('smoker', 5506);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5503, 5501);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5502);
 INSERT INTO includegroups(parentgroupid, includegroupid) VALUES(5504, 5501);
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user1', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user2', 5002, 5502, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256) VALUES('user3', 5003, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
-INSERT INTO users(name, unixid, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a', '5505,5506');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('hackers', 5001, 5501, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256) VALUES('johndoe', 5002, 5502, '6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a');
+INSERT INTO users(name, mail, uidnumber, primarygroup, passsha256) VALUES('serviceuser', "serviceuser@example.com", 5003, 5502, '652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0');
+INSERT INTO users(name, uidnumber, primarygroup, passsha256, othergroups) VALUES('user4', 5004, 5504, '652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0', '5505,5506');
+INSERT INTO capabilities(userid, action, object) VALUES(5001, "search", "ou=superheros,dc=glauth,dc=com");
+INSERT INTO capabilities(userid, action, object) VALUES(5003, "search", "*");
 ```
 This should be equivalent to this configuration:
 ```text
 [[users]]
   name = "hackers"
-  unixid = 5001
+  uidnumber = 5001
   primarygroup = 5501
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+    [[users.capabilities]]
+    action = "search"
+    object = "ou=superheros,dc=glauth,dc=com"
 
 [[users]]
-  name = "user1"
-  unixid = 5001
-  primarygroup = 5501
-  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
-
-[[users]]
-  name = "user2"
-  unixid = 5002
+  name = "johndoe"
+  uidnumber = 5002
   primarygroup = 5502
   passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
 
 [[users]]
-  name = "user3"
-  unixid = 5003
-  primarygroup = 5504
-  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+  name = "serviceuser"
+  mail = "serviceuser@example.com"
+  uidnumber = 5003
+  passsha256 = "652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0" # mysecret
+  primarygroup = 5502
+    [[users.capabilities]]
+    action = "search"
+    object = "*"
 
 [[users]]
   name = "user4"
-  unixid = 5003
+  uidnumber = 5003
   primarygroup = 5504
   othergroups = [5505, 5506]
-  passsha256 = "6478579e37aff45f013e14eeb30b3cc56c72ccdc310123bcdf53e0333e3f416a" # dogood
+  passsha256 = "652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0" # mysecret
 
 [[groups]]
   name = "superheros"
-  unixid = 5501
+  gidnumber = 5501
 
 [[groups]]
-  name = "crusaders"
-  unixid = 5502
+  name = "svcaccts"
+  gidnumber = 5502
 
 [[groups]]
   name = "civilians"
-  unixid = 5503
+  gidnumber = 5503
   includegroups = [ 5501 ]
 
 [[groups]]
   name = "caped"
-  unixid = 5504
+  gidnumber = 5504
   includegroups = [ 5502, 5501 ]
 ```
 and LDAP should return these `memberOf` values:
 ```text
-uid: user1
+uid: hackers
 ou: superheros
 memberOf: cn=caped,ou=groups,dc=militate,dc=com
 memberOf: cn=civilians,ou=groups,dc=militate,dc=com
 memberOf: cn=superheros,ou=groups,dc=militate,dc=com
 
-uid: user2
-ou: crusaders
+uid: johndoe
+ou: svcaccts
 memberOf: cn=caped,ou=groups,dc=militate,dc=com
-memberOf: cn=crusaders,ou=groups,dc=militate,dc=com
+memberOf: cn=svcaccts,ou=groups,dc=militate,dc=com
 
-uid: user3
+uid: serviceuser
 ou: caped
 memberOf: cn=caped,ou=groups,dc=militate,dc=com
 
@@ -133,6 +135,6 @@ memberOf: cn=smoker,ou=groups,dc=militate,dc=com
 ```
 If you have the ldap client package installed, this can be easily confirmed by running
 ```
-ldapsearch  -H ldap://localhost:3893 -D cn=hackers,ou=superheros,dc=glauth,dc=com -w dogood -x -bdc=glauth,dc=com cn=user1
+ldapsearch  -H ldap://localhost:3893 -D cn=hackers,ou=superheros,dc=glauth,dc=com -w dogood -x -bdc=glauth,dc=com cn=hackers
 ```
 and so on.

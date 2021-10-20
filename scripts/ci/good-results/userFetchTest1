@@ -7,6 +7,7 @@ ou: superheros
 uidNumber: 5002
 accountStatus: active
 mail: jdoe@example.com
+userPrincipalName: jdoe@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh

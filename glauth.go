@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/GeertJohan/yubigo"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/pkg/config"
@@ -20,7 +22,6 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 // Set with buildtime vars
@@ -127,6 +128,15 @@ func startService() {
 	// web API
 	if activeConfig.API.Enabled {
 		log.V(6).Info("Web API enabled")
+
+		if activeConfig.API.Internals {
+			statsviz.Register(
+				http.DefaultServeMux,
+				statsviz.Root("/internals"),
+				statsviz.SendFrequency(1000*time.Millisecond),
+			)
+		}
+
 		go frontend.RunAPI(
 			frontend.Logger(log),
 			frontend.Config(&activeConfig.API),
@@ -177,38 +187,46 @@ func startService() {
 
 func startConfigWatcher() {
 	configFileLocation := getConfigLocation()
-
-	if strings.HasPrefix(configFileLocation, "s3://") {
+	if !activeConfig.WatchConfig || strings.HasPrefix(configFileLocation, "s3://") {
 		return
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Error(err, "Could not start config-watcher")
+		return
 	}
 
+	ticker := time.NewTicker(1 * time.Second)
 	go func() {
+		isChanged, isRemoved := false, false
 		for {
 			select {
 			case event := <-watcher.Events:
-				if activeConfig.WatchConfig {
-					if event.Op&fsnotify.Remove == fsnotify.Remove {
-						// Ensure we still watch when symlinks are updated
-						watcher.Remove(event.Name)
-						watcher.Add(configFileLocation)
-					}
-
-					if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Remove == fsnotify.Remove {
-						if err := doConfig(); err != nil {
-							log.V(2).Info("Could not reload config.Holding on to old config", "error", err.Error())
-						} else {
-							log.V(3).Info("Config was reloaded")
-						}
-					}
+				log.V(6).Info("watcher got event", "e", event.Op.String())
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					isChanged = true
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
+					isChanged, isRemoved = true, true
 				}
 			case err := <-watcher.Errors:
-				if activeConfig.WatchConfig {
-					log.Error(err, "Error!")
+				log.Error(err, "Error!")
+			case <-ticker.C:
+				// wakeup, try finding removed config
+			}
+			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
+				if isRemoved {
+					log.V(6).Info("rewatching config", "file", configFileLocation)
+					watcher.Add(configFileLocation) // overwrite
+					isChanged, isRemoved = true, false
+				}
+				if isChanged {
+					if err := doConfig(); err != nil {
+						log.V(2).Info("Could not reload config. Holding on to old config", "error", err.Error())
+					} else {
+						log.V(3).Info("Config was reloaded")
+					}
+					isChanged = false
 				}
 			}
 		}
@@ -284,7 +302,6 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 			cfg.Backends = append(cfg.Backends, cfg.Backend)
 		}
 	}
-	spew.Dump(cfg.Backends)
 
 	// Patch with default values where not specified
 	for i := range cfg.Backends {
@@ -390,6 +407,21 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 			return &cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backends[i].Datastore)
 		}
 	}
+
+	// TODO: remove after deprecating UnixID on User and Group
+	for _, user := range cfg.Users {
+		if user.UnixID != 0 {
+			user.UIDNumber = user.UnixID
+			log.V(2).Info(fmt.Sprintf("User '%s': 'unixid' is deprecated - please move to 'uidnumber' as per documentation", user.Name))
+		}
+	}
+	for _, group := range cfg.Groups {
+		if group.UnixID != 0 {
+			group.GIDNumber = group.UnixID
+			log.V(2).Info(fmt.Sprintf("Group '%s': 'unixid' is deprecated - please move to 'gidnumber' as per documentation", group.Name))
+		}
+	}
+
 	return &cfg, nil
 }
 

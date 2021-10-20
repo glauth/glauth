@@ -30,7 +30,6 @@ type ownCloudSession struct {
 type ownCloudHandler struct {
 	backend  config.Backend
 	log      logr.Logger
-	cfg      *config.Config
 	client   *http.Client
 	sessions map[string]ownCloudSession
 	lock     *sync.Mutex
@@ -124,7 +123,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			attrs := []*ldap.EntryAttribute{}
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{*g.ID}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *g.ID)}})
-			//			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.UnixID)}})
+			//			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
 			if g.Members != nil {
 				members := make([]string, len(g.Members))
@@ -188,8 +187,13 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h ownCloudHandler) FindUser(userName string) (found bool, user config.User, err error) {
+// FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
+func (h ownCloudHandler) FindUser(userName string, searchByUPN bool) (found bool, user config.User, err error) {
 	return false, config.User{}, nil
+}
+
+func (h ownCloudHandler) FindGroup(groupName string) (found bool, group config.Group, err error) {
+	return false, config.Group{}, nil
 }
 
 func (h ownCloudHandler) Close(boundDN string, conn net.Conn) error {
@@ -355,7 +359,6 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 	return ownCloudHandler{
 		backend:  options.Backend,
 		log:      options.Logger,
-		cfg:      options.Config,
 		sessions: make(map[string]ownCloudSession),
 		lock:     &ownCloudLock,
 		client: &http.Client{

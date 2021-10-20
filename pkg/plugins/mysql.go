@@ -30,7 +30,7 @@ func (b MysqlBackend) CreateSchema(db *sql.DB) {
 CREATE TABLE IF NOT EXISTS users (
 	id INTEGER AUTO_INCREMENT PRIMARY KEY,
 	name VARCHAR(64) NOT NULL,
-	unixid INTEGER NOT NULL,
+	uidnumber INTEGER NOT NULL,
 	primarygroup INTEGER NOT NULL,
 	othergroups VARCHAR(1024) DEFAULT '',
 	givenname VARCHAR(64) DEFAULT '',
@@ -47,10 +47,12 @@ CREATE TABLE IF NOT EXISTS users (
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE UNIQUE INDEX idx_user_name on users(name)")
 	statement.Exec()
-	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS groups (id INTEGER AUTO_INCREMENT PRIMARY KEY, name VARCHAR(64) NOT NULL, unixid INTEGER NOT NULL)")
+	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS groups (id INTEGER AUTO_INCREMENT PRIMARY KEY, name VARCHAR(64) NOT NULL, gidnumber INTEGER NOT NULL)")
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE UNIQUE INDEX idx_group_name on groups(name)")
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS includegroups (id INTEGER AUTO_INCREMENT PRIMARY KEY, parentgroupid INTEGER NOT NULL, includegroupid INTEGER NOT NULL)")
+	statement.Exec()
+	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS capabilities (id INTEGER AUTO_INCREMENT PRIMARY KEY, userid INTEGER NOT NULL, action VARCHAR(128) NOT NULL, object VARCHAR(128) NOT NULL)")
 	statement.Exec()
 }

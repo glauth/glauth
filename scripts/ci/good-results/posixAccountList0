@@ -31,6 +31,7 @@ ou: superheros
 uidNumber: 5002
 accountStatus: active
 mail: jdoe@example.com
+userPrincipalName: jdoe@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh
@@ -64,6 +65,7 @@ ou: superheros
 uidNumber: 5003
 accountStatus: active
 mail: jdoe2@example.com
+userPrincipalName: jdoe2@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh
@@ -99,6 +101,7 @@ ou: superheros
 uidNumber: 5004
 accountStatus: active
 mail: adoe@example.com
+userPrincipalName: adoe@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh
@@ -128,6 +131,7 @@ ou: superheros
 uidNumber: 5005
 accountStatus: active
 mail: jdoe3@example.com
+userPrincipalName: jdoe3@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh
@@ -157,6 +161,7 @@ ou: superheros
 uidNumber: 5006
 accountStatus: active
 mail: sdoe@example.com
+userPrincipalName: sdoe@example.com
 objectClass: posixAccount
 objectClass: shadowAccount
 loginShell: /bin/sh
