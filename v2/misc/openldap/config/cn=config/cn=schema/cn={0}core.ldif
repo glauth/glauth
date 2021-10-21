@@ -1,0 +1,249 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 57d21f8c
+dn: cn={0}core
+objectClass: olcSchemaConfig
+cn: {0}core
+olcAttributeTypes: {0}( 2.5.4.2 NAME 'knowledgeInformation' DESC 'RFC2256: k
+ nowledge information' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.
+ 121.1.15{32768} )
+olcAttributeTypes: {1}( 2.5.4.4 NAME ( 'sn' 'surname' ) DESC 'RFC2256: last 
+ (family) name(s) for which the entity is known by' SUP name )
+olcAttributeTypes: {2}( 2.5.4.5 NAME 'serialNumber' DESC 'RFC2256: serial nu
+ mber of the entity' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMat
+ ch SYNTAX 1.3.6.1.4.1.1466.115.121.1.44{64} )
+olcAttributeTypes: {3}( 2.5.4.6 NAME ( 'c' 'countryName' ) DESC 'RFC4519: tw
+ o-letter ISO-3166 country code' SUP name SYNTAX 1.3.6.1.4.1.1466.115.121.1.
+ 11 SINGLE-VALUE )
+olcAttributeTypes: {4}( 2.5.4.7 NAME ( 'l' 'localityName' ) DESC 'RFC2256: l
+ ocality which this object resides in' SUP name )
+olcAttributeTypes: {5}( 2.5.4.8 NAME ( 'st' 'stateOrProvinceName' ) DESC 'RF
+ C2256: state or province which this object resides in' SUP name )
+olcAttributeTypes: {6}( 2.5.4.9 NAME ( 'street' 'streetAddress' ) DESC 'RFC2
+ 256: street address of this object' EQUALITY caseIgnoreMatch SUBSTR caseIgn
+ oreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} )
+olcAttributeTypes: {7}( 2.5.4.10 NAME ( 'o' 'organizationName' ) DESC 'RFC22
+ 56: organization this object belongs to' SUP name )
+olcAttributeTypes: {8}( 2.5.4.11 NAME ( 'ou' 'organizationalUnitName' ) DESC
+  'RFC2256: organizational unit this object belongs to' SUP name )
+olcAttributeTypes: {9}( 2.5.4.12 NAME 'title' DESC 'RFC2256: title associate
+ d with the entity' SUP name )
+olcAttributeTypes: {10}( 2.5.4.14 NAME 'searchGuide' DESC 'RFC2256: search g
+ uide, deprecated by enhancedSearchGuide' SYNTAX 1.3.6.1.4.1.1466.115.121.1.
+ 25 )
+olcAttributeTypes: {11}( 2.5.4.15 NAME 'businessCategory' DESC 'RFC2256: bus
+ iness category' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch S
+ YNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} )
+olcAttributeTypes: {12}( 2.5.4.16 NAME 'postalAddress' DESC 'RFC2256: postal
+  address' EQUALITY caseIgnoreListMatch SUBSTR caseIgnoreListSubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.41 )
+olcAttributeTypes: {13}( 2.5.4.17 NAME 'postalCode' DESC 'RFC2256: postal co
+ de' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.
+ 1.4.1.1466.115.121.1.15{40} )
+olcAttributeTypes: {14}( 2.5.4.18 NAME 'postOfficeBox' DESC 'RFC2256: Post O
+ ffice Box' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX
+  1.3.6.1.4.1.1466.115.121.1.15{40} )
+olcAttributeTypes: {15}( 2.5.4.19 NAME 'physicalDeliveryOfficeName' DESC 'RF
+ C2256: Physical Delivery Office Name' EQUALITY caseIgnoreMatch SUBSTR caseI
+ gnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} )
+olcAttributeTypes: {16}( 2.5.4.20 NAME 'telephoneNumber' DESC 'RFC2256: Tele
+ phone Number' EQUALITY telephoneNumberMatch SUBSTR telephoneNumberSubstring
+ sMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.50{32} )
+olcAttributeTypes: {17}( 2.5.4.21 NAME 'telexNumber' DESC 'RFC2256: Telex Nu
+ mber' SYNTAX 1.3.6.1.4.1.1466.115.121.1.52 )
+olcAttributeTypes: {18}( 2.5.4.22 NAME 'teletexTerminalIdentifier' DESC 'RFC
+ 2256: Teletex Terminal Identifier' SYNTAX 1.3.6.1.4.1.1466.115.121.1.51 )
+olcAttributeTypes: {19}( 2.5.4.23 NAME ( 'facsimileTelephoneNumber' 'fax' ) 
+ DESC 'RFC2256: Facsimile (Fax) Telephone Number' SYNTAX 1.3.6.1.4.1.1466.11
+ 5.121.1.22 )
+olcAttributeTypes: {20}( 2.5.4.24 NAME 'x121Address' DESC 'RFC2256: X.121 Ad
+ dress' EQUALITY numericStringMatch SUBSTR numericStringSubstringsMatch SYNT
+ AX 1.3.6.1.4.1.1466.115.121.1.36{15} )
+olcAttributeTypes: {21}( 2.5.4.25 NAME 'internationaliSDNNumber' DESC 'RFC22
+ 56: international ISDN number' EQUALITY numericStringMatch SUBSTR numericSt
+ ringSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.36{16} )
+olcAttributeTypes: {22}( 2.5.4.26 NAME 'registeredAddress' DESC 'RFC2256: re
+ gistered postal address' SUP postalAddress SYNTAX 1.3.6.1.4.1.1466.115.121.
+ 1.41 )
+olcAttributeTypes: {23}( 2.5.4.27 NAME 'destinationIndicator' DESC 'RFC2256:
+  destination indicator' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstring
+ sMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.44{128} )
+olcAttributeTypes: {24}( 2.5.4.28 NAME 'preferredDeliveryMethod' DESC 'RFC22
+ 56: preferred delivery method' SYNTAX 1.3.6.1.4.1.1466.115.121.1.14 SINGLE-
+ VALUE )
+olcAttributeTypes: {25}( 2.5.4.29 NAME 'presentationAddress' DESC 'RFC2256: 
+ presentation address' EQUALITY presentationAddressMatch SYNTAX 1.3.6.1.4.1.
+ 1466.115.121.1.43 SINGLE-VALUE )
+olcAttributeTypes: {26}( 2.5.4.30 NAME 'supportedApplicationContext' DESC 'R
+ FC2256: supported application context' EQUALITY objectIdentifierMatch SYNTA
+ X 1.3.6.1.4.1.1466.115.121.1.38 )
+olcAttributeTypes: {27}( 2.5.4.31 NAME 'member' DESC 'RFC2256: member of a g
+ roup' SUP distinguishedName )
+olcAttributeTypes: {28}( 2.5.4.32 NAME 'owner' DESC 'RFC2256: owner (of the 
+ object)' SUP distinguishedName )
+olcAttributeTypes: {29}( 2.5.4.33 NAME 'roleOccupant' DESC 'RFC2256: occupan
+ t of role' SUP distinguishedName )
+olcAttributeTypes: {30}( 2.5.4.36 NAME 'userCertificate' DESC 'RFC2256: X.50
+ 9 user certificate, use ;binary' EQUALITY certificateExactMatch SYNTAX 1.3.
+ 6.1.4.1.1466.115.121.1.8 )
+olcAttributeTypes: {31}( 2.5.4.37 NAME 'cACertificate' DESC 'RFC2256: X.509 
+ CA certificate, use ;binary' EQUALITY certificateExactMatch SYNTAX 1.3.6.1.
+ 4.1.1466.115.121.1.8 )
+olcAttributeTypes: {32}( 2.5.4.38 NAME 'authorityRevocationList' DESC 'RFC22
+ 56: X.509 authority revocation list, use ;binary' SYNTAX 1.3.6.1.4.1.1466.1
+ 15.121.1.9 )
+olcAttributeTypes: {33}( 2.5.4.39 NAME 'certificateRevocationList' DESC 'RFC
+ 2256: X.509 certificate revocation list, use ;binary' SYNTAX 1.3.6.1.4.1.14
+ 66.115.121.1.9 )
+olcAttributeTypes: {34}( 2.5.4.40 NAME 'crossCertificatePair' DESC 'RFC2256:
+  X.509 cross certificate pair, use ;binary' SYNTAX 1.3.6.1.4.1.1466.115.121
+ .1.10 )
+olcAttributeTypes: {35}( 2.5.4.42 NAME ( 'givenName' 'gn' ) DESC 'RFC2256: f
+ irst name(s) for which the entity is known by' SUP name )
+olcAttributeTypes: {36}( 2.5.4.43 NAME 'initials' DESC 'RFC2256: initials of
+  some or all of names, but not the surname(s).' SUP name )
+olcAttributeTypes: {37}( 2.5.4.44 NAME 'generationQualifier' DESC 'RFC2256: 
+ name qualifier indicating a generation' SUP name )
+olcAttributeTypes: {38}( 2.5.4.45 NAME 'x500UniqueIdentifier' DESC 'RFC2256:
+  X.500 unique identifier' EQUALITY bitStringMatch SYNTAX 1.3.6.1.4.1.1466.1
+ 15.121.1.6 )
+olcAttributeTypes: {39}( 2.5.4.46 NAME 'dnQualifier' DESC 'RFC2256: DN quali
+ fier' EQUALITY caseIgnoreMatch ORDERING caseIgnoreOrderingMatch SUBSTR case
+ IgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.44 )
+olcAttributeTypes: {40}( 2.5.4.47 NAME 'enhancedSearchGuide' DESC 'RFC2256: 
+ enhanced search guide' SYNTAX 1.3.6.1.4.1.1466.115.121.1.21 )
+olcAttributeTypes: {41}( 2.5.4.48 NAME 'protocolInformation' DESC 'RFC2256: 
+ protocol information' EQUALITY protocolInformationMatch SYNTAX 1.3.6.1.4.1.
+ 1466.115.121.1.42 )
+olcAttributeTypes: {42}( 2.5.4.50 NAME 'uniqueMember' DESC 'RFC2256: unique 
+ member of a group' EQUALITY uniqueMemberMatch SYNTAX 1.3.6.1.4.1.1466.115.1
+ 21.1.34 )
+olcAttributeTypes: {43}( 2.5.4.51 NAME 'houseIdentifier' DESC 'RFC2256: hous
+ e identifier' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYN
+ TAX 1.3.6.1.4.1.1466.115.121.1.15{32768} )
+olcAttributeTypes: {44}( 2.5.4.52 NAME 'supportedAlgorithms' DESC 'RFC2256: 
+ supported algorithms' SYNTAX 1.3.6.1.4.1.1466.115.121.1.49 )
+olcAttributeTypes: {45}( 2.5.4.53 NAME 'deltaRevocationList' DESC 'RFC2256: 
+ delta revocation list; use ;binary' SYNTAX 1.3.6.1.4.1.1466.115.121.1.9 )
+olcAttributeTypes: {46}( 2.5.4.54 NAME 'dmdName' DESC 'RFC2256: name of DMD'
+  SUP name )
+olcAttributeTypes: {47}( 2.5.4.65 NAME 'pseudonym' DESC 'X.520(4th): pseudon
+ ym for the object' SUP name )
+olcAttributeTypes: {48}( 0.9.2342.19200300.100.1.3 NAME ( 'mail' 'rfc822Mail
+ box' ) DESC 'RFC1274: RFC822 Mailbox'   EQUALITY caseIgnoreIA5Match   SUBST
+ R caseIgnoreIA5SubstringsMatch   SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{256} 
+ )
+olcAttributeTypes: {49}( 0.9.2342.19200300.100.1.25 NAME ( 'dc' 'domainCompo
+ nent' ) DESC 'RFC1274/2247: domain component' EQUALITY caseIgnoreIA5Match S
+ UBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SIN
+ GLE-VALUE )
+olcAttributeTypes: {50}( 0.9.2342.19200300.100.1.37 NAME 'associatedDomain' 
+ DESC 'RFC1274: domain associated with object' EQUALITY caseIgnoreIA5Match S
+ UBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {51}( 1.2.840.113549.1.9.1 NAME ( 'email' 'emailAddress' 
+ 'pkcs9email' ) DESC 'RFC3280: legacy attribute for email addresses in DNs' 
+ EQUALITY caseIgnoreIA5Match SUBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.
+ 6.1.4.1.1466.115.121.1.26{128} )
+olcObjectClasses: {0}( 2.5.6.2 NAME 'country' DESC 'RFC2256: a country' SUP 
+ top STRUCTURAL MUST c MAY ( searchGuide $ description ) )
+olcObjectClasses: {1}( 2.5.6.3 NAME 'locality' DESC 'RFC2256: a locality' SU
+ P top STRUCTURAL MAY ( street $ seeAlso $ searchGuide $ st $ l $ descriptio
+ n ) )
+olcObjectClasses: {2}( 2.5.6.4 NAME 'organization' DESC 'RFC2256: an organiz
+ ation' SUP top STRUCTURAL MUST o MAY ( userPassword $ searchGuide $ seeAlso
+  $ businessCategory $ x121Address $ registeredAddress $ destinationIndicato
+ r $ preferredDeliveryMethod $ telexNumber $ teletexTerminalIdentifier $ tel
+ ephoneNumber $ internationaliSDNNumber $  facsimileTelephoneNumber $ street
+  $ postOfficeBox $ postalCode $ postalAddress $ physicalDeliveryOfficeName 
+ $ st $ l $ description ) )
+olcObjectClasses: {3}( 2.5.6.5 NAME 'organizationalUnit' DESC 'RFC2256: an o
+ rganizational unit' SUP top STRUCTURAL MUST ou MAY ( userPassword $ searchG
+ uide $ seeAlso $ businessCategory $ x121Address $ registeredAddress $ desti
+ nationIndicator $ preferredDeliveryMethod $ telexNumber $ teletexTerminalId
+ entifier $ telephoneNumber $ internationaliSDNNumber $ facsimileTelephoneNu
+ mber $ street $ postOfficeBox $ postalCode $ postalAddress $ physicalDelive
+ ryOfficeName $ st $ l $ description ) )
+olcObjectClasses: {4}( 2.5.6.6 NAME 'person' DESC 'RFC2256: a person' SUP to
+ p STRUCTURAL MUST ( sn $ cn ) MAY ( userPassword $ telephoneNumber $ seeAls
+ o $ description ) )
+olcObjectClasses: {5}( 2.5.6.7 NAME 'organizationalPerson' DESC 'RFC2256: an
+  organizational person' SUP person STRUCTURAL MAY ( title $ x121Address $ r
+ egisteredAddress $ destinationIndicator $ preferredDeliveryMethod $ telexNu
+ mber $ teletexTerminalIdentifier $ telephoneNumber $ internationaliSDNNumbe
+ r $  facsimileTelephoneNumber $ street $ postOfficeBox $ postalCode $ posta
+ lAddress $ physicalDeliveryOfficeName $ ou $ st $ l ) )
+olcObjectClasses: {6}( 2.5.6.8 NAME 'organizationalRole' DESC 'RFC2256: an o
+ rganizational role' SUP top STRUCTURAL MUST cn MAY ( x121Address $ register
+ edAddress $ destinationIndicator $ preferredDeliveryMethod $ telexNumber $ 
+ teletexTerminalIdentifier $ telephoneNumber $ internationaliSDNNumber $ fac
+ simileTelephoneNumber $ seeAlso $ roleOccupant $ preferredDeliveryMethod $ 
+ street $ postOfficeBox $ postalCode $ postalAddress $ physicalDeliveryOffic
+ eName $ ou $ st $ l $ description ) )
+olcObjectClasses: {7}( 2.5.6.9 NAME 'groupOfNames' DESC 'RFC2256: a group of
+  names (DNs)' SUP top STRUCTURAL MUST ( member $ cn ) MAY ( businessCategor
+ y $ seeAlso $ owner $ ou $ o $ description ) )
+olcObjectClasses: {8}( 2.5.6.10 NAME 'residentialPerson' DESC 'RFC2256: an r
+ esidential person' SUP person STRUCTURAL MUST l MAY ( businessCategory $ x1
+ 21Address $ registeredAddress $ destinationIndicator $ preferredDeliveryMet
+ hod $ telexNumber $ teletexTerminalIdentifier $ telephoneNumber $ internati
+ onaliSDNNumber $ facsimileTelephoneNumber $ preferredDeliveryMethod $ stree
+ t $ postOfficeBox $ postalCode $ postalAddress $ physicalDeliveryOfficeName
+  $ st $ l ) )
+olcObjectClasses: {9}( 2.5.6.11 NAME 'applicationProcess' DESC 'RFC2256: an 
+ application process' SUP top STRUCTURAL MUST cn MAY ( seeAlso $ ou $ l $ de
+ scription ) )
+olcObjectClasses: {10}( 2.5.6.12 NAME 'applicationEntity' DESC 'RFC2256: an 
+ application entity' SUP top STRUCTURAL MUST ( presentationAddress $ cn ) MA
+ Y ( supportedApplicationContext $ seeAlso $ ou $ o $ l $ description ) )
+olcObjectClasses: {11}( 2.5.6.13 NAME 'dSA' DESC 'RFC2256: a directory syste
+ m agent (a server)' SUP applicationEntity STRUCTURAL MAY knowledgeInformati
+ on )
+olcObjectClasses: {12}( 2.5.6.14 NAME 'device' DESC 'RFC2256: a device' SUP 
+ top STRUCTURAL MUST cn MAY ( serialNumber $ seeAlso $ owner $ ou $ o $ l $ 
+ description ) )
+olcObjectClasses: {13}( 2.5.6.15 NAME 'strongAuthenticationUser' DESC 'RFC22
+ 56: a strong authentication user' SUP top AUXILIARY MUST userCertificate )
+olcObjectClasses: {14}( 2.5.6.16 NAME 'certificationAuthority' DESC 'RFC2256
+ : a certificate authority' SUP top AUXILIARY MUST ( authorityRevocationList
+  $ certificateRevocationList $ cACertificate ) MAY crossCertificatePair )
+olcObjectClasses: {15}( 2.5.6.17 NAME 'groupOfUniqueNames' DESC 'RFC2256: a 
+ group of unique names (DN and Unique Identifier)' SUP top STRUCTURAL MUST (
+  uniqueMember $ cn ) MAY ( businessCategory $ seeAlso $ owner $ ou $ o $ de
+ scription ) )
+olcObjectClasses: {16}( 2.5.6.18 NAME 'userSecurityInformation' DESC 'RFC225
+ 6: a user security information' SUP top AUXILIARY MAY ( supportedAlgorithms
+  ) )
+olcObjectClasses: {17}( 2.5.6.16.2 NAME 'certificationAuthority-V2' SUP cert
+ ificationAuthority AUXILIARY MAY ( deltaRevocationList ) )
+olcObjectClasses: {18}( 2.5.6.19 NAME 'cRLDistributionPoint' SUP top STRUCTU
+ RAL MUST ( cn ) MAY ( certificateRevocationList $ authorityRevocationList $
+  deltaRevocationList ) )
+olcObjectClasses: {19}( 2.5.6.20 NAME 'dmd' SUP top STRUCTURAL MUST ( dmdNam
+ e ) MAY ( userPassword $ searchGuide $ seeAlso $ businessCategory $ x121Add
+ ress $ registeredAddress $ destinationIndicator $ preferredDeliveryMethod $
+  telexNumber $ teletexTerminalIdentifier $ telephoneNumber $ internationali
+ SDNNumber $ facsimileTelephoneNumber $ street $ postOfficeBox $ postalCode 
+ $ postalAddress $ physicalDeliveryOfficeName $ st $ l $ description ) )
+olcObjectClasses: {20}( 2.5.6.21 NAME 'pkiUser' DESC 'RFC2587: a PKI user' S
+ UP top AUXILIARY MAY userCertificate )
+olcObjectClasses: {21}( 2.5.6.22 NAME 'pkiCA' DESC 'RFC2587: PKI certificate
+  authority' SUP top AUXILIARY MAY ( authorityRevocationList $ certificateRe
+ vocationList $ cACertificate $ crossCertificatePair ) )
+olcObjectClasses: {22}( 2.5.6.23 NAME 'deltaCRL' DESC 'RFC2587: PKI user' SU
+ P top AUXILIARY MAY deltaRevocationList )
+olcObjectClasses: {23}( 1.3.6.1.4.1.250.3.15 NAME 'labeledURIObject' DESC 'R
+ FC2079: object that contains the URI attribute type' MAY ( labeledURI ) SUP
+  top AUXILIARY )
+olcObjectClasses: {24}( 0.9.2342.19200300.100.4.19 NAME 'simpleSecurityObjec
+ t' DESC 'RFC1274: simple security object' SUP top AUXILIARY MUST userPasswo
+ rd )
+olcObjectClasses: {25}( 1.3.6.1.4.1.1466.344 NAME 'dcObject' DESC 'RFC2247: 
+ domain component object' SUP top AUXILIARY MUST dc )
+olcObjectClasses: {26}( 1.3.6.1.1.3.1 NAME 'uidObject' DESC 'RFC2377: uid ob
+ ject' SUP top AUXILIARY MUST uid )
+structuralObjectClass: olcSchemaConfig
+entryUUID: 5c26a290-7ddc-103b-9ebf-c740e015b81b
+creatorsName: cn=admin,cn=config
+createTimestamp: 20210720192809Z
+entryCSN: 20210720192809.324162Z#000000#000#000000
+modifiersName: cn=admin,cn=config
+modifyTimestamp: 20210720192809Z

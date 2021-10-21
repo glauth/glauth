@@ -23,12 +23,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Fetch Go dependencies
+        working-directory: ./v2
         run: go get -t -v ./...
       - name: Fail if a .go file hasn't been formatted with 'go fmt'
+        working-directory: ./v2
         run: diff -u <(echo -n) <(gofmt -d ./)
       - name: Full compile test
+        working-directory: ./v2
         run: make all
       - name: Output hashes to the build log
+        working-directory: ./v2
         run: cat bin/*.sha256
       - name: Integration test with compiled binary
+        working-directory: ./v2
         run: make test
