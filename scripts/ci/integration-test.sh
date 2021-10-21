@@ -19,6 +19,7 @@ if [[ "$CI_BUILD_DIR" == "" ]] ; then
 fi
 
 # Fix semantic version naming
+echo "Fixing CI_BUILD_DIR"
 [[ $CI_BUILD_DIR == */v2 ]] || export CI_BUILD_DIR=$CI_BUILD_DIR/v2
 
 # This script requires that "$CI_BUILD_DIR" is set to the repo root
