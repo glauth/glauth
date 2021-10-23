@@ -176,7 +176,7 @@ func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, er
 	return found, group, err
 }
 
-func (h databaseHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) {
+func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
 	entries := []*ldap.Entry{}
 
 	h.MemGroups, err = h.memoizeGroups()
@@ -209,7 +209,7 @@ func (h databaseHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error
 	return entries, nil
 }
 
-func (h databaseHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
+func (h databaseHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
 	entries := []*ldap.Entry{}
 
 	h.MemGroups, err = h.memoizeGroups()
@@ -218,7 +218,11 @@ func (h databaseHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) 
 	}
 
 	for _, g := range h.MemGroups {
-		entries = append(entries, h.getGroup(g))
+		info := h.getGroup(g)
+		if hierarchy != "groups" {
+			info.DN = strings.Replace(info.DN, ",ou=groups,", fmt.Sprintf(",ou=%s,", hierarchy), 1)
+		}
+		entries = append(entries, info)
 	}
 
 	return entries, nil

@@ -111,7 +111,7 @@ func (h configHandler) FindGroup(groupName string) (f bool, g config.Group, err 
 	return found, group, nil
 }
 
-func (h configHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
 	entries := []*ldap.Entry{}
 
 	for _, u := range h.cfg.Users {
@@ -171,14 +171,19 @@ func (h configHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) 
 		if len(u.SSHKeys) > 0 {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.SSHKeyAttr, Values: u.SSHKeys})
 		}
-		dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+		var dn string
+		if hierarchy == "" {
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+		} else {
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+		}
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
 
 	return entries, nil
 }
 
-func (h configHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
 	entries := []*ldap.Entry{}
 
 	for _, g := range h.cfg.Groups {
@@ -190,7 +195,7 @@ func (h configHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMembers(g.GIDNumber)})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
-		dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
+		dn := fmt.Sprintf("%s=%s,ou=%s,%s", h.backend.GroupFormat, g.Name, hierarchy, h.backend.BaseDN)
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
 

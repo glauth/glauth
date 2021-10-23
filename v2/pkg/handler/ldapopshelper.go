@@ -33,8 +33,8 @@ type LDAPOpsHandler interface {
 
 	FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error)
 	FindGroup(groupName string) (f bool, g config.Group, err error)
-	FindPosixAccounts() (entrylist []*ldap.Entry, err error)
-	FindPosixGroups() (entrylist []*ldap.Entry, err error)
+	FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error)
+	FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error)
 }
 
 type failedBind struct {
@@ -191,7 +191,6 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower(h.GetBackend().BaseDN)
-	delimitedBaseDN := "," + baseDN
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 
 	anonymous := len(bindDN) < 1
@@ -200,84 +199,39 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	var ldapcode ldap.LDAPResultCode
 
 	if !anonymous {
-		boundUser, ldapcode = l.findUser(h, bindDN, false /* checkGroup */)
-		if ldapcode != ldap.LDAPResultSuccess {
+		if bindDN, boundUser, ldapcode = l.searchCheckBindDN(h, baseDN, bindDN, anonymous); ldapcode != ldap.LDAPResultSuccess {
 			return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Search Error: Potential bypass of BindDN %s", bindDN)
-		}
-		// What if this user was bound using their UPN? We still want to enforce baseDN etc so we
-		// have to rewire them to their original DN which is of course a waste of cycles.
-		// TODO Down the road we would want to perform lightweight memoization of DNs to UPNs
-		if emailmatcher.MatchString(bindDN) {
-			// cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
-			bindDN = fmt.Sprintf("cn=%s,%s", boundUser.Name, baseDN)
 		}
 	}
 
 	h.GetLog().V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "searchbasedn", searchBaseDN, "src", conn.RemoteAddr(), "scope", searchReq.Scope, "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
 
-	// special case: querying the root DSE
-	if searchReq.Scope == 0 && (searchBaseDN == "" || searchBaseDN == baseDN) {
-		if anonymous && !h.GetBackend().AnonymousDSE {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Root DSE Search Error: Anonymous BindDN not allowed %s", bindDN)
-		}
-		h.GetLog().V(6).Info("Search request", "special case", "root DSE")
-		entries := []*ldap.Entry{}
-		attrs := []*ldap.EntryAttribute{}
-		// unfortunately, objectClass is not to be included so we will respect that
-		// attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"*"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedSASLMechanisms", Values: []string{}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedLDAPVersion", Values: []string{"3"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedControl", Values: []string{}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedCapabilities", Values: []string{}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "subschemaSubentry", Values: []string{"cn=schema"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "serverName", Values: []string{"unknown"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "namingContexts", Values: []string{baseDN}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "defaultNamingContext", Values: []string{baseDN}})
-		attrs = l.collectRequestedAttributesBack(attrs, searchReq)
-		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
-		stats.Frontend.Add("search_successes", 1)
-		h.GetLog().V(6).Info("AP: Root Search OK", "filter", searchReq.Filter)
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	switch entries, ldapcode := l.searchMaybeRootDSEQuery(h, baseDN, searchBaseDN, searchReq, anonymous); ldapcode {
+	case ldap.LDAPResultUnwillingToPerform:
+		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Search Error: No BaseDN provided")
+	case ldap.LDAPResultInsufficientAccessRights:
+		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Root DSE Search Error: Anonymous BindDN not allowed %s", bindDN)
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
 	}
 
-	// validate the user is authenticated and has appropriate access
+	// Past this point, there is no reason to allow anonymous searches
 	if anonymous {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
 	}
 
-	if searchBaseDN == "cn=schema" {
-		h.GetLog().V(6).Info("Search request", "special case", "schema discovery")
-		entries := []*ldap.Entry{}
-		attrs := []*ldap.EntryAttribute{}
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{"schema"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "hasSubordinates", Values: []string{"false"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "modifiersName", Values: []string{"cn=Directory Manager"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "modifyTimeStamp", Values: []string{"Mar 8, 2021, 12:46:29 PM PST (20210308204629Z)"}})
-		// Iterate through schema attributes provided in schema/ directory
-		filenames, _ := ioutil.ReadDir("schema")
-		for _, filename := range filenames {
-			file, err := os.Open(filepath.Join("schema", filename.Name()))
-			if err != nil {
-				return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Schema Error: attribute %s cannot be read", filename)
-			}
-			defer file.Close()
-			values := []string{}
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := scanner.Text()
-				values = append(values, line)
-			}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: filename.Name(), Values: values})
-		}
-		attrs = l.collectRequestedAttributesBack(attrs, searchReq)
-		entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
-		stats.Frontend.Add("search_successes", 1)
-		h.GetLog().V(6).Info("AP: Schema Discovery OK", "filter", searchReq.Filter)
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	switch entries, ldapcode, attributename := l.searchMaybeSchemaQuery(h, baseDN, searchBaseDN, searchReq, anonymous); ldapcode {
+	case ldap.LDAPResultOperationsError:
+		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Schema Error: attribute %s cannot be read", attributename)
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
 	}
 
-	if !strings.HasSuffix(bindDN, delimitedBaseDN) {
+	// Past this further point, we are looking at tree searches... not all standard searches yet, though
+
+	// But first, let's only allow legal searches
+	if !strings.HasSuffix(bindDN, fmt.Sprintf(",%s", baseDN)) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.GetBackend().BaseDN)
 	}
 	if !strings.HasSuffix(searchBaseDN, h.GetBackend().BaseDN) {
@@ -288,31 +242,248 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: no capability allowing BindDN %s to perform search in %s", bindDN, searchBaseDN)
 	}
 
-	// return all users in the config file - the LDAP library will filter results for us
-	entries := []*ldap.Entry{}
+	switch entries, ldapcode := l.searchMaybeTopLevelNodes(h, baseDN, searchBaseDN, searchReq); ldapcode {
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+	}
+
+	switch entries, ldapcode := l.searchMaybeTopLevelGroupsNode(h, baseDN, searchBaseDN, searchReq); ldapcode {
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+	}
+
+	switch entries, ldapcode := l.searchMaybeTopLevelUsersNode(h, baseDN, searchBaseDN, searchReq); ldapcode {
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+	}
+
 	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
 	if err != nil {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter)
 	}
-	switch filterEntity {
-	default:
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
-	case "posixgroup":
-		posixentries, err := h.FindPosixGroups()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to retrieve data [%s]", err.Error())
-		}
-		entries = append(entries, posixentries...)
-	case "posixaccount", "shadowaccount", "":
-		posixentries, err := h.FindPosixAccounts()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: Unable to retrieve data [%s]", err.Error())
-		}
-		entries = append(entries, posixentries...)
+
+	switch entries, ldapcode := l.searchMaybePosixGroups(h, baseDN, searchBaseDN, searchReq, filterEntity); ldapcode {
+	case ldap.LDAPResultSuccess:
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
 	}
-	stats.Frontend.Add("search_successes", 1)
-	h.GetLog().V(6).Info("AP: Search OK", "filter", searchReq.Filter)
+
+	switch entries, ldapcode := l.searchMaybePosixAccounts(h, baseDN, searchBaseDN, searchReq, filterEntity); ldapcode {
+	case ldap.LDAPResultSuccess:
+		stats.Frontend.Add("search_successes", 1)
+		h.GetLog().V(6).Info("AP: Search OK", "filter", searchReq.Filter)
+		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+	}
+
+	// So, this would be an ERROR condition!
+	entries := []*ldap.Entry{}
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+}
+
+// Returns: LDAPResultSuccess or anay ldap code returned by findUser
+func (l LDAPOpsHelper) searchCheckBindDN(h LDAPOpsHandler, baseDN string, bindDN string, anonymous bool) (newBindDN string, boundUser *config.User, ldapresultcode ldap.LDAPResultCode) {
+	boundUser, ldapcode := l.findUser(h, bindDN, false /* checkGroup */)
+	if ldapcode != ldap.LDAPResultSuccess {
+		return "", nil, ldapcode
+	}
+	// What if this user was bound using their UPN? We still want to enforce baseDN etc so we
+	// have to rewire them to their original DN which is of course a waste of cycles.
+	// TODO Down the road we would want to perform lightweight memoization of DNs to UPNs
+	if emailmatcher.MatchString(bindDN) {
+		// cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+		bindDN = fmt.Sprintf("cn=%s,%s", boundUser.Name, baseDN)
+	}
+	return bindDN, boundUser, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultUnwillingToPerform, LDAPResultInsufficientAccessRights
+func (l LDAPOpsHelper) searchMaybeRootDSEQuery(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	isBaseDNLess := searchBaseDN == ""
+	isBaseDNFull := searchBaseDN == baseDN
+	if !isBaseDNLess && !isBaseDNFull {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	/// Only base scope searches allowed if no basedn is provided
+	if isBaseDNLess && (searchReq.Scope != ldap.ScopeBaseObject && searchReq.Scope != ldap.ScopeWholeSubtree) {
+		h.GetLog().V(2).Info("Search Error: No BaseDN provided", "src", searchReq.Controls)
+		return nil, ldap.LDAPResultUnwillingToPerform // KO
+	}
+	if isBaseDNFull && searchReq.Scope != ldap.ScopeBaseObject {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	if anonymous && !h.GetBackend().AnonymousDSE {
+		return nil, ldap.LDAPResultInsufficientAccessRights // KO
+	}
+
+	h.GetLog().V(6).Info("Search request", "special case", "root DSE")
+	entries := []*ldap.Entry{}
+	attrs := []*ldap.EntryAttribute{}
+	// unfortunately, objectClass is not to be included so we will respect that
+	// attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"*"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedSASLMechanisms", Values: []string{}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedLDAPVersion", Values: []string{"3"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedControl", Values: []string{}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "supportedCapabilities", Values: []string{}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "subschemaSubentry", Values: []string{"cn=schema"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "serverName", Values: []string{"unknown"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "namingContexts", Values: []string{baseDN}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "defaultNamingContext", Values: []string{baseDN}})
+	attrs = l.collectRequestedAttributesBack(attrs, searchReq)
+	entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Root Search OK", "filter", searchReq.Filter)
+	return entries, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
+func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode, attributename *string) {
+	if searchBaseDN != "cn=schema" {
+		return nil, ldap.LDAPResultOther, nil // OK
+	}
+
+	h.GetLog().V(6).Info("Search request", "special case", "schema discovery")
+	entries := []*ldap.Entry{}
+	attrs := []*ldap.EntryAttribute{}
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{"schema"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "hasSubordinates", Values: []string{"false"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifiersName", Values: []string{"cn=Directory Manager"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifyTimeStamp", Values: []string{"Mar 8, 2021, 12:46:29 PM PST (20210308204629Z)"}})
+	// Iterate through schema attributes provided in schema/ directory
+	filenames, _ := ioutil.ReadDir("schema")
+	for _, filename := range filenames {
+		attributename := new(string)
+		*attributename = filename.Name()
+		file, err := os.Open(filepath.Join("schema", *attributename))
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError, attributename
+		}
+		defer file.Close()
+		values := []string{}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			values = append(values, line)
+		}
+		attrs = append(attrs, &ldap.EntryAttribute{Name: filename.Name(), Values: values})
+	}
+	attrs = l.collectRequestedAttributesBack(attrs, searchReq)
+	entries = append(entries, &ldap.Entry{DN: searchBaseDN, Attributes: attrs})
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Schema Discovery OK", "filter", searchReq.Filter)
+	return entries, ldap.LDAPResultSuccess, nil
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther
+func (l LDAPOpsHelper) searchMaybeTopLevelNodes(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	if searchBaseDN != baseDN || (searchReq.Scope != ldap.ScopeSingleLevel && searchReq.Scope != ldap.ScopeWholeSubtree) {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	h.GetLog().V(6).Info("Search request", "special case", "top-level browse")
+	entries := []*ldap.Entry{}
+	entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "groups"))
+	entries = append(entries, l.topLevelUsersNode(searchBaseDN))
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Top-Level Browse OK", "filter", searchReq.Filter)
+	return entries, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther
+func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	if searchBaseDN != fmt.Sprintf("ou=groups,%s", baseDN) {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	h.GetLog().V(6).Info("Search request", "special case", "top-level groups node")
+	entries := []*ldap.Entry{}
+	if searchReq.Scope == ldap.ScopeBaseObject || searchReq.Scope == ldap.ScopeWholeSubtree {
+		entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "groups"))
+	}
+	if searchReq.Scope == ldap.ScopeSingleLevel || searchReq.Scope == ldap.ScopeWholeSubtree {
+		groupentries, err := h.FindPosixGroups("groups")
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, groupentries...)
+	}
+	return entries, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther
+func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	if searchBaseDN != fmt.Sprintf("ou=users,%s", baseDN) {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	h.GetLog().V(6).Info("Search request", "special case", "top-level users node")
+	entries := []*ldap.Entry{}
+	if searchReq.Scope == ldap.ScopeBaseObject || searchReq.Scope == ldap.ScopeWholeSubtree {
+		entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "users"))
+	}
+	if searchReq.Scope == ldap.ScopeSingleLevel || searchReq.Scope == ldap.ScopeWholeSubtree {
+		groupentries, err := h.FindPosixGroups("users")
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, groupentries...)
+	}
+	return entries, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
+// This function ignores scopes... for now
+func (l LDAPOpsHelper) searchMaybePosixGroups(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	if filterEntity != "posixgroup" {
+		return nil, ldap.LDAPResultOther // OK
+	}
+	h.GetLog().V(6).Info("Search request", "special case", "posix groups")
+	entries, err := h.FindPosixGroups("groups")
+	if err != nil {
+		return nil, ldap.LDAPResultOperationsError
+	}
+	return entries, ldap.LDAPResultSuccess
+}
+
+// Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
+// This function ignores scopes... for now
+func (l LDAPOpsHelper) searchMaybePosixAccounts(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	switch filterEntity {
+	case "posixaccount", "shadowaccount", "":
+		h.GetLog().V(6).Info("Search request", "default case", filterEntity)
+	default:
+		return nil, ldap.LDAPResultOther // OK
+	}
+
+	// FixUp: we may be in the process of browsing users from a group ou
+	hierarchyString := ""
+	if strings.HasSuffix(searchBaseDN, fmt.Sprintf("ou=users,%s", baseDN)) {
+		hierarchyString = "ou=users"
+	}
+
+	entries, err := h.FindPosixAccounts(hierarchyString)
+	if err != nil {
+		return nil, ldap.LDAPResultOperationsError
+	}
+	return entries, ldap.LDAPResultSuccess
+}
+
+func (l LDAPOpsHelper) topLevelGroupsNode(searchBaseDN string, hierarchy string) *ldap.Entry {
+	attrs := []*ldap.EntryAttribute{}
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{"groups"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"organizationalUnit", "top"}})
+	hierarchyStringPrefix := fmt.Sprintf("ou=%s,", hierarchy)
+	dn := searchBaseDN
+	if !strings.HasPrefix(dn, hierarchyStringPrefix) {
+		dn = fmt.Sprintf("%s%s", hierarchyStringPrefix, dn)
+	}
+	return &ldap.Entry{DN: dn, Attributes: attrs}
+}
+
+func (l LDAPOpsHelper) topLevelUsersNode(searchBaseDN string) *ldap.Entry {
+	attrs := []*ldap.EntryAttribute{}
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{"users"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"organizationalUnit", "top"}})
+	dn := searchBaseDN
+	if !strings.HasPrefix(dn, "ou=users,") {
+		dn = fmt.Sprintf("ou=users,%s", dn)
+	}
+	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
 
 func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool) (userWhenFound *config.User, resultCode ldap.LDAPResultCode) {
