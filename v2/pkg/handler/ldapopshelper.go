@@ -184,6 +184,21 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 	return ldap.LDAPResultSuccess, nil
 }
 
+/*
+ * TODO #1:
+ * Is it possible to map, on-the-fly, ou= -> cn= to maintain backware compatibility? Could be a switch...
+ * Or maybe sinmply configure in the .cfg file using the nameformat and groupformat settings?
+ * In 3.0 we could change default from cn to ou
+ * TODO #2: DONE
+ * Returns values when scope==base or scope==sub on a group entry
+ * TODO #3: DONE
+ * Make sure that when scope==sub, we do not always return, but augment results instead
+ * TODO #4:
+ * Handle groups as two distinct objectclasses like OLDAP does
+ * Q: Does OLDAP return the groups twice when querying root+sub?
+ * TODO #5:
+ * Document roll out of schemas
+ */
 func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	if l.isInTimeout(h, conn) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultUnwillingToPerform}, fmt.Errorf("Source is in a timeout")
@@ -274,7 +289,7 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
 	}
 
-	// So, this would be an ERROR condition!
+	// So, this should be an ERROR condition! Right..?
 	entries := []*ldap.Entry{}
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
@@ -297,18 +312,13 @@ func (l LDAPOpsHelper) searchCheckBindDN(h LDAPOpsHandler, baseDN string, bindDN
 
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultUnwillingToPerform, LDAPResultInsufficientAccessRights
 func (l LDAPOpsHelper) searchMaybeRootDSEQuery(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
-	isBaseDNLess := searchBaseDN == ""
-	isBaseDNFull := searchBaseDN == baseDN
-	if !isBaseDNLess && !isBaseDNFull {
+	if searchBaseDN != "" {
 		return nil, ldap.LDAPResultOther // OK
 	}
 	/// Only base scope searches allowed if no basedn is provided
-	if isBaseDNLess && (searchReq.Scope != ldap.ScopeBaseObject && searchReq.Scope != ldap.ScopeWholeSubtree) {
+	if searchReq.Scope != ldap.ScopeBaseObject {
 		h.GetLog().V(2).Info("Search Error: No BaseDN provided", "src", searchReq.Controls)
 		return nil, ldap.LDAPResultUnwillingToPerform // KO
-	}
-	if isBaseDNFull && searchReq.Scope != ldap.ScopeBaseObject {
-		return nil, ldap.LDAPResultOther // OK
 	}
 	if anonymous && !h.GetBackend().AnonymousDSE {
 		return nil, ldap.LDAPResultInsufficientAccessRights // KO
@@ -374,13 +384,29 @@ func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, s
 
 // Returns: LDAPResultSuccess, LDAPResultOther
 func (l LDAPOpsHelper) searchMaybeTopLevelNodes(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
-	if searchBaseDN != baseDN || (searchReq.Scope != ldap.ScopeSingleLevel && searchReq.Scope != ldap.ScopeWholeSubtree) {
+	if baseDN != searchBaseDN {
 		return nil, ldap.LDAPResultOther // OK
 	}
 	h.GetLog().V(6).Info("Search request", "special case", "top-level browse")
 	entries := []*ldap.Entry{}
+	if searchReq.Scope == ldap.ScopeBaseObject || searchReq.Scope == ldap.ScopeWholeSubtree {
+		entries = append(entries, l.topLevelRootNode(searchBaseDN))
+	}
 	entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "groups"))
 	entries = append(entries, l.topLevelUsersNode(searchBaseDN))
+	if searchReq.Scope == ldap.ScopeWholeSubtree {
+		groupentries, err := h.FindPosixGroups("ou=users")
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, groupentries...)
+
+		userentries, err := h.FindPosixAccounts("ou=users")
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, userentries...)
+	}
 	stats.Frontend.Add("search_successes", 1)
 	h.GetLog().V(6).Info("AP: Top-Level Browse OK", "filter", searchReq.Filter)
 	return entries, ldap.LDAPResultSuccess
@@ -397,12 +423,14 @@ func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(h LDAPOpsHandler, baseDN st
 		entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "groups"))
 	}
 	if searchReq.Scope == ldap.ScopeSingleLevel || searchReq.Scope == ldap.ScopeWholeSubtree {
-		groupentries, err := h.FindPosixGroups("groups")
+		groupentries, err := h.FindPosixGroups("ou=groups")
 		if err != nil {
 			return nil, ldap.LDAPResultOperationsError
 		}
 		entries = append(entries, groupentries...)
 	}
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Top-Level Groups Browse OK", "filter", searchReq.Filter)
 	return entries, ldap.LDAPResultSuccess
 }
 
@@ -414,29 +442,57 @@ func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(h LDAPOpsHandler, baseDN str
 	h.GetLog().V(6).Info("Search request", "special case", "top-level users node")
 	entries := []*ldap.Entry{}
 	if searchReq.Scope == ldap.ScopeBaseObject || searchReq.Scope == ldap.ScopeWholeSubtree {
-		entries = append(entries, l.topLevelGroupsNode(searchBaseDN, "users"))
+		entries = append(entries, l.topLevelUsersNode(searchBaseDN))
 	}
 	if searchReq.Scope == ldap.ScopeSingleLevel || searchReq.Scope == ldap.ScopeWholeSubtree {
-		groupentries, err := h.FindPosixGroups("users")
+		groupentries, err := h.FindPosixGroups("ou=users")
 		if err != nil {
 			return nil, ldap.LDAPResultOperationsError
 		}
 		entries = append(entries, groupentries...)
 	}
+	if searchReq.Scope == ldap.ScopeWholeSubtree {
+		userentries, err := h.FindPosixAccounts("ou=users")
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, userentries...)
+	}
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Top-Level Users Browse OK", "filter", searchReq.Filter)
 	return entries, ldap.LDAPResultSuccess
 }
 
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
-// This function ignores scopes... for now
 func (l LDAPOpsHelper) searchMaybePosixGroups(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+	hierarchy := "ou=groups"
 	if filterEntity != "posixgroup" {
-		return nil, ldap.LDAPResultOther // OK
+		bits := strings.Split(strings.Replace(searchBaseDN, baseDN, "", 1), ",")
+		if len(bits) != 3 || (bits[1] != "ou=groups" && bits[1] != "ou=users") {
+			return nil, ldap.LDAPResultOther // OK
+		}
+		hierarchy = bits[1]
 	}
 	h.GetLog().V(6).Info("Search request", "special case", "posix groups")
-	entries, err := h.FindPosixGroups("groups")
-	if err != nil {
-		return nil, ldap.LDAPResultOperationsError
+	entries := []*ldap.Entry{}
+	if searchReq.Scope == ldap.ScopeBaseObject || searchReq.Scope == ldap.ScopeWholeSubtree {
+		groupentries, err := h.FindPosixGroups(hierarchy)
+		if err != nil {
+			return nil, ldap.LDAPResultOperationsError
+		}
+		entries = append(entries, l.preFilterEntries(searchBaseDN, groupentries)...)
 	}
+	if searchReq.Scope == ldap.ScopeSingleLevel || searchReq.Scope == ldap.ScopeWholeSubtree {
+		if hierarchy == "ou=users" {
+			userentries, err := h.FindPosixAccounts("ou=users")
+			if err != nil {
+				return nil, ldap.LDAPResultOperationsError
+			}
+			entries = append(entries, l.preFilterEntries(searchBaseDN, userentries)...)
+		}
+	}
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Posix Groups Search OK", "filter", searchReq.Filter)
 	return entries, ldap.LDAPResultSuccess
 }
 
@@ -460,7 +516,20 @@ func (l LDAPOpsHelper) searchMaybePosixAccounts(h LDAPOpsHandler, baseDN string,
 	if err != nil {
 		return nil, ldap.LDAPResultOperationsError
 	}
+	stats.Frontend.Add("search_successes", 1)
+	h.GetLog().V(6).Info("AP: Account Search OK", "filter", searchReq.Filter)
 	return entries, ldap.LDAPResultSuccess
+}
+
+func (l LDAPOpsHelper) topLevelRootNode(searchBaseDN string) *ldap.Entry {
+	attrs := []*ldap.EntryAttribute{}
+	dnBits := strings.Split(searchBaseDN, ",")
+	for _, dnBit := range dnBits {
+		chunk := strings.Split(dnBit, "=")
+		attrs = append(attrs, &ldap.EntryAttribute{Name: chunk[0], Values: []string{chunk[1]}})
+	}
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"organizationalUnit", "dcObject", "top"}})
+	return &ldap.Entry{DN: searchBaseDN, Attributes: attrs}
 }
 
 func (l LDAPOpsHelper) topLevelGroupsNode(searchBaseDN string, hierarchy string) *ldap.Entry {
@@ -484,6 +553,20 @@ func (l LDAPOpsHelper) topLevelUsersNode(searchBaseDN string) *ldap.Entry {
 		dn = fmt.Sprintf("ou=users,%s", dn)
 	}
 	return &ldap.Entry{DN: dn, Attributes: attrs}
+}
+
+// I am not quite sure why but I found out that, maybe due to my playing around with their DN,
+// querying groups and users under a certain node (e.g. ou=users) with a scope of "sub"
+// (and only in this scenario!) will defeat the LDAP library's filtering capabilities.
+// Some day, hopefully, I'll fix this directly in the library.
+func (l LDAPOpsHelper) preFilterEntries(searchBaseDN string, entries []*ldap.Entry) (resultentries []*ldap.Entry) {
+	filteredEntries := []*ldap.Entry{}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.DN, searchBaseDN) {
+			filteredEntries = append(filteredEntries, entry)
+		}
+	}
+	return filteredEntries
 }
 
 func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool) (userWhenFound *config.User, resultCode ldap.LDAPResultCode) {
