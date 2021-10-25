@@ -456,16 +456,16 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	if asGroupOfUniqueNames {
-		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"groupOfUniqueNames", "top"}})
-	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup", "top"}})
-		attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.GIDNumber)})
-	}
 	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberDNs(g.GIDNumber)})
+	if asGroupOfUniqueNames {
+		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"groupOfUniqueNames", "top"}})
+	} else {
+		attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.GIDNumber)})
+		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup", "top"}})
+	}
 	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
 	return &ldap.Entry{dn, attrs}
 }
