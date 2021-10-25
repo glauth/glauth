@@ -22,7 +22,7 @@ func (b SqliteBackend) GetDriverName() string {
 }
 
 func (b SqliteBackend) FindUserQuery(criterion string) string {
-	return fmt.Sprintf("SELECT uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey FROM users WHERE %s=?", criterion)
+	return fmt.Sprintf("SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey FROM users u WHERE %s=?", criterion)
 }
 
 func (b SqliteBackend) FindGroupQuery() string {

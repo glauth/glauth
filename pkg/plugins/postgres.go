@@ -22,7 +22,7 @@ func (b PostgresBackend) GetDriverName() string {
 }
 
 func (b PostgresBackend) FindUserQuery(criterion string) string {
-	return fmt.Sprintf("SELECT uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey FROM users WHERE %s=$1", criterion)
+	return fmt.Sprintf("SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey FROM users u WHERE %s=$1", criterion)
 }
 
 func (b PostgresBackend) FindGroupQuery() string {
