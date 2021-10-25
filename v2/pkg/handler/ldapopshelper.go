@@ -193,7 +193,7 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
  * Returns values when scope==base or scope==sub on a group entry
  * TODO #3: DONE
  * Make sure that when scope==sub, we do not always return, but augment results instead
- * TODO #4:
+ * TODO #4: DONE
  * Handle groups as two distinct objectclasses like OLDAP does
  * Q: Does OLDAP return the groups twice when querying root+sub?
  * TODO #5:
@@ -310,6 +310,7 @@ func (l LDAPOpsHelper) searchCheckBindDN(h LDAPOpsHandler, baseDN string, bindDN
 	return bindDN, boundUser, ldap.LDAPResultSuccess
 }
 
+// Search RootDSE and return information on the server
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultUnwillingToPerform, LDAPResultInsufficientAccessRights
 func (l LDAPOpsHelper) searchMaybeRootDSEQuery(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
 	if searchBaseDN != "" {
@@ -344,6 +345,7 @@ func (l LDAPOpsHelper) searchMaybeRootDSEQuery(h LDAPOpsHandler, baseDN string, 
 	return entries, ldap.LDAPResultSuccess
 }
 
+// Search and return the information, after indirection from the RootDSE
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
 func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode, attributename *string) {
 	if searchBaseDN != "cn=schema" {
@@ -382,6 +384,7 @@ func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, s
 	return entries, ldap.LDAPResultSuccess, nil
 }
 
+// Retrieve the top-levell nodes, i.e. the baseDN, groups, members...
 // Returns: LDAPResultSuccess, LDAPResultOther
 func (l LDAPOpsHelper) searchMaybeTopLevelNodes(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
 	if baseDN != searchBaseDN {
@@ -412,6 +415,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelNodes(h LDAPOpsHandler, baseDN string,
 	return entries, ldap.LDAPResultSuccess
 }
 
+// Search starting from and including the ou=groups node
 // Returns: LDAPResultSuccess, LDAPResultOther
 func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
 	if searchBaseDN != fmt.Sprintf("ou=groups,%s", baseDN) {
@@ -434,6 +438,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(h LDAPOpsHandler, baseDN st
 	return entries, ldap.LDAPResultSuccess
 }
 
+// Search starting from and including the ou=users node
 // Returns: LDAPResultSuccess, LDAPResultOther
 func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
 	if searchBaseDN != fmt.Sprintf("ou=users,%s", baseDN) {
@@ -463,6 +468,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(h LDAPOpsHandler, baseDN str
 	return entries, ldap.LDAPResultSuccess
 }
 
+// Look up posixgroup entries, either through objectlass or parent is ou=groups or ou=users
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
 func (l LDAPOpsHelper) searchMaybePosixGroups(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
 	hierarchy := "ou=groups"
@@ -496,6 +502,7 @@ func (l LDAPOpsHelper) searchMaybePosixGroups(h LDAPOpsHandler, baseDN string, s
 	return entries, ldap.LDAPResultSuccess
 }
 
+// Lookup posixaccount entries
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
 // This function ignores scopes... for now
 func (l LDAPOpsHelper) searchMaybePosixAccounts(h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {

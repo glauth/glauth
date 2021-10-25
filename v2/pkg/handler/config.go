@@ -192,7 +192,6 @@ func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entr
 		attrs := []*ldap.EntryAttribute{}
 		if asGroupOfUniqueNames {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"groupOfUniqueNames", "top"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberIDs(g.GIDNumber)})
 		} else {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
@@ -201,6 +200,7 @@ func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entr
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(g.GIDNumber)})
 		dn := fmt.Sprintf("%s=%s,%s,%s", h.backend.GroupFormat, g.Name, hierarchy, h.backend.BaseDN)
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
@@ -214,8 +214,7 @@ func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	return nil
 }
 
-/*
-func (h configHandler) getGroupMembers(gid int) []string {
+func (h configHandler) getGroupMemberDNs(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
@@ -235,7 +234,7 @@ func (h configHandler) getGroupMembers(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					includegroupmembers := h.getGroupMembers(includegroupid)
+					includegroupmembers := h.getGroupMemberDNs(includegroupid)
 
 					for _, includegroupmember := range includegroupmembers {
 						members[includegroupmember] = true
@@ -254,7 +253,6 @@ func (h configHandler) getGroupMembers(gid int) []string {
 
 	return m
 }
-*/
 
 func (h configHandler) getGroupMemberIDs(gid int) []string {
 	members := make(map[string]bool)

@@ -295,14 +295,12 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	return memGroups, nil
 }
 
-/*
-func (h databaseHandler) getGroupMembers(gid int) []string {
+func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 	members := make(map[string]bool)
 
 	rows, err := h.database.cnx.Query(`
 			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
-			FROM users u WHERE lower(u.name)=?`,
-	)
+			FROM users u`)
 	if err != nil {
 		// Silent fail... for now
 		return []string{}
@@ -334,7 +332,7 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					includegroupmembers := h.getGroupMembers(includegroupid)
+					includegroupmembers := h.getGroupMemberDNs(includegroupid)
 
 					for _, includegroupmember := range includegroupmembers {
 						members[includegroupmember] = true
@@ -350,11 +348,9 @@ func (h databaseHandler) getGroupMembers(gid int) []string {
 	}
 
 	sort.Strings(m)
-	spew.Dump(m)
 
 	return m
 }
-*/
 
 // Used exclusively when looking up Posix Groups
 func (h databaseHandler) getGroupMemberIDs(gid int) []string {
@@ -462,7 +458,6 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	attrs := []*ldap.EntryAttribute{}
 	if asGroupOfUniqueNames {
 		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"groupOfUniqueNames", "top"}})
-		attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberIDs(g.GIDNumber)})
 	} else {
 		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup", "top"}})
 		attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.GIDNumber)})
@@ -470,6 +465,7 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
+	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberDNs(g.GIDNumber)})
 	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
 	return &ldap.Entry{dn, attrs}
 }
