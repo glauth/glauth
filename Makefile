@@ -1,4 +1,6 @@
-VERSION=$(shell bin/glauth64 --version)
+# This is the V1 Makefile.
+# If you need to build a V1 target, remove the next line.
+exit 0
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
 BUILD_TIME=$(shell date -u +%Y%m%d_%H%M%SZ)

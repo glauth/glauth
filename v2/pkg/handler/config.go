@@ -111,7 +111,7 @@ func (h configHandler) FindGroup(groupName string) (f bool, g config.Group, err 
 	return found, group, nil
 }
 
-func (h configHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
 	entries := []*ldap.Entry{}
 
 	for _, u := range h.cfg.Users {
@@ -171,14 +171,21 @@ func (h configHandler) FindPosixAccounts() (entrylist []*ldap.Entry, err error) 
 		if len(u.SSHKeys) > 0 {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.SSHKeyAttr, Values: u.SSHKeys})
 		}
-		dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+		var dn string
+		if hierarchy == "" {
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+		} else {
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+		}
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
 
 	return entries, nil
 }
 
-func (h configHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+	asGroupOfUniqueNames := hierarchy == "ou=groups"
+
 	entries := []*ldap.Entry{}
 
 	for _, g := range h.cfg.Groups {
@@ -187,10 +194,14 @@ func (h configHandler) FindPosixGroups() (entrylist []*ldap.Entry, err error) {
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMembers(g.GIDNumber)})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
-		dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(g.GIDNumber)})
+		if asGroupOfUniqueNames {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"groupOfUniqueNames", "top"}})
+		} else {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
+		}
+		dn := fmt.Sprintf("%s=%s,%s,%s", h.backend.GroupFormat, g.Name, hierarchy, h.backend.BaseDN)
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
 
@@ -203,7 +214,7 @@ func (h configHandler) Close(boundDn string, conn net.Conn) error {
 	return nil
 }
 
-func (h configHandler) getGroupMembers(gid int) []string {
+func (h configHandler) getGroupMemberDNs(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
@@ -223,7 +234,7 @@ func (h configHandler) getGroupMembers(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					includegroupmembers := h.getGroupMembers(includegroupid)
+					includegroupmembers := h.getGroupMemberDNs(includegroupid)
 
 					for _, includegroupmember := range includegroupmembers {
 						members[includegroupmember] = true
@@ -289,7 +300,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	for _, gid := range gids {
 		for _, g := range h.cfg.Groups {
 			if g.GIDNumber == gid {
-				dn := fmt.Sprintf("cn=%s,%s=groups,%s", g.Name, h.backend.GroupFormat, h.backend.BaseDN)
+				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
 				groups[dn] = true
 			}
 
