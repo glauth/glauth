@@ -1,6 +1,6 @@
 module github.com/glauth/glauth
 
-go 1.15
+go 1.16
 
 replace github.com/hydronica/toml => ./toml
 

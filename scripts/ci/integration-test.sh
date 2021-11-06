@@ -15,7 +15,7 @@ fi
 
 # Get the git working directory base if CI build dir isn't set
 if [[ "$CI_BUILD_DIR" == "" ]] ; then
-  export CI_BUILD_DIR="$(git rev-parse --show-toplevel)"
+  export CI_BUILD_DIR="$(git rev-parse --show-toplevel)/v2"
 fi
 
 # This script requires that "$CI_BUILD_DIR" is set to the repo root

@@ -1,0 +1,178 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 3133677b
+dn: cn={1}cosine
+objectClass: olcSchemaConfig
+cn: {1}cosine
+olcAttributeTypes: {0}( 0.9.2342.19200300.100.1.2 NAME 'textEncodedORAddress
+ ' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.
+ 4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {1}( 0.9.2342.19200300.100.1.4 NAME 'info' DESC 'RFC1274:
+  general information' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsM
+ atch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{2048} )
+olcAttributeTypes: {2}( 0.9.2342.19200300.100.1.5 NAME ( 'drink' 'favouriteD
+ rink' ) DESC 'RFC1274: favorite drink' EQUALITY caseIgnoreMatch SUBSTR case
+ IgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {3}( 0.9.2342.19200300.100.1.6 NAME 'roomNumber' DESC 'RF
+ C1274: room number' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMat
+ ch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {4}( 0.9.2342.19200300.100.1.7 NAME 'photo' DESC 'RFC1274
+ : photo (G3 fax)' SYNTAX 1.3.6.1.4.1.1466.115.121.1.23{25000} )
+olcAttributeTypes: {5}( 0.9.2342.19200300.100.1.8 NAME 'userClass' DESC 'RFC
+ 1274: category of user' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstring
+ sMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {6}( 0.9.2342.19200300.100.1.9 NAME 'host' DESC 'RFC1274:
+  host computer' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubstringsMatch S
+ YNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {7}( 0.9.2342.19200300.100.1.10 NAME 'manager' DESC 'RFC1
+ 274: DN of manager' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466
+ .115.121.1.12 )
+olcAttributeTypes: {8}( 0.9.2342.19200300.100.1.11 NAME 'documentIdentifier'
+  DESC 'RFC1274: unique identifier of document' EQUALITY caseIgnoreMatch SUB
+ STR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {9}( 0.9.2342.19200300.100.1.12 NAME 'documentTitle' DESC
+  'RFC1274: title of document' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSub
+ stringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {10}( 0.9.2342.19200300.100.1.13 NAME 'documentVersion' D
+ ESC 'RFC1274: version of document' EQUALITY caseIgnoreMatch SUBSTR caseIgno
+ reSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {11}( 0.9.2342.19200300.100.1.14 NAME 'documentAuthor' DE
+ SC 'RFC1274: DN of author of document' EQUALITY distinguishedNameMatch SYNT
+ AX 1.3.6.1.4.1.1466.115.121.1.12 )
+olcAttributeTypes: {12}( 0.9.2342.19200300.100.1.15 NAME 'documentLocation' 
+ DESC 'RFC1274: location of document original' EQUALITY caseIgnoreMatch SUBS
+ TR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {13}( 0.9.2342.19200300.100.1.20 NAME ( 'homePhone' 'home
+ TelephoneNumber' ) DESC 'RFC1274: home telephone number' EQUALITY telephone
+ NumberMatch SUBSTR telephoneNumberSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.1
+ 15.121.1.50 )
+olcAttributeTypes: {14}( 0.9.2342.19200300.100.1.21 NAME 'secretary' DESC 'R
+ FC1274: DN of secretary' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1
+ .1466.115.121.1.12 )
+olcAttributeTypes: {15}( 0.9.2342.19200300.100.1.22 NAME 'otherMailbox' SYNT
+ AX 1.3.6.1.4.1.1466.115.121.1.39 )
+olcAttributeTypes: {16}( 0.9.2342.19200300.100.1.26 NAME 'aRecord' EQUALITY 
+ caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {17}( 0.9.2342.19200300.100.1.27 NAME 'mDRecord' EQUALITY
+  caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {18}( 0.9.2342.19200300.100.1.28 NAME 'mXRecord' EQUALITY
+  caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {19}( 0.9.2342.19200300.100.1.29 NAME 'nSRecord' EQUALITY
+  caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {20}( 0.9.2342.19200300.100.1.30 NAME 'sOARecord' EQUALIT
+ Y caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {21}( 0.9.2342.19200300.100.1.31 NAME 'cNAMERecord' EQUAL
+ ITY caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+olcAttributeTypes: {22}( 0.9.2342.19200300.100.1.38 NAME 'associatedName' DE
+ SC 'RFC1274: DN of entry associated with domain' EQUALITY distinguishedName
+ Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+olcAttributeTypes: {23}( 0.9.2342.19200300.100.1.39 NAME 'homePostalAddress'
+  DESC 'RFC1274: home postal address' EQUALITY caseIgnoreListMatch SUBSTR ca
+ seIgnoreListSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.41 )
+olcAttributeTypes: {24}( 0.9.2342.19200300.100.1.40 NAME 'personalTitle' DES
+ C 'RFC1274: personal title' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubst
+ ringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {25}( 0.9.2342.19200300.100.1.41 NAME ( 'mobile' 'mobileT
+ elephoneNumber' ) DESC 'RFC1274: mobile telephone number' EQUALITY telephon
+ eNumberMatch SUBSTR telephoneNumberSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.
+ 115.121.1.50 )
+olcAttributeTypes: {26}( 0.9.2342.19200300.100.1.42 NAME ( 'pager' 'pagerTel
+ ephoneNumber' ) DESC 'RFC1274: pager telephone number' EQUALITY telephoneNu
+ mberMatch SUBSTR telephoneNumberSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115
+ .121.1.50 )
+olcAttributeTypes: {27}( 0.9.2342.19200300.100.1.43 NAME ( 'co' 'friendlyCou
+ ntryName' ) DESC 'RFC1274: friendly country name' EQUALITY caseIgnoreMatch 
+ SUBSTR caseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcAttributeTypes: {28}( 0.9.2342.19200300.100.1.44 NAME 'uniqueIdentifier' 
+ DESC 'RFC1274: unique identifer' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.
+ 1.1466.115.121.1.15{256} )
+olcAttributeTypes: {29}( 0.9.2342.19200300.100.1.45 NAME 'organizationalStat
+ us' DESC 'RFC1274: organizational status' EQUALITY caseIgnoreMatch SUBSTR c
+ aseIgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {30}( 0.9.2342.19200300.100.1.46 NAME 'janetMailbox' DESC
+  'RFC1274: Janet mailbox' EQUALITY caseIgnoreIA5Match SUBSTR caseIgnoreIA5S
+ ubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{256} )
+olcAttributeTypes: {31}( 0.9.2342.19200300.100.1.47 NAME 'mailPreferenceOpti
+ on' DESC 'RFC1274: mail preference option' SYNTAX 1.3.6.1.4.1.1466.115.121.
+ 1.27 )
+olcAttributeTypes: {32}( 0.9.2342.19200300.100.1.48 NAME 'buildingName' DESC
+  'RFC1274: name of building' EQUALITY caseIgnoreMatch SUBSTR caseIgnoreSubs
+ tringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{256} )
+olcAttributeTypes: {33}( 0.9.2342.19200300.100.1.49 NAME 'dSAQuality' DESC '
+ RFC1274: DSA Quality' SYNTAX 1.3.6.1.4.1.1466.115.121.1.19 SINGLE-VALUE )
+olcAttributeTypes: {34}( 0.9.2342.19200300.100.1.50 NAME 'singleLevelQuality
+ ' DESC 'RFC1274: Single Level Quality' SYNTAX 1.3.6.1.4.1.1466.115.121.1.13
+  SINGLE-VALUE )
+olcAttributeTypes: {35}( 0.9.2342.19200300.100.1.51 NAME 'subtreeMinimumQual
+ ity' DESC 'RFC1274: Subtree Mininum Quality' SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.13 SINGLE-VALUE )
+olcAttributeTypes: {36}( 0.9.2342.19200300.100.1.52 NAME 'subtreeMaximumQual
+ ity' DESC 'RFC1274: Subtree Maximun Quality' SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.13 SINGLE-VALUE )
+olcAttributeTypes: {37}( 0.9.2342.19200300.100.1.53 NAME 'personalSignature'
+  DESC 'RFC1274: Personal Signature (G3 fax)' SYNTAX 1.3.6.1.4.1.1466.115.12
+ 1.1.23 )
+olcAttributeTypes: {38}( 0.9.2342.19200300.100.1.54 NAME 'dITRedirect' DESC 
+ 'RFC1274: DIT Redirect' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.
+ 1466.115.121.1.12 )
+olcAttributeTypes: {39}( 0.9.2342.19200300.100.1.55 NAME 'audio' DESC 'RFC12
+ 74: audio (u-law)' SYNTAX 1.3.6.1.4.1.1466.115.121.1.4{25000} )
+olcAttributeTypes: {40}( 0.9.2342.19200300.100.1.56 NAME 'documentPublisher'
+  DESC 'RFC1274: publisher of document' EQUALITY caseIgnoreMatch SUBSTR case
+ IgnoreSubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+olcObjectClasses: {0}( 0.9.2342.19200300.100.4.4 NAME ( 'pilotPerson' 'newPi
+ lotPerson' ) SUP person STRUCTURAL MAY ( userid $ textEncodedORAddress $ rf
+ c822Mailbox $ favouriteDrink $ roomNumber $ userClass $ homeTelephoneNumber
+  $ homePostalAddress $ secretary $ personalTitle $ preferredDeliveryMethod 
+ $ businessCategory $ janetMailbox $ otherMailbox $ mobileTelephoneNumber $ 
+ pagerTelephoneNumber $ organizationalStatus $ mailPreferenceOption $ person
+ alSignature ) )
+olcObjectClasses: {1}( 0.9.2342.19200300.100.4.5 NAME 'account' SUP top STRU
+ CTURAL MUST userid MAY ( description $ seeAlso $ localityName $ organizatio
+ nName $ organizationalUnitName $ host ) )
+olcObjectClasses: {2}( 0.9.2342.19200300.100.4.6 NAME 'document' SUP top STR
+ UCTURAL MUST documentIdentifier MAY ( commonName $ description $ seeAlso $ 
+ localityName $ organizationName $ organizationalUnitName $ documentTitle $ 
+ documentVersion $ documentAuthor $ documentLocation $ documentPublisher ) )
+olcObjectClasses: {3}( 0.9.2342.19200300.100.4.7 NAME 'room' SUP top STRUCTU
+ RAL MUST commonName MAY ( roomNumber $ description $ seeAlso $ telephoneNum
+ ber ) )
+olcObjectClasses: {4}( 0.9.2342.19200300.100.4.9 NAME 'documentSeries' SUP t
+ op STRUCTURAL MUST commonName MAY ( description $ seeAlso $ telephonenumber
+  $ localityName $ organizationName $ organizationalUnitName ) )
+olcObjectClasses: {5}( 0.9.2342.19200300.100.4.13 NAME 'domain' SUP top STRU
+ CTURAL MUST domainComponent MAY ( associatedName $ organizationName $ descr
+ iption $ businessCategory $ seeAlso $ searchGuide $ userPassword $ locality
+ Name $ stateOrProvinceName $ streetAddress $ physicalDeliveryOfficeName $ p
+ ostalAddress $ postalCode $ postOfficeBox $ streetAddress $ facsimileTeleph
+ oneNumber $ internationalISDNNumber $ telephoneNumber $ teletexTerminalIden
+ tifier $ telexNumber $ preferredDeliveryMethod $ destinationIndicator $ reg
+ isteredAddress $ x121Address ) )
+olcObjectClasses: {6}( 0.9.2342.19200300.100.4.14 NAME 'RFC822localPart' SUP
+  domain STRUCTURAL MAY ( commonName $ surname $ description $ seeAlso $ tel
+ ephoneNumber $ physicalDeliveryOfficeName $ postalAddress $ postalCode $ po
+ stOfficeBox $ streetAddress $ facsimileTelephoneNumber $ internationalISDNN
+ umber $ telephoneNumber $ teletexTerminalIdentifier $ telexNumber $ preferr
+ edDeliveryMethod $ destinationIndicator $ registeredAddress $ x121Address )
+  )
+olcObjectClasses: {7}( 0.9.2342.19200300.100.4.15 NAME 'dNSDomain' SUP domai
+ n STRUCTURAL MAY ( ARecord $ MDRecord $ MXRecord $ NSRecord $ SOARecord $ C
+ NAMERecord ) )
+olcObjectClasses: {8}( 0.9.2342.19200300.100.4.17 NAME 'domainRelatedObject'
+  DESC 'RFC1274: an object related to an domain' SUP top AUXILIARY MUST asso
+ ciatedDomain )
+olcObjectClasses: {9}( 0.9.2342.19200300.100.4.18 NAME 'friendlyCountry' SUP
+  country STRUCTURAL MUST friendlyCountryName )
+olcObjectClasses: {10}( 0.9.2342.19200300.100.4.20 NAME 'pilotOrganization' 
+ SUP ( organization $ organizationalUnit ) STRUCTURAL MAY buildingName )
+olcObjectClasses: {11}( 0.9.2342.19200300.100.4.21 NAME 'pilotDSA' SUP dsa S
+ TRUCTURAL MAY dSAQuality )
+olcObjectClasses: {12}( 0.9.2342.19200300.100.4.22 NAME 'qualityLabelledData
+ ' SUP top AUXILIARY MUST dsaQuality MAY ( subtreeMinimumQuality $ subtreeMa
+ ximumQuality ) )
+structuralObjectClass: olcSchemaConfig
+entryUUID: 5c286ac6-7ddc-103b-9ec0-c740e015b81b
+creatorsName: cn=admin,cn=config
+createTimestamp: 20210720192809Z
+entryCSN: 20210720192809.335841Z#000000#000#000000
+modifiersName: cn=admin,cn=config
+modifyTimestamp: 20210720192809Z

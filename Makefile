@@ -1,4 +1,6 @@
-VERSION=$(shell bin/glauth64 --version)
+# This is the V1 Makefile.
+# If you need to build a V1 target, remove the next line.
+exit 0
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
 BUILD_TIME=$(shell date -u +%Y%m%d_%H%M%SZ)
@@ -26,22 +28,22 @@ include pkg/plugins/Makefile
 #####################
 
 # Build and run - used for development
-run: setup devrun cleanup
+run: setup devrun
 
 # Run the integration test on linux64 (eventually allow the binary to be set)
 test: runtest
 
 # Run build process for all binaries
-all: setup binaries verify cleanup
+all: setup binaries verify
 
 # Run build process for only linux64
-fast: setup linux64 verify cleanup
+fast: setup linux64 verify
 
 # list of binary formats to build
 binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
 
 # Setup commands to always run
-setup: bindata getdeps format
+setup: getdeps format
 
 #####################
 # Subcommands
@@ -57,13 +59,6 @@ getdeps:
 
 updatetest:
 	./scripts/ci/integration-test.sh
-
-bindata:
-	go get -u github.com/jteeuwen/go-bindata/... && ${GOPATH}/bin/go-bindata -pkg=assets -o=pkg/assets/bindata.go assets && gofmt -w pkg/assets/bindata.go
-
-
-cleanup:
-	rm pkg/assets/bindata.go
 
 format:
 	go fmt
