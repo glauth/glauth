@@ -2,15 +2,14 @@ module github.com/glauth/glauth/v2
 
 go 1.16
 
-replace github.com/nmcclain/ldap => ./misc/ldap
-
-replace github.com/hydronica/toml => ./misc/toml
+// Do not mistake /vendored for /vendor!
+replace github.com/hydronica/toml => ./vendored/toml
 
 require (
 	github.com/GeertJohan/yubigo v0.0.0-20190917122436-175bc097e60e
 	github.com/arl/statsviz v0.4.0
 	github.com/boombuler/barcode v1.0.1 // indirect
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-logr/logr v0.4.0
