@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
 	passbcrypt TEXT DEFAULT '',
 	otpsecret TEXT DEFAULT '',
 	yubikey TEXT DEFAULT '',
-    custattr TEXT DEFAULT '')
+	custattr TEXT DEFAULT '{}')
 `)
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_name on users(name)")
