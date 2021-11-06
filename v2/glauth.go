@@ -289,8 +289,30 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 			return &cfg, err
 		}
 	} else { // local config file
-		if _, err := toml.DecodeFile(configFileLocation, &cfg); err != nil {
+		md, err := toml.DecodeFile(configFileLocation, &cfg)
+		if err != nil {
 			return &cfg, err
+		}
+		// CAUTION handling md here means it is not handled in other cases see above
+		switch users := md.Mappings()["users"].(type) {
+		case []map[string]interface{}:
+			for _, mduser := range users {
+				if mduser["customattributes"] != nil {
+					for idx, cfguser := range cfg.Users {
+						if cfguser.Name == mduser["name"].(string) {
+							switch attributes := mduser["customattributes"].(type) {
+							case []map[string]interface{}:
+								cfg.Users[idx].CustomAttrs = attributes[0]
+							case map[string]interface{}:
+								cfg.Users[idx].CustomAttrs = attributes
+							default:
+								log.V(2).Info("Unknown attribute structure in config file", "attributes", attributes)
+							}
+							break
+						}
+					}
+				}
+			}
 		}
 	}
 

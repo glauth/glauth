@@ -138,3 +138,20 @@ If you have the ldap client package installed, this can be easily confirmed by r
 ldapsearch  -H ldap://localhost:3893 -D cn=hackers,ou=superheros,dc=glauth,dc=com -w dogood -x -bdc=glauth,dc=com cn=hackers
 ```
 and so on.
+
+
+### Discussion: database schema
+
+While GLAuth is not meant to support millions of user accounts, some decent performance is still expected! In fact, when searching through records using a database query, we should see a performance of O(log n) as opposed to, when searching through a flat config, O(n).
+
+While it would be friendlier to offer related attributes in `join`ed tables, we may end up re-creating a "browse" scenario unintentionally.
+
+For instance, when retrieving custom attributes, we could go through an attribute table: `custattr[userid, attribute, value#n]`
+
+However, this means that a `join` statement between the account table and the custom attribute table would yield the cartesian product of each account x attributes; we would need to iterate through the results and collate them.
+
+Alternatively, in Postgres and MySQL, we could rely on the database engine's built-in support for `crosstab` which pivots the second table's results into corresponding columns. This would not be supported in SQLite and would also mean building pretty nasty execution plans.
+
+**So, what's the decision?**
+
+In GLAuth 2.x, when including information that does not benefit from being normalized (e.g. custom attributes) we are following the "nosql" trend (irony!) of storing this data in a JSON structure.
