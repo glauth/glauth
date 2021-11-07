@@ -180,9 +180,9 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 					for _, v := range typedattr {
 						switch typedvalue := v.(type) {
 						case string:
-							values = append(values, typedvalue)
+							values = append(values, MaybeDecode(typedvalue))
 						default:
-							values = append(values, fmt.Sprintf("%v", typedvalue))
+							values = append(values, MaybeDecode(fmt.Sprintf("%v", typedvalue)))
 						}
 					}
 					attrs = append(attrs, &ldap.EntryAttribute{Name: key, Values: values})
