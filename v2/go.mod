@@ -2,6 +2,9 @@ module github.com/glauth/glauth/v2
 
 go 1.16
 
+// Do not mistake /vendored for /vendor!
+replace github.com/hydronica/toml => ./vendored/toml
+
 require (
 	github.com/GeertJohan/yubigo v0.0.0-20190917122436-175bc097e60e
 	github.com/arl/statsviz v0.4.0

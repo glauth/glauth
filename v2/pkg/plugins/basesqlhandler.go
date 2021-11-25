@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -133,7 +134,7 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	found := false
 
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey 
+			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey
 			FROM users u WHERE %s=%s`,
 		criterion,
 		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
@@ -185,7 +186,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 	}
 
 	rows, err := h.database.cnx.Query(`
-		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled 
+		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.custattr  
 		FROM users u`)
 	if err != nil {
 		return entries, err
@@ -194,16 +195,44 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 
 	var otherGroups string
 	var disabled int
+	var custattrstr string
 	u := config.User{}
 	for rows.Next() {
-		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled)
+		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled, &custattrstr)
 		if err != nil {
 			return entries, err
 		}
 		u.OtherGroups = h.commaListToTable(otherGroups)
 		u.Disabled = h.intToBool(disabled)
 
-		entries = append(entries, h.getAccount(hierarchy, u))
+		entry := h.getAccount(hierarchy, u)
+
+		if custattrstr != "{}" {
+			var r map[string]interface{}
+			err := json.Unmarshal([]byte(custattrstr), &r)
+			if err != nil {
+				return entries, err
+			}
+			for key, attr := range r {
+				switch typedattr := attr.(type) {
+				case []interface{}:
+					var values []string
+					for _, v := range typedattr {
+						switch typedvalue := v.(type) {
+						case string:
+							values = append(values, handler.MaybeDecode(typedvalue))
+						default:
+							values = append(values, handler.MaybeDecode(fmt.Sprintf("%v", typedvalue)))
+						}
+					}
+					entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: key, Values: values})
+				default:
+					h.log.V(2).Info("Unable to map custom attribute", "key", key, "value", attr)
+				}
+			}
+		}
+
+		entries = append(entries, entry)
 	}
 
 	return entries, nil

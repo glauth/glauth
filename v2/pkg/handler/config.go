@@ -171,6 +171,26 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 		if len(u.SSHKeys) > 0 {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.SSHKeyAttr, Values: u.SSHKeys})
 		}
+
+		if len(u.CustomAttrs) > 0 {
+			for key, attr := range u.CustomAttrs {
+				switch typedattr := attr.(type) {
+				case []interface{}:
+					var values []string
+					for _, v := range typedattr {
+						switch typedvalue := v.(type) {
+						case string:
+							values = append(values, MaybeDecode(typedvalue))
+						default:
+							values = append(values, MaybeDecode(fmt.Sprintf("%v", typedvalue)))
+						}
+					}
+					attrs = append(attrs, &ldap.EntryAttribute{Name: key, Values: values})
+				default:
+					h.log.V(2).Info("Unable to map custom attribute", "key", key, "value", attr)
+				}
+			}
+		}
 		var dn string
 		if hierarchy == "" {
 			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)

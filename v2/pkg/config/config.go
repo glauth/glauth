@@ -84,6 +84,7 @@ type User struct {
 	GivenName     string
 	SN            string
 	Homedir       string
+	CustomAttrs   map[string]interface{}
 }
 type Group struct {
 	Name          string

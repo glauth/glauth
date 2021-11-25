@@ -18,8 +18,10 @@ type testEnv struct {
 	otpdn                 string
 	expectedinfo          string
 	expectedaccount       string
+	scopedaccount         string
 	expectedfirstaccount  string
 	expectedgroup         string
+	checkemployeetype     string
 }
 
 func TestIntegerStuff(t *testing.T) {
@@ -36,9 +38,11 @@ func TestIntegerStuff(t *testing.T) {
 				svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
 				svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
 				otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-				expectedaccount:       "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-				expectedfirstaccount:  "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-				expectedgroup:         "dn: cn=superheros,ou=groups,dc=glauth,dc=com",
+				expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+				scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+				expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+				expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+				checkemployeetype:     "cn=hackers",
 			})
 		stopSvc(svc)
 	})
@@ -57,9 +61,11 @@ func TestIntegerStuff(t *testing.T) {
 					svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
 					svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
 					otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-					expectedaccount:       "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-					expectedfirstaccount:  "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-					expectedgroup:         "dn: cn=superheros,ou=groups,dc=glauth,dc=com",
+					expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+					scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+					expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+					expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+					checkemployeetype:     "",
 				})
 			stopSvc(svc)
 		})
@@ -80,8 +86,10 @@ func TestIntegerStuff(t *testing.T) {
 					svcdnnogroup:          "", // ignore
 					otpdn:                 "cn=otpuser,cn=superheros,ou=users,dc=glauth,dc=com",
 					expectedaccount:       "dn: cn=hackers,cn=superheros,ou=users,dc=glauth,dc=com",
+					scopedaccount:         "dn: cn=hackers,cn=superheros,dc=glauth,dc=com",
 					expectedfirstaccount:  "dn: cn=johndoe,cn=superheros,ou=users,dc=glauth,dc=com",
-					expectedgroup:         "dn: cn=superheros,ou=users,dc=glauth,dc=com",
+					expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+					checkemployeetype:     "",
 				})
 			stopSvc(svc)
 		})
@@ -138,14 +146,14 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 	})
 
 	Convey("When searching for members of the 'superheros' group", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(memberOf=cn=superheros,ou=groups,dc=glauth,dc=com)")
+		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com)")
 		Convey("We should get a list starting with the 'hackers' user", func() {
 			So(out, ShouldEqual, env.expectedfirstaccount)
 		})
 	})
 
 	Convey("When performing a complex search for members of 'superheros' group", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(&(objectClass=*)(memberOf=cn=superheros,ou=groups,dc=glauth,dc=com))")
+		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(&(objectClass=*)(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com))")
 		Convey("We should get a list starting with the 'hackers' user", func() {
 			So(out, ShouldEqual, env.expectedfirstaccount)
 		})
@@ -156,7 +164,7 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 			otpvalue := doRunGetFirst(RD, "oathtool", "--totp", "-b", "-d", "6", "3hnvnk4ycv44glzigd6s25j4dougs3rk")
 			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 			Convey("We should find them in in the 'superheros' group", func() {
-				So(out, ShouldEqual, env.expectedaccount)
+				So(out, ShouldEqual, env.scopedaccount)
 			})
 		})
 
@@ -171,6 +179,15 @@ func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
 			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 			Convey("We should get 'Invalid credentials(49)'", func() {
 				So(out, ShouldEqual, "exit status 49")
+			})
+		})
+	}
+
+	if env.checkemployeetype != "" {
+		Convey("When searching for the 'hacker' user", func() {
+			out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", env.checkemployeetype, "employeetype")
+			Convey("Employee type should be 'Intern'", func() {
+				So(out, ShouldEqual, "employeetype: Intern")
 			})
 		})
 	}
