@@ -24,9 +24,9 @@ RUN go get -d -v ./...
 
 # Build and copy final result
 RUN uname -a
-RUN if [ $(uname -m) == x86_64 ]; then make linux64 && cp ./bin/glauth64 /app/glauth; fi
-RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; fi
-RUN if [ $(uname -m) == armv7l ]; then make linuxarm32 && cp ./bin/glauth-arm32 /app/glauth; fi
+RUN if [ $(uname -m) == x86_64 ]; then make linuxamd64 && cp ./bin/linuxamd64/glauth /app/glauth; fi
+RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/linuxarm64/glauth /app/glauth; fi
+RUN if [ $(uname -m) == armv7l ]; then make linuxarm && cp ./bin/linuxarm/glauth /app/glauth; fi
 
 # Check glauth works
 RUN /app/glauth --version

@@ -33,7 +33,7 @@ jobs:
         run: make all
       - name: Output hashes to the build log
         working-directory: ./v2
-        run: cat bin/*.sha256
+        run: cat bin/*/glauth.sha256
       - name: Integration test with compiled binary
         working-directory: ./v2
         run: make test

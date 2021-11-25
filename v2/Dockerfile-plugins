@@ -25,8 +25,8 @@ RUN go get -d -v ./...
 # Build and copy final result
 RUN uname -a
 RUN uname -m
-RUN bash -c '[[ $(uname -m) == x86_64 ]] && { make linux64 && cp ./bin/glauth64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=amd64; make bin/sqlite.so bin/postgres.so bin/mysql.so && cp ./bin/*.so /app/; } || { true; }'
-RUN bash -c '[[ $(uname -m) == aarch64 ]] && { make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=arm64; make bin/sqlite.so bin/postgres.so bin/mysql.so && cp ./bin/*.so /app/; } || { true; }'
+RUN bash -c '[[ $(uname -m) == x86_64 ]] && { make linuxamd64 && cp ./bin/linuxamd64/glauth /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=amd64; make bin/linuxamd64/sqlite.so bin/linuxamd64/postgres.so bin/linuxamd64/mysql.so && cp ./bin/linuxamd64/*.so /app/; } || { true; }'
+RUN bash -c '[[ $(uname -m) == aarch64 ]] && { make linuxarm64 && cp ./bin/linuxarm64/glauth /app/glauth; export PLUGIN_OS=linux PLUGIN_ARCH=arm64; make bin/linuxarm64/sqlite.so bin/linuxarm64/postgres.so bin/linuxarm64/mysql.so && cp ./bin/linuxarm64/*.so /app/; } || { true; }'
 
 # Check glauth works
 RUN /app/glauth --version
