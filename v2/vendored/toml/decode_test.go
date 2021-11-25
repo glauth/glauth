@@ -164,25 +164,25 @@ func TestDecodeDuration(t *testing.T) {
 		Data time.Duration
 	}
 	type test struct {
-		input string
-		expected tStruct
+		input     string
+		expected  tStruct
 		shouldErr bool
 	}
 	cases := map[string]test{
 		"10s": {
-			input: `Data = "10s"`,
-			expected:tStruct{Data: 10 * time.Second},
+			input:    `Data = "10s"`,
+			expected: tStruct{Data: 10 * time.Second},
 		},
 		"1000": {
-			input: `Data = 1000`,
+			input:    `Data = 1000`,
 			expected: tStruct{Data: 1000},
 		},
 		"10m15s": {
-			input: `Data = "10m15s"`,
-			expected:tStruct{Data:10 * time.Minute + 15 * time.Second},
+			input:    `Data = "10m15s"`,
+			expected: tStruct{Data: 10*time.Minute + 15*time.Second},
 		},
 		"invalid": {
-			input: `Data = "abc"`,
+			input:     `Data = "abc"`,
 			shouldErr: true,
 		},
 	}
@@ -194,9 +194,9 @@ func TestDecodeDuration(t *testing.T) {
 		} else if !tst.shouldErr && err != nil {
 			t.Errorf("FAIL:%q unexpected error %s ", name, err)
 		} else if !reflect.DeepEqual(s, tst.expected) {
-			t.Errorf("FAIL: %q mismatch %s:%s", name,  s,tst.expected)
+			t.Errorf("FAIL: %q mismatch %s:%s", name, s, tst.expected)
 		} else {
-			t.Logf("PASS: %q",name  )
+			t.Logf("PASS: %q", name)
 		}
 	}
 }

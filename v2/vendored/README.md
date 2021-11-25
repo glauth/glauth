@@ -10,3 +10,4 @@ func (md *MetaData) Mappings() map[string]interface{} {
   return md.mapping
 }
 ```
+3. Run `gofmt -w ./` in `vendored/`
