@@ -1,4 +1,4 @@
-VERSION=$(shell bin/glauth64 --version)
+VERSION=$(shell bin/linuxamd64/glauth --version)
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
 BUILD_TIME=$(shell date -u +%Y%m%d_%H%M%SZ)
@@ -28,17 +28,17 @@ include pkg/plugins/Makefile
 # Build and run - used for development
 run: setup devrun
 
-# Run the integration test on linux64 (eventually allow the binary to be set)
+# Run the integration test on linuxamd64 (eventually allow the binary to be set)
 test: runtest
 
 # Run build process for all binaries
 all: setup binaries verify
 
-# Run build process for only linux64
-fast: setup linux64 verify
+# Run build process for only linuxamd64
+fast: setup linuxamd64 verify
 
 # list of binary formats to build
-binaries: linux32 linux64 linuxarm32 linuxarm64 darwin64 win32 win64
+binaries: linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64
 
 # Setup commands to always run
 setup: getdeps format
@@ -64,30 +64,32 @@ format:
 devrun:
 	go run ${BUILD_FILES} -c sample-simple.cfg
 
-linux32:
-	GOOS=linux GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth32 ${BUILD_FILES} && cd bin && sha256sum glauth32 > glauth32.sha256
+linux386:
+	mkdir -p bin/$@ && GOOS=linux GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
-linux64:
-	GOOS=linux GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth64 ${BUILD_FILES} && cd bin && sha256sum glauth64 > glauth64.sha256
+linuxamd64:
+	mkdir -p bin/$@ && GOOS=linux GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
-linuxarm32:
-	GOOS=linux GOARCH=arm go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-arm32 ${BUILD_FILES} && cd bin && sha256sum glauth-arm32 > glauth-arm32.sha256
+linuxarm:
+	mkdir -p bin/$@ && GOOS=linux GOARCH=arm go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
 linuxarm64:
-	GOOS=linux GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-arm64 ${BUILD_FILES} && cd bin && sha256sum glauth-arm64 > glauth-arm64.sha256
+	mkdir -p bin/$@ && GOOS=linux GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
-darwin64:
-	GOOS=darwin GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX ${BUILD_FILES} && cd bin && sha256sum glauthOSX > glauthOSX.sha256
+darwinamd64:
+	mkdir -p bin/$@ && GOOS=darwin GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
 darwinarm64:
-	GOOS=darwin GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauthOSX-arm64 ${BUILD_FILES} && cd bin && sha256sum glauthOSX-arm64 > glauthOSX-arm64.sha256
+	mkdir -p bin/$@ && GOOS=darwin GOARCH=arm64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
-win32:
-	GOOS=windows GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-win32 ${BUILD_FILES} && cd bin && sha256sum glauth-win32 > glauth-win32.sha256
+win386:
+	mkdir -p bin/$@ && GOOS=windows GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
-win64:
-	GOOS=windows GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/glauth-win64 ${BUILD_FILES} && cd bin && sha256sum glauth-win64 > glauth-win64.sha256
+winamd64:
+	mkdir -p bin/$@ && GOOS=windows GOARCH=amd64 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
 
 
 verify:
-	cd bin && sha256sum *.sha256 -c && cd ../;
+	@for binary in linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
+
+release: linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64
