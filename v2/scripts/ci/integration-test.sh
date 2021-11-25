@@ -33,14 +33,14 @@ fi
 echo "";
 echo ""
 echo "Version string of tested binary:"
-"$CI_BUILD_DIR/bin/glauth64" --version
+"$CI_BUILD_DIR/bin/linuxamd64/glauth" --version
 echo ""
 
 # Start in background, capture PID
-"$CI_BUILD_DIR/bin/glauth64" -c "$CI_BUILD_DIR/scripts/ci/test-config.cfg" &> /dev/null &
+"$CI_BUILD_DIR/bin/linuxamd64/glauth" -c "$CI_BUILD_DIR/scripts/ci/test-config.cfg" &> /dev/null &
 
 # Use this instead to see glauth logs while running
-# "$CI_BUILD_DIR/bin/glauth64" -c "$CI_BUILD_DIR/scripts/ci/test-config.cfg" &
+# "$CI_BUILD_DIR/bin/linuxamd64/glauth" -c "$CI_BUILD_DIR/scripts/ci/test-config.cfg" &
 glauthPid="$!"
 
 echo "Running glauth at PID=$glauthPid"

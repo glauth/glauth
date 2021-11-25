@@ -22,7 +22,7 @@ RUN apk add --no-cache git make busybox-static dumb-init
 # Install deps
 RUN go get -d -v ./...
 
-# Build and copy final result
+# Build and copy final result -- wrong file BTW
 RUN uname -a
 RUN if [ $(uname -m) == x86_64 ]; then make linux64 && cp ./bin/glauth64 /app/glauth; fi
 RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/glauth-arm64 /app/glauth; fi
