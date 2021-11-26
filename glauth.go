@@ -606,6 +606,30 @@ func handleArgs(cfg config.Config) (*config.Config, error) {
 		cfg.LDAPS.Key = ldapsKey
 	}
 
+	// Backward Compability
+	if cfg.Backend.Datastore != "" {
+		if cfg.Backends != nil {
+			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+		} else {
+			cfg.Backends = append(cfg.Backends, cfg.Backend)
+		}
+	}
+	spew.Dump(cfg.Backends)
+
+	// Patch with default values where not specified
+	for i := range cfg.Backends {
+		if cfg.Backends[i].NameFormat == "" {
+			cfg.Backends[i].NameFormat = "cn"
+		}
+		if cfg.Backends[i].GroupFormat == "" {
+			cfg.Backends[i].GroupFormat = "ou"
+		}
+		if cfg.Backends[i].SSHKeyAttr == "" {
+			cfg.Backends[i].SSHKeyAttr = "sshPublicKey"
+		}
+	}
+	//
+
 	return &cfg, nil
 }
 
