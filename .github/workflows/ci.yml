@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+     - dev
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        go-version: [1.16.x, 1.17.x]
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Updating packages database
+        run: sudo apt-get -qq update
+      - name: Install CLI Dependencies
+        run: sudo apt-get install -y ldap-utils oathtool
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Fetch Go dependencies
+        working-directory: ./v2
+        run: go get -t -v ./...
+      - name: Fail if a .go file hasn't been formatted with 'go fmt'
+        working-directory: ./v2
+        run: diff -u <(echo -n) <(gofmt -d ./)
+      - name: Full compile test
+        working-directory: ./v2
+        run: make all
+      - name: Output hashes to the build log
+        working-directory: ./v2
+        run: cat bin/*/glauth.sha256
+      - name: Integration test with compiled binary
+        working-directory: ./v2
+        run: make test

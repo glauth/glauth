@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: set up multiarch builder
+        working-directory: ./v2
         run: |
           set -ex
           curl -sSL https://get.docker.com | bash
@@ -35,7 +36,9 @@ jobs:
       - name: log in github registry
         run: docker login --username "${{ github.actor }}" --password "${{ secrets.GITHUB_TOKEN }}" docker.pkg.github.com
       - name: build multiarch images
-        run: docker buildx build -t docker.pkg.github.com/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):$(echo ${{ github.ref }} | tr / -) --platform linux/amd64,linux/arm64,linux/arm/v7 .
+        working-directory: ./v2
+        run: docker buildx build -f Dockerfile-standalone -t docker.pkg.github.com/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):$(echo ${{ github.ref }} | tr / -) --platform linux/amd64,linux/arm64,linux/arm/v7 .
       - name: push multiarch images
+        working-directory: ./v2
         if: github.event.release.tag_name
-        run: docker buildx build --push -t docker.pkg.github.com/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):${{ github.event.release.tag_name }} --platform linux/amd64,linux/arm64,linux/arm/v7 .
+        run: docker buildx build --push -f Dockerfile-standalone -t docker.pkg.github.com/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]'):${{ github.event.release.tag_name }} --platform linux/amd64,linux/arm64,linux/arm/v7 .

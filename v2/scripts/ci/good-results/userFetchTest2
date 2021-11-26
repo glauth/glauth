@@ -1,0 +1,23 @@
+dn: cn=serviceuser,ou=svcaccts,ou=users,dc=glauth,dc=com
+cn: serviceuser
+uid: serviceuser
+ou: svcaccts
+uidNumber: 5003
+accountStatus: active
+objectClass: posixAccount
+objectClass: shadowAccount
+loginShell: /bin/bash
+homeDirectory: /home/serviceuser
+description: serviceuser
+gecos: serviceuser
+gidNumber: 5502
+memberOf: ou=allaccs,ou=groups,dc=glauth,dc=com
+memberOf: ou=svcaccts,ou=groups,dc=glauth,dc=com
+shadowExpire: -1
+shadowFlag: 134538308
+shadowInactive: -1
+shadowLastChange: 11000
+shadowMax: 99999
+shadowMin: -1
+shadowWarning: 7
+

@@ -66,7 +66,6 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 	}
 
 	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.GetBackend().BaseDN)
 
 	h.GetLog().V(6).Info("Bind request", "binddn", bindDN, "basedn", h.GetBackend().BaseDN, "src", conn.RemoteAddr())
 
@@ -79,61 +78,9 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 		return ldap.LDAPResultSuccess, nil
 	}
 
-	var user config.User
-
-	// Special Case: bind using UPN
-	// Not using mail.ParseAddress/1 because we would allow incorrectly formatted UPNs
-	if emailmatcher.MatchString(bindDN) {
-		var foundUser bool // = false
-		foundUser, user, _ = h.FindUser(bindDN, true)
-		if !foundUser {
-			h.GetLog().V(2).Info("User not found", "userprincipalname", bindDN)
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-	} else {
-		// parse the bindDN - ensure that the bindDN ends with the BaseDN
-		if !strings.HasSuffix(bindDN, baseDN) {
-			h.GetLog().V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.GetBackend().BaseDN)
-			// h.GetLog().Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-		parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
-		groupName := ""
-		userName := ""
-		if len(parts) == 1 {
-			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-		} else if len(parts) == 2 {
-			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
-		} else {
-			h.GetLog().V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-
-		// find the user
-		var foundUser bool // = false
-		foundUser, user, _ = h.FindUser(userName, false)
-		if !foundUser {
-			h.GetLog().V(2).Info("User not found", "username", userName)
-			return ldap.LDAPResultInvalidCredentials, nil
-		}
-		// find the group
-		var group config.Group // = nil
-		var foundGroup bool    // = false
-		if groupName != "" {
-			foundGroup, group, _ = h.FindGroup(groupName)
-			if !foundGroup {
-				h.GetLog().V(2).Info("Group not found", "groupname", groupName)
-				return ldap.LDAPResultInvalidCredentials, nil
-			}
-		}
-		// validate group membership
-		if foundGroup {
-			if user.PrimaryGroup != group.GIDNumber {
-				h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
-				return ldap.LDAPResultInvalidCredentials, nil
-			}
-		}
+	user, ldapcode := l.findUser(h, bindDN, true /* checkGroup */)
+	if ldapcode != ldap.LDAPResultSuccess {
+		return ldapcode, nil
 	}
 
 	validotp := false
@@ -162,7 +109,7 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 	// in the otp check
 	untouchedBindSimplePw := bindSimplePw
 
-	// Test OTP if exists
+	// Test OTP if is exists
 	if len(user.OTPSecret) > 0 && !validotp {
 		if len(bindSimplePw) > 6 {
 			otp := bindSimplePw[len(bindSimplePw)-6:]
@@ -247,22 +194,27 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	delimitedBaseDN := "," + baseDN
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
 
-	// What if this user was bound using their UPN? We still want to enforce baseDN etc so we
-	// have to rewire them to their original DN which is of course a waste of cycles.
-	// TODO Down the road we would want to perform lightweight memoization of DNs to UPNs
-	if emailmatcher.MatchString(bindDN) {
-		foundUser, userInfo, _ := h.FindUser(bindDN, true)
-		if !foundUser {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: UPN %s could not be resolved to a DN", bindDN)
+	anonymous := len(bindDN) < 1
+
+	var boundUser *config.User
+	var ldapcode ldap.LDAPResultCode
+
+	if !anonymous {
+		boundUser, ldapcode = l.findUser(h, bindDN, false /* checkGroup */)
+		if ldapcode != ldap.LDAPResultSuccess {
+			return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Search Error: Potential bypass of BindDN %s", bindDN)
 		}
-		// cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
-		bindDN = fmt.Sprintf("cn=%s,%s", userInfo.Name, baseDN)
+		// What if this user was bound using their UPN? We still want to enforce baseDN etc so we
+		// have to rewire them to their original DN which is of course a waste of cycles.
+		// TODO Down the road we would want to perform lightweight memoization of DNs to UPNs
+		if emailmatcher.MatchString(bindDN) {
+			// cn=serviceuser,ou=svcaccts,dc=glauth,dc=com
+			bindDN = fmt.Sprintf("cn=%s,%s", boundUser.Name, baseDN)
+		}
 	}
 
 	h.GetLog().V(6).Info("Search request", "binddn", bindDN, "basedn", baseDN, "searchbasedn", searchBaseDN, "src", conn.RemoteAddr(), "scope", searchReq.Scope, "filter", searchReq.Filter)
 	stats.Frontend.Add("search_reqs", 1)
-
-	anonymous := len(bindDN) < 1
 
 	// special case: querying the root DSE
 	if searchReq.Scope == 0 && (searchBaseDN == "" || searchBaseDN == baseDN) {
@@ -331,6 +283,11 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	if !strings.HasSuffix(searchBaseDN, h.GetBackend().BaseDN) {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.GetBackend().BaseDN)
 	}
+	// Unless globally ignored, we will check that a user has capabilities allowing them to perform a search in the requested BaseDN
+	if !h.GetCfg().Behaviors.IgnoreCapabilities && !l.checkCapability(*boundUser, "search", []string{"*", searchBaseDN}) {
+		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: no capability allowing BindDN %s to perform search in %s", bindDN, searchBaseDN)
+	}
+
 	// return all users in the config file - the LDAP library will filter results for us
 	entries := []*ldap.Entry{}
 	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
@@ -356,6 +313,84 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	stats.Frontend.Add("search_successes", 1)
 	h.GetLog().V(6).Info("AP: Search OK", "filter", searchReq.Filter)
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+}
+
+func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool) (userWhenFound *config.User, resultCode ldap.LDAPResultCode) {
+
+	var user config.User
+
+	baseDN := strings.ToLower("," + h.GetBackend().BaseDN)
+
+	// Special Case: bind using UPN
+	// Not using mail.ParseAddress/1 because we would allow incorrectly formatted UPNs
+	if emailmatcher.MatchString(bindDN) {
+		var foundUser bool // = false
+		foundUser, user, _ = h.FindUser(bindDN, true)
+		if !foundUser {
+			h.GetLog().V(2).Info("User not found", "userprincipalname", bindDN)
+			return nil, ldap.LDAPResultInvalidCredentials
+		}
+	} else {
+		// parse the bindDN - ensure that the bindDN ends with the BaseDN
+		if !strings.HasSuffix(bindDN, baseDN) {
+			h.GetLog().V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.GetBackend().BaseDN)
+			// h.GetLog().Warning(fmt.Sprintf("Bind Error: BindDN %s not our BaseDN %s", bindDN, baseDN))
+			return nil, ldap.LDAPResultInvalidCredentials
+		}
+		parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
+		groupName := ""
+		userName := ""
+		if len(parts) == 1 {
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
+		} else if len(parts) == 2 {
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
+			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
+		} else {
+			h.GetLog().V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
+			return nil, ldap.LDAPResultInvalidCredentials
+		}
+
+		// find the user
+		var foundUser bool // = false
+		foundUser, user, _ = h.FindUser(userName, false)
+		if !foundUser {
+			h.GetLog().V(2).Info("User not found", "username", userName)
+			return nil, ldap.LDAPResultInvalidCredentials
+		}
+		if checkGroup {
+			// find the group
+			var group config.Group // = nil
+			var foundGroup bool    // = false
+			if groupName != "" {
+				foundGroup, group, _ = h.FindGroup(groupName)
+				if !foundGroup {
+					h.GetLog().V(2).Info("Group not found", "groupname", groupName)
+					return nil, ldap.LDAPResultInvalidCredentials
+				}
+			}
+			// validate group membership
+			if foundGroup {
+				if user.PrimaryGroup != group.GIDNumber {
+					h.GetLog().V(2).Info("primary group mismatch", "username", userName, "primarygroup", user.PrimaryGroup, "groupid", group.GIDNumber)
+					return nil, ldap.LDAPResultInvalidCredentials
+				}
+			}
+		}
+	}
+	return &user, ldap.LDAPResultSuccess
+}
+
+func (l LDAPOpsHelper) checkCapability(user config.User, action string, objects []string) bool {
+	for _, capability := range user.Capabilities {
+		if capability.Action == action {
+			for _, object := range objects {
+				if capability.Object == object {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // If your query is for, say 'objectClass', then our LDAP
@@ -395,14 +430,12 @@ func (l LDAPOpsHelper) isInTimeout(handler LDAPOpsHandler, conn net.Conn) bool {
 			failures:  make(chan failedBind, cfg.Behaviors.NumberOfFailedBinds),
 			waitUntil: now,
 		}
-		handler.GetLog().V(6).Info("CFRDBG: Created Struct", "remoteAddr", remoteAddr)
 		return false
 	}
 	// update so that this source does not get pruned
 	info.lastSeen = now
 	// if we are in a time out...
 	if cfg.Behaviors.LimitFailedBinds && info.waitUntil.After(now) {
-		handler.GetLog().V(6).Info("CFRDBG: Time Out")
 		return true
 	}
 	return false
@@ -420,15 +453,12 @@ func (l LDAPOpsHelper) maybePutInTimeout(handler LDAPOpsHandler, conn net.Conn, 
 	// if we have a failed bind...
 	if noteFailure {
 		info.failures <- failedBind{ts: time.Now()}
-		handler.GetLog().V(6).Info("CFRDBG: Failed Bind", "Count", len(info.failures))
 		// if we now have 3 failed binds in a row
 		if len(info.failures) == cfg.Behaviors.NumberOfFailedBinds {
-			handler.GetLog().V(6).Info("CFRDBG: 3 Failures")
 			// we cannot have more than 3 failed binds in our channel so pop the oldest one
 			pruned := <-info.failures
 			// if we have 3 failed bind in a row in less than 3 seconds
 			if pruned.ts.Add(cfg.Behaviors.PeriodOfFailedBinds * time.Second).After(now) {
-				handler.GetLog().V(6).Info("CFRDBG: 3 Rapid Failures")
 				// we will wait for 'n' seconds no matter what happens next
 				info.waitUntil = time.Now().Add(cfg.Behaviors.BlockFailedBindsFor * time.Second)
 				// purge our failure queue until we resume accepting operations
