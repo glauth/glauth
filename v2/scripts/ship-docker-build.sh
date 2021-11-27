@@ -18,10 +18,17 @@ prepare_image() {
     profile="$1"
     img="localhost/$(image_name $profile)"
 
+    inform "Deleting local builds to avoid future surprises."
+    rm -rf bin
+    inform "Mounting pseudo app directory to expose parent to current context."
+    mkdir -p local/app
+    sudo mount -o bind .. local/app/
     inform "Building profile: $profile container: $img"
     podman build --security-opt seccomp=scripts/docker/fastat-workaround.json -f Dockerfile-$profile -t $img
+    sudo umount local/app
 
     inform "Starting registry"
+    mkdir -p local/registry
     podman run -d --name registry -p 5000:5000 -v ./local/registry:/var/lib/registry --restart=unless-stopped registry:2
 
     inform "Pushing image to container"
