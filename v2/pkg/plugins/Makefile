@@ -29,6 +29,9 @@ plugins_darwin: plugins_darwin_amd64 plugins_darwin_arm64
 plugins_linux_amd64:
 	PLUGIN_OS=linux PLUGIN_ARCH=amd64 make plugins
 
+plugins_linux_arm64:
+	PLUGIN_OS=linux PLUGIN_ARCH=arm64 make plugins
+
 plugins_darwin_amd64:
 	PLUGIN_OS=darwin PLUGIN_ARCH=amd64 make plugins
 

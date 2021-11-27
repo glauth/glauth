@@ -11,7 +11,16 @@ REMOTE_HOST=192.168.1.36
 # Exit immediataly on error code
 set -e
 
+info() {
+  echo ""
+  echo "################################################################################"
+  echo "$1"
+  echo "################################################################################"
+  echo ""
+}
+
 remoteprepare() {
+  info "Preparing remote environment for execution"
   ssh $REMOTE_HOST mkdir -p $REMOTE_ROOT/tools
   scp $LOCAL_ROOT/tools/release.sh $REMOTE_HOST:$REMOTE_ROOT/tools/release.sh
   ssh $REMOTE_HOST chmod +x $REMOTE_ROOT/tools/release.sh
@@ -19,6 +28,7 @@ remoteprepare() {
 
 localmake() {
   branch="$1"
+  info "Building local $branch environment"
   cd $LOCAL_ROOT
   git checkout $branch
   git pull
@@ -29,11 +39,13 @@ localmake() {
 
 requestremotemake() {
   branch="$1"
+  info "Requesting remote $branch build"
   ssh -t $REMOTE_HOST GOPATH=$REMOTE_GOPATH PATH=$REMOTE_PATH:\$PATH $REMOTE_ROOT/tools/release.sh $branch iamremote
 }
 
 remotemake() {
   branch="$1"
+  info "Building remote $branch environment"
   cd $REMOTE_ROOT
   git checkout $branch
   git pull
@@ -42,6 +54,7 @@ remotemake() {
 }
 
 retrieveremote() {
+  info "Retrieving remote artifacts"
   for pkg in $(ssh $REMOTE_HOST ls $REMOTE_ROOT/bin); do
     for lib in $(ssh $REMOTE_HOST ls $REMOTE_ROOT/bin/$pkg); do
       scp $REMOTE_HOST:$REMOTE_ROOT/bin/$pkg/$lib $LOCAL_ROOT/bin/$pkg/$lib
@@ -51,6 +64,7 @@ retrieveremote() {
 }
 
 archivelocal() {
+  info "Archiving local artifacts"
   cd bin
   [[ -f *.zip ]] && rm -f *.zip
   for pkg in *; do
@@ -67,15 +81,15 @@ ACT="$1"
 
 case $ACT in
   dev)
-    remoteprepare
     localmake dev
+    remoteprepare
     requestremotemake dev
     retrieveremote
     archivelocal
     ;;
   master)
-    remoteprepare
     localmake master
+    remoteprepare
     requestremotemake master
     retrieveremote
     archivelocal
