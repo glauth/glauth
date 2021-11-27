@@ -7,8 +7,8 @@ LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@but
 
 # Setup work env
 RUN mkdir /app /tmp/gocode
-ADD . /app/
-WORKDIR /app
+ADD local/app /app/
+WORKDIR /app/v2
 
 # Required envs for GO
 ENV GOPATH=/tmp/gocode
@@ -24,12 +24,12 @@ RUN go get -d -v ./...
 
 # Build and copy final result
 RUN uname -a
-RUN if [ $(uname -m) == x86_64 ]; then make linuxamd64 && cp ./bin/linuxamd64/glauth /app/glauth; fi
-RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/linuxarm64/glauth /app/glauth; fi
-RUN if [ $(uname -m) == armv7l ]; then make linuxarm && cp ./bin/linuxarm/glauth /app/glauth; fi
+RUN if [ $(uname -m) == x86_64 ]; then make linuxamd64 && cp ./bin/linuxamd64/glauth /app/v2/glauth; fi
+RUN if [ $(uname -m) == aarch64 ]; then make linuxarm64 && cp ./bin/linuxarm64/glauth /app/v2/glauth; fi
+RUN if [ $(uname -m) == armv7l ]; then make linuxarm && cp ./bin/linuxarm/glauth /app/v2/glauth; fi
 
 # Check glauth works
-RUN /app/glauth --version
+RUN /app/v2/glauth --version
 
 #################
 # Run Step
@@ -39,11 +39,11 @@ FROM gcr.io/distroless/base-debian10 as run
 LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
 
 # Copy binary from build container
-COPY --from=build /app/glauth /app/glauth
+COPY --from=build /app/v2/glauth /app/glauth
 
 # Copy docker specific scripts from build container
-COPY --from=build /app/scripts/docker/start-standalone.sh /app/docker/
-COPY --from=build /app/scripts/docker/default-config-standalone.cfg /app/docker/
+COPY --from=build /app/v2/scripts/docker/start-standalone.sh /app/docker/
+COPY --from=build /app/v2/scripts/docker/default-config-standalone.cfg /app/docker/
 
 # Just what we need
 COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
