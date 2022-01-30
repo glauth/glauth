@@ -603,11 +603,14 @@ func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool
 		userName := ""
 		if len(parts) == 1 {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-		} else if len(parts) == 2 {
+		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == fmt.Sprintf("%s=users", h.GetBackend().GroupFormat)) {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
 			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
 		} else {
 			h.GetLog().V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
+			for _, part := range parts {
+				h.GetLog().V(2).Info("Parts", "part", part)
+			}
 			return nil, ldap.LDAPResultInvalidCredentials
 		}
 
