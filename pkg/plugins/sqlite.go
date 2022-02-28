@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -20,8 +21,36 @@ func (b SqliteBackend) GetDriverName() string {
 	return "sqlite3"
 }
 
-func (b SqliteBackend) GetPrepareSymbol() string {
-	return "?"
+func (b SqliteBackend) FindUserQuery(criterion string) string {
+	return fmt.Sprintf("SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey FROM users u WHERE %s=?", criterion)
+}
+
+func (b SqliteBackend) FindGroupQuery() string {
+	return "SELECT gidnumber FROM groups WHERE lower(name)=?"
+}
+
+func (b SqliteBackend) FindPosixAccountsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups,givenname,sn,mail,loginshell,homedirectory,disabled FROM users"
+}
+
+func (b SqliteBackend) MemoizeGroupsQuery() string {
+	return `
+		SELECT g1.name,g1.gidnumber,ig.includegroupid
+		FROM groups g1
+		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid
+		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`
+}
+
+func (b SqliteBackend) GetGroupMembersQuery() string {
+	return "SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups FROM users u WHERE lower(u.name)=?"
+}
+
+func (b SqliteBackend) GetGroupMemberIDsQuery() string {
+	return "SELECT name,uidnumber,primarygroup,passbcrypt,passsha256,otpsecret,yubikey,othergroups FROM users"
+}
+
+func (b SqliteBackend) GetUserCapabilitiesQuery() string {
+	return "SELECT action,object FROM capabilities WHERE userid=?"
 }
 
 // Create db/schema if necessary
