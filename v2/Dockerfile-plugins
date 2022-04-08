@@ -7,7 +7,7 @@ LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@but
 
 # Setup work env
 RUN mkdir /app /tmp/gocode
-ADD local/app /app/
+ADD . /app/
 WORKDIR /app/v2
 
 # Required envs for GO
