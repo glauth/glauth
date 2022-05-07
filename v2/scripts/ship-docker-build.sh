@@ -128,7 +128,7 @@ prepare_images
 while true; do
     read -p "Everything seems ok. Push to Docker registry? (y/n) " yn
     case $yn in
-        [Yy]* ) push_to_docker $TAG; break;;
+        [Yy]* ) push_to_docker $TAG; push_to_docker latest; break;;
         [Nn]* ) exit;;
     esac
 done
