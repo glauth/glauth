@@ -158,3 +158,15 @@ Alternatively, in Postgres and MySQL, we could rely on the database engine's bui
 **So, what's the decision?**
 
 In GLAuth 2.x, when including information that does not benefit from being normalized (e.g. custom attributes) we are following the "nosql" trend (irony!) of storing this data in a JSON structure.
+
+## PAM Plugin
+
+To authenticate against local users, edit the configuration file (see pkg/plugins/sample-pam.cfg) so that:
+
+```
+...
+[backend]
+  datastore = "plugin"
+  plugin = "bin/pam.so"
+...
+```
