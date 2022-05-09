@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
 	passbcrypt VARCHAR(64) DEFAULT '',
 	otpsecret VARCHAR(64) DEFAULT '',
 	yubikey VARCHAR(128) DEFAULT '',
+	sshkeys TEXT DEFAULT '',
 	custattr TEXT DEFAULT '{}')
 `)
 	statement.Exec()
@@ -56,4 +57,12 @@ CREATE TABLE IF NOT EXISTS users (
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS capabilities (id INTEGER AUTO_INCREMENT PRIMARY KEY, userid INTEGER NOT NULL, action VARCHAR(128) NOT NULL, object VARCHAR(128) NOT NULL)")
 	statement.Exec()
+}
+
+// Migrate schema if necessary
+func (b MysqlBackend) MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool) {
+	if !checker(db, "sshkeys") {
+		statement, _ := db.Prepare("ALTER TABLE users ADD COLUMN sshkeys TEXT DEFAULT ''")
+		statement.Exec()
+	}
 }
