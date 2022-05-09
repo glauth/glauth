@@ -294,7 +294,7 @@ func (l LDAPOpsHelper) Search(h LDAPOpsHandler, bindDN string, searchReq ldap.Se
 	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
 }
 
-// Returns: LDAPResultSuccess or anay ldap code returned by findUser
+// Returns: LDAPResultSuccess or any ldap code returned by findUser
 func (l LDAPOpsHelper) searchCheckBindDN(h LDAPOpsHandler, baseDN string, bindDN string, anonymous bool) (newBindDN string, boundUser *config.User, ldapresultcode ldap.LDAPResultCode) {
 	boundUser, ldapcode := l.findUser(h, bindDN, false /* checkGroup */)
 	if ldapcode != ldap.LDAPResultSuccess {

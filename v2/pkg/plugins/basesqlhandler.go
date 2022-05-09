@@ -27,6 +27,8 @@ type SqlBackend interface {
 	GetDriverName() string
 	// Create db/schema if necessary
 	CreateSchema(db *sql.DB)
+	// Migrate schema if necessary
+	MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool)
 	//
 	GetPrepareSymbol() string
 }
@@ -80,10 +82,21 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 		attmatcher:  configattributematcher}
 
 	sqlBackend.CreateSchema(db)
+	sqlBackend.MigrateSchema(db, ColumnExists)
 
 	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
+}
+
+func ColumnExists(db *sql.DB, columnName string) bool {
+	var found string
+	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM users`, columnName)).Scan(
+		&found)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (h databaseHandler) GetBackend() config.Backend {
@@ -133,30 +146,34 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	user := config.User{}
 	found := false
 
+	var disabled int
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey
+			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.disabled
 			FROM users u WHERE %s=%s`,
 		criterion,
 		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
-		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
+		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey, &disabled)
 	if err == nil {
-		found = true
+		user.Disabled = h.intToBool(disabled)
+		if !user.Disabled {
+			found = true
 
-		if !h.cfg.Behaviors.IgnoreCapabilities {
-			capability := config.Capability{}
-			rows, err := h.database.cnx.Query(fmt.Sprintf(`
+			if !h.cfg.Behaviors.IgnoreCapabilities {
+				capability := config.Capability{}
+				rows, err := h.database.cnx.Query(fmt.Sprintf(`
 				SELECT c.action,c.object
 				FROM capabilities c WHERE userid=%s`,
-				h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
-			if err == nil {
-				for rows.Next() {
-					err := rows.Scan(&capability.Action, &capability.Object)
-					if err == nil {
-						user.Capabilities = append(user.Capabilities, capability)
+					h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
+				if err == nil {
+					for rows.Next() {
+						err := rows.Scan(&capability.Action, &capability.Object)
+						if err == nil {
+							user.Capabilities = append(user.Capabilities, capability)
+						}
 					}
 				}
+				defer rows.Close()
 			}
-			defer rows.Close()
 		}
 	}
 
@@ -186,7 +203,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 	}
 
 	rows, err := h.database.cnx.Query(`
-		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.custattr  
+		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.sshkeys,u.custattr  
 		FROM users u`)
 	if err != nil {
 		return entries, err
@@ -195,15 +212,17 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 
 	var otherGroups string
 	var disabled int
+	var sshKeys string
 	var custattrstr string
 	u := config.User{}
 	for rows.Next() {
-		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled, &custattrstr)
+		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled, &sshKeys, &custattrstr)
 		if err != nil {
 			return entries, err
 		}
-		u.OtherGroups = h.commaListToTable(otherGroups)
+		u.OtherGroups = h.commaListToIntTable(otherGroups)
 		u.Disabled = h.intToBool(disabled)
+		u.SSHKeys = h.commaListToStringTable(sshKeys)
 
 		entry := h.getAccount(hierarchy, u)
 
@@ -269,7 +288,7 @@ func (h databaseHandler) intToBool(value int) bool {
 	return true
 }
 
-func (h databaseHandler) commaListToTable(commaList string) []int {
+func (h databaseHandler) commaListToIntTable(commaList string) []int {
 	if len(commaList) == 0 {
 		return make([]int, 0)
 	}
@@ -283,6 +302,13 @@ func (h databaseHandler) commaListToTable(commaList string) []int {
 		rowsAsInts[i] = iv
 	}
 	return rowsAsInts
+}
+
+func (h databaseHandler) commaListToStringTable(commaList string) []string {
+	if len(commaList) == 0 {
+		return make([]string, 0)
+	}
+	return strings.Split(commaList, ",")
 }
 
 func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
@@ -347,7 +373,7 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			members[dn] = true
 		} else {
-			u.OtherGroups = h.commaListToTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
 					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
@@ -403,7 +429,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if u.PrimaryGroup == gid {
 			members[u.Name] = true
 		} else {
-			u.OtherGroups = h.commaListToTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
 					members[u.Name] = true

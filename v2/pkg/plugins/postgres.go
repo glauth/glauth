@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
 	passbcrypt TEXT DEFAULT '',
 	otpsecret TEXT DEFAULT '',
 	yubikey TEXT DEFAULT '',
+	sshkeys TEXT DEFAULT '',
 	custattr TEXT DEFAULT '{}')
 `)
 	statement.Exec()
@@ -56,4 +57,12 @@ CREATE TABLE IF NOT EXISTS users (
 	statement.Exec()
 	statement, _ = db.Prepare("CREATE TABLE IF NOT EXISTS capabilities (id SERIAL PRIMARY KEY, userid INTEGER NOT NULL, action TEXT NOT NULL, object TEXT NOT NULL)")
 	statement.Exec()
+}
+
+// Migrate schema if necessary
+func (b PostgresBackend) MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool) {
+	if !checker(db, "sshkeys") {
+		statement, _ := db.Prepare("ALTER TABLE users ADD COLUMN sshkeys TEXT DEFAULT ''")
+		statement.Exec()
+	}
 }
