@@ -149,6 +149,17 @@ func (l LDAPOpsHelper) Bind(h LDAPOpsHandler, bindDN, bindSimplePw string, conn 
 			}
 		}
 	}
+	if user.PassAppCustom != nil {
+		err := user.PassAppCustom(user, untouchedBindSimplePw)
+		if err != nil {
+			h.GetLog().V(6).Info("Attempt to bind app custom auth failed", "binddn", bindDN, "src", conn.RemoteAddr(), "error", err.Error())
+			return ldap.LDAPResultInvalidCredentials, nil
+		} else {
+			stats.Frontend.Add("bind_successes", 1)
+			h.GetLog().V(6).Info("Bind success using app custom auth", "binddn", bindDN, "src", conn.RemoteAddr())
+			return ldap.LDAPResultSuccess, nil
+		}
+	}
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {

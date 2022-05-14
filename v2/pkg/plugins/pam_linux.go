@@ -5,22 +5,32 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"os/user"
+	"os"
+	"bufio"
+	"strconv"
 
+	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 	"github.com/msteinert/pam"
-	"os/user"
-	"os"
-	"bufio"
 )
 
 func copyBytes(x []byte) []byte {
 	y := make([]byte, len(x))
 	copy(y, x)
 	return y
+}
+
+func convertId(strId string)int {
+	id, err := strconv.Atoi(strId)
+	if err != nil {
+		return -1
+	}
+	return id
 }
 
 func (h pamHandler)localUserIds() ([]string, error) {
@@ -55,7 +65,7 @@ type GroupEntry struct {
 	MemberNames []string
 }
 
-func (h pamHandler)localGroupIds() ([]GroupEntry, error) {
+func (h pamHandler)collectAllLocalGroups() ([]GroupEntry, error) {
 	file, err := os.Open("/etc/group")
 	if err != nil {
 		return nil, err
@@ -87,69 +97,7 @@ func (h pamHandler)localGroupIds() ([]GroupEntry, error) {
 	return entries, nil
 }
 
-
-type pamHandler struct {
-	log      logr.Logger
-	cfg      *config.Config
-}
-
-func (h pamHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
-
-	h.log.V(6).Info("Bind request", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
-
-	stats.Frontend.Add("bind_reqs", 1)
-
-	// parse the bindDN - ensure that the bindDN ends with the BaseDN
-	if !strings.HasSuffix(bindDN, baseDN) {
-		h.log.V(2).Info("BindDN not part of our BaseDN", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	parts := strings.Split(strings.TrimSuffix(bindDN, baseDN), ",")
-	groupName := ""
-	userName := ""
-	if len(parts) == 1 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
-	} else if len(parts) == 2 {
-		userName = strings.TrimPrefix(parts[0], h.cfg.Backend.NameFormat+"=")
-		groupName = strings.TrimPrefix(parts[1], h.cfg.Backend.GroupFormat+"=")
-	} else {
-		h.log.V(2).Info("BindDN should have only one or two parts", "binddn", bindDN, "numparts", len(parts))
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
-	// verify the group
-	localUser, err := user.Lookup(userName)
-	if err != nil {
-		// user is unknown
-		h.log.V(2).Info("Authentication failed - no such user", "username", userName, "group", groupName, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	localGroups, err := localUser.GroupIds()
-	if err != nil {
-		// user has no groups
-		h.log.V(2).Info("Authentication failed - user without groups", "username", userName, "group", groupName, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-	matchingGroup := false
-	for _, gid := range localGroups {
-		localGroup, err := user.LookupGroupId(gid)
-		if err != nil {
-			h.log.V(6).Info("Bad group", "gid", gid, "error", err.Error())
-			continue
-		}
-    	if localGroup.Name == groupName {
-    		matchingGroup = true
-    		break
-    	}
-	}
-	if !matchingGroup {
-		// user has wrong groups
-		h.log.V(2).Info("Authentication failed - user not in group", "username", userName, "group", groupName, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
-
+func authenticateUserPAM(user *config.User, bindSimplePw string)error {
 	// Note: While there is golang bindings to interface with unix_pam (e.g. github.com/msteinert/pam),
 	//		 these have the limitation that only the user running the glauth process is able to authenticate
 	//		 unless explicitly spawned as root which is not advisable.
@@ -159,8 +107,7 @@ func (h pamHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPR
 	// One possible workaround which is fine for the time being is adding the user executing glauth to the 'shadow' group
 
 	// try to login
-	h.log.V(6).Info("Trying to authenticate", "username", userName)
-	t, err := pam.StartFunc("", userName, func(s pam.Style, msg string) (string, error) {
+	t, err := pam.StartFunc("", user.Name, func(s pam.Style, msg string) (string, error) {
 		switch s {
 		case pam.PromptEchoOff:
 			return bindSimplePw, nil
@@ -170,19 +117,35 @@ func (h pamHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPR
 		return "", errors.New("Unrecognized PAM message style")
 	})
 
-	if err != nil {
-		h.log.V(2).Info("Authentication failed", "username", userName, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
+	if err == nil {
+		err = t.Authenticate(0)
 	}
+	return err
+}
 
-	if err = t.Authenticate(0); err != nil {
-		h.log.V(2).Info("Authentication failed", "username", userName, "basedn", h.cfg.Backend.BaseDN)
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
 
-	stats.Frontend.Add("bind_successes", 1)
-	h.log.V(6).Info("Bind success", "binddn", bindDN, "basedn", h.cfg.Backend.BaseDN, "src", conn.RemoteAddr())
-	return ldap.LDAPResultSuccess, nil
+type pamHandler struct {
+	backend   config.Backend
+	log       logr.Logger
+	ldohelper handler.LDAPOpsHelper
+	cfg       *config.Config
+}
+
+func (h pamHandler) GetBackend() config.Backend {
+	return h.backend
+}
+func (h pamHandler) GetLog() logr.Logger {
+	return h.log
+}
+func (h pamHandler) GetCfg() *config.Config {
+	return h.cfg
+}
+func (h pamHandler) GetYubikeyAuth() *yubigo.YubiAuth {
+	return nil
+}
+
+func (h pamHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+	return h.ldohelper.Bind(h, bindDN, bindSimplePw, conn)
 }
 
 func (h pamHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
@@ -212,7 +175,7 @@ func (h pamHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net
 	default:
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
 	case "posixgroup":
-		groups, err := h.localGroupIds()
+		groups, err := h.collectAllLocalGroups()
 		if err != nil {
 			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: failed to enumerate users: %s", err.Error())
 		}
@@ -345,13 +308,81 @@ func (h pamHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (resu
 }
 
 // FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
-func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, user config.User, err error) {
+func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, ldapUser config.User, err error) {
 	h.log.V(6).Info("FindUser", "userName", userName, "searchByUPN", searchByUPN)
-	return false, config.User{}, nil
+	if searchByUPN {
+		h.log.V(2).Info("Searching by UPN is not supported")
+		return false, config.User{}, nil
+	}
+
+	localUser, err := user.Lookup(userName)
+	if err != nil {
+		// user is unknown
+		h.log.V(2).Info("FindUser failed - no such user", "username", userName, "error", err.Error())
+		return false, config.User{}, err
+	}
+
+	ldapUser = config.User{}
+	ldapUser.Name = localUser.Username
+	ldapUser.PassAppCustom = authenticateUserPAM
+	if len(localUser.Name) > 0 {
+		ldapUser.GivenName = localUser.Name
+	} else {
+		ldapUser.GivenName = localUser.Username
+	}
+	ldapUser.PrimaryGroup = convertId(localUser.Gid)
+	ldapUser.Disabled = false
+	ldapUser.UnixID = convertId(localUser.Uid)
+	ldapUser.UIDNumber = convertId(localUser.Uid)
+	ldapUser.Homedir = localUser.HomeDir
+
+	localGroups, err := localUser.GroupIds()
+	if err == nil {
+		ldapUser.OtherGroups = make([]int, len(localGroups))
+		for index, gid := range localGroups {
+			ldapUser.OtherGroups[index] = convertId(gid)
+		}
+	} else {
+		// user has no groups
+		h.log.V(2).Info("FindUser - user without groups", "username", userName, "error", err.Error())
+	}
+
+	return true, ldapUser, nil
 }
 
 func (h pamHandler) FindGroup(groupName string) (found bool, group config.Group, err error) {
+	allLocalGroups, err := h.collectAllLocalGroups()
+	if err != nil {
+		h.log.V(2).Info("FindGroup - failed to enumerate groups", "error", err.Error())
+	}
+	for _, g := range allLocalGroups {
+		localGroup, err := user.LookupGroupId(g.Gid)
+		if err != nil {
+			h.log.V(6).Info("FindGroup - bad group", "gid", g.Gid, "error", err.Error())
+			continue
+		}
+
+		if localGroup.Name != groupName {
+			continue
+		}
+
+		ldapGroup := config.Group{}
+		ldapGroup.Name = localGroup.Name
+		ldapGroup.UnixID = convertId(localGroup.Gid)
+		ldapGroup.GIDNumber = convertId(localGroup.Gid)
+		return true, ldapGroup, nil
+	}
 	return false, config.Group{}, nil
+}
+
+func (h pamHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
+	entries := []*ldap.Entry{}
+	return entries, nil
+}
+
+func (h pamHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+	entries := []*ldap.Entry{}
+	return entries, nil
 }
 
 func (h pamHandler) Close(boundDN string, conn net.Conn) error {
@@ -362,7 +393,9 @@ func NewPamHandler(opts ...handler.Option) handler.Handler {
 	options := handler.NewOptions(opts...)
 
 	return pamHandler{
-		log:      options.Logger,
-		cfg:      options.Config,
-	}
+		backend:   options.Backend,
+		log:       options.Logger,
+		ldohelper: options.LDAPHelper,
+		cfg:       options.Config,
+	} 
 }

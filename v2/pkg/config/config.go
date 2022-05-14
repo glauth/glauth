@@ -64,6 +64,7 @@ type Capability struct {
 	Action string
 	Object string
 }
+type UserAuthenticator func(user *User, pw string)error
 type User struct {
 	Name          string
 	OtherGroups   []int
@@ -71,6 +72,7 @@ type User struct {
 	PassBcrypt    string
 	PassAppSHA256 []string
 	PassAppBcrypt []string
+	PassAppCustom UserAuthenticator
 	PrimaryGroup  int
 	Capabilities  []Capability
 	SSHKeys       []string
