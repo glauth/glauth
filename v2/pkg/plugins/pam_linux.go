@@ -13,7 +13,6 @@ import (
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
-	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 	"github.com/msteinert/pam"
@@ -149,147 +148,7 @@ func (h pamHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPR
 }
 
 func (h pamHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
-	bindDN = strings.ToLower(bindDN)
-	baseDN := strings.ToLower("," + h.cfg.Backend.BaseDN)
-	searchBaseDN := strings.ToLower(searchReq.BaseDN)
-	h.log.V(6).Info("Search request", "bindDN", bindDN, "baseDN", baseDN, "searchBaseDN", searchBaseDN, "src", conn.RemoteAddr(), "filter", searchReq.Filter)
-	stats.Frontend.Add("search_reqs", 1)
-
-	// validate the user is authenticated and has appropriate access
-	if len(bindDN) < 1 {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
-	}
-	if !strings.HasSuffix(bindDN, baseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.cfg.Backend.BaseDN)
-	}
-	if len(searchBaseDN) > 0 && !strings.HasSuffix(searchBaseDN, h.cfg.Backend.BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.cfg.Backend.BaseDN)
-	}
-	// return all users known in the system - the LDAP library will filter results for us
-	entries := []*ldap.Entry{}
-	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
-	if err != nil {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter)
-	}
-	switch filterEntity {
-	default:
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: unhandled filter type: %s [%s]", filterEntity, searchReq.Filter)
-	case "posixgroup":
-		groups, err := h.collectAllLocalGroups()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: failed to enumerate users: %s", err.Error())
-		}
-		for _, g := range groups {
-			localGroup, err := user.LookupGroupId(g.Gid)
-			if err != nil {
-				h.log.V(6).Info("Bad group", "gid", g.Gid, "error", err.Error())
-				continue
-			}
-			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{localGroup.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{localGroup.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", localGroup.Name)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%s", localGroup.Gid)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
-
-			var memberNames []string
-			var memberUids []string
-			for _, name := range g.MemberNames {
-				localUser, err := user.Lookup(name)
-				if err != nil {
-					h.log.V(6).Info("Bad user", "name", name, "group", localGroup.Name, "error", err.Error())
-					continue
-				}
-				primaryGroup, err := user.LookupGroupId(localUser.Gid)
-				if err != nil {
-					h.log.V(6).Info("User without primary group", "name", name, "gid", localUser.Gid, "error", err.Error())
-					continue
-				}
-				dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Username, h.cfg.Backend.GroupFormat, primaryGroup.Name, h.cfg.Backend.BaseDN)
-				memberNames = append(memberNames, dn)
-				memberUids = append(memberUids, localUser.Username)
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: memberNames})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: memberUids})
-
-			dn := fmt.Sprintf("cn=%s,%s=groups,%s", localGroup.Name, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
-			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
-		}
-	case "posixaccount", "shadowaccount", "":
-		users, err := h.localUserIds()
-		if err != nil {
-			return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: failed to enumerate users: %s", err.Error())
-		}
-		for _, u := range users {
-			localUser, err := user.LookupId(u)
-			if err != nil {
-				h.log.V(6).Info("Bad user", "uid", u, "error", err.Error())
-				continue
-			}
-			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{localUser.Username}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{localUser.Username}})
-
-			if len(localUser.Name) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{localUser.Name}})
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "displayName", Values: []string{localUser.Name}})
-			} else {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{localUser.Username}})
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "displayName", Values: []string{localUser.Username}})
-			}
-
-			localGroup, err := user.LookupGroupId(localUser.Gid)
-			if err != nil {
-				h.log.V(6).Info("Bad primary group", "user", localUser.Username, "gid", localUser.Gid, "error", err.Error())
-				continue
-			}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{localGroup.Name}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{localUser.Uid}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "accountStatus", Values: []string{"active"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount", "shadowAccount"}})
-
-			if len(localUser.HomeDir) > 0 {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{localUser.HomeDir}})
-			} else {
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{"/home/" + localUser.Username}})
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", localUser.Username)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "gecos", Values: []string{fmt.Sprintf("%s", localUser.Username)}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{localUser.Gid}})
-
-			var localGroupDns []string
-			localGroups, err := localUser.GroupIds()
-			if err == nil {
-				for _, gid := range localGroups {
-					userGroup, err := user.LookupGroupId(gid)
-					if err != nil {
-						h.log.V(6).Info("Bad group", "gid", gid, "error", err.Error())
-						continue
-					}
-					dn := fmt.Sprintf("cn=%s,%s=groups,%s", userGroup.Name, h.cfg.Backend.GroupFormat, h.cfg.Backend.BaseDN)
-					//dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Name, h.cfg.Backend.GroupFormat, userGroup.Name, h.cfg.Backend.BaseDN)
-					localGroupDns = append(localGroupDns, dn)
-				}
-				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: localGroupDns})
-			}
-
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowExpire", Values: []string{"-1"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowFlag", Values: []string{"134538308"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowInactive", Values: []string{"-1"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowLastChange", Values: []string{"11000"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowMax", Values: []string{"99999"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowMin", Values: []string{"-1"}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowWarning", Values: []string{"7"}})
-
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Username, h.cfg.Backend.GroupFormat, localGroup.Name, h.cfg.Backend.BaseDN)
-			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
-		}
-	}
-	stats.Frontend.Add("search_successes", 1)
-	h.log.V(6).Info("AP: Search OK", "filter", searchReq.Filter)
-	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	return h.ldohelper.Search(h, bindDN, searchReq, conn)
 }
 
 // Add is not yet supported for the pam backend
@@ -335,6 +194,8 @@ func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, lda
 	ldapUser.UnixID = convertId(localUser.Uid)
 	ldapUser.UIDNumber = convertId(localUser.Uid)
 	ldapUser.Homedir = localUser.HomeDir
+	searchCapability := config.Capability{ Action:"search", Object:"*" }
+	ldapUser.Capabilities = []config.Capability{ searchCapability} // TODO: Make this configurable
 
 	localGroups, err := localUser.GroupIds()
 	if err == nil {
@@ -375,13 +236,115 @@ func (h pamHandler) FindGroup(groupName string) (found bool, group config.Group,
 	return false, config.Group{}, nil
 }
 
-func (h pamHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h pamHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+	groups, err := h.collectAllLocalGroups()
+	if err != nil {
+		return nil, err
+	}
 	entries := []*ldap.Entry{}
+	for _, g := range groups {
+		localGroup, err := user.LookupGroupId(g.Gid)
+		if err != nil {
+			h.log.V(6).Info("Bad group", "gid", g.Gid, "error", err.Error())
+			continue
+		}
+		attrs := []*ldap.EntryAttribute{}
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{localGroup.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{localGroup.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{localGroup.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{localGroup.Gid}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
+
+		var memberNames []string
+		var memberUids []string
+		for _, name := range g.MemberNames {
+			localUser, err := user.Lookup(name)
+			if err != nil {
+				h.log.V(6).Info("Bad user", "name", name, "group", localGroup.Name, "error", err.Error())
+				continue
+			}
+			primaryGroup, err := user.LookupGroupId(localUser.Gid)
+			if err != nil {
+				h.log.V(6).Info("User without primary group", "name", name, "gid", localUser.Gid, "error", err.Error())
+				continue
+			}
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Username, h.cfg.Backend.GroupFormat, primaryGroup.Name, h.cfg.Backend.BaseDN)
+			memberNames = append(memberNames, dn)
+			memberUids = append(memberUids, localUser.Username)
+		}
+
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: memberNames})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: memberUids})
+
+		dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.cfg.Backend.GroupFormat, localGroup.Name, h.cfg.Backend.BaseDN)
+		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
+	}
 	return entries, nil
 }
 
-func (h pamHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h pamHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
+	users, err := h.localUserIds()
+	if err != nil {
+		return nil, err
+	}
 	entries := []*ldap.Entry{}
+	for _, u := range users {
+		localUser, err := user.LookupId(u)
+		if err != nil {
+			h.log.V(6).Info("Bad user", "uid", u, "error", err.Error())
+			continue
+		}
+		attrs := []*ldap.EntryAttribute{}
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{localUser.Username}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{localUser.Username}})
+
+		if len(localUser.Name) > 0 {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{localUser.Name}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "displayName", Values: []string{localUser.Name}})
+		} else {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{localUser.Username}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "displayName", Values: []string{localUser.Username}})
+		}
+
+		localGroup, err := user.LookupGroupId(localUser.Gid)
+		if err != nil {
+			h.log.V(6).Info("Bad primary group", "user", localUser.Username, "gid", localUser.Gid, "error", err.Error())
+			continue
+		}
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{localGroup.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{localUser.Uid}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "accountStatus", Values: []string{"active"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount"}})
+
+		if len(localUser.HomeDir) > 0 {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{localUser.HomeDir}})
+		} else {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{"/home/" + localUser.Username}})
+		}
+
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", localUser.Username)}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "gecos", Values: []string{fmt.Sprintf("%s", localUser.Username)}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{localUser.Gid}})
+
+		var localGroupDns []string
+		localGroups, err := localUser.GroupIds()
+		if err == nil {
+			for _, gid := range localGroups {
+				userGroup, err := user.LookupGroupId(gid)
+				if err != nil {
+					h.log.V(6).Info("Bad group", "gid", gid, "error", err.Error())
+					continue
+				}
+				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.cfg.Backend.GroupFormat, userGroup.Name, h.cfg.Backend.BaseDN)
+				//dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Name, h.cfg.Backend.GroupFormat, userGroup.Name, h.cfg.Backend.BaseDN)
+				localGroupDns = append(localGroupDns, dn)
+			}
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: localGroupDns})
+		}
+
+		dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.cfg.Backend.NameFormat, localUser.Username, h.cfg.Backend.GroupFormat, localGroup.Name, h.cfg.Backend.BaseDN)
+		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
+	}
 	return entries, nil
 }
 
