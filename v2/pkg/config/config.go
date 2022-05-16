@@ -65,6 +65,8 @@ type Capability struct {
 	Action string
 	Object string
 }
+
+// UserAuthenticator authenticates a user via custom auth from a backend
 type UserAuthenticator func(user *User, pw string) error
 type User struct {
 	Name          string
