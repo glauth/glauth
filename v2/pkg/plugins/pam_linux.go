@@ -1,21 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"net"
-	"strings"
-	"os/user"
 	"os"
-	"bufio"
+	"os/user"
 	"strconv"
+	"strings"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/go-logr/logr"
-	"github.com/nmcclain/ldap"
 	"github.com/msteinert/pam"
+	"github.com/nmcclain/ldap"
 )
 
 func copyBytes(x []byte) []byte {
@@ -24,7 +24,7 @@ func copyBytes(x []byte) []byte {
 	return y
 }
 
-func convertId(strId string)int {
+func convertId(strId string) int {
 	id, err := strconv.Atoi(strId)
 	if err != nil {
 		return -1
@@ -32,7 +32,7 @@ func convertId(strId string)int {
 	return id
 }
 
-func (h pamHandler)localUserIds() ([]string, error) {
+func (h pamHandler) localUserIds() ([]string, error) {
 	file, err := os.Open("/etc/passwd")
 	if err != nil {
 		return nil, err
@@ -60,11 +60,11 @@ func (h pamHandler)localUserIds() ([]string, error) {
 }
 
 type GroupEntry struct {
-	Gid string
+	Gid         string
 	MemberNames []string
 }
 
-func (h pamHandler)collectAllLocalGroups() ([]GroupEntry, error) {
+func (h pamHandler) collectAllLocalGroups() ([]GroupEntry, error) {
 	file, err := os.Open("/etc/group")
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (h pamHandler)collectAllLocalGroups() ([]GroupEntry, error) {
 		}
 		// prefer FieldsFunc over Split so that we drop empty entries
 		splitMembersFunc := func(c rune) bool {
-	        return c == ','
+			return c == ','
 		}
 		members := strings.FieldsFunc(fs[len(fs)-1], splitMembersFunc)
 		entries = append(entries, GroupEntry{fs[2], members})
@@ -96,7 +96,7 @@ func (h pamHandler)collectAllLocalGroups() ([]GroupEntry, error) {
 	return entries, nil
 }
 
-func authenticateUserPAM(user *config.User, bindSimplePw string)error {
+func authenticateUserPAM(user *config.User, bindSimplePw string) error {
 	// Note: While there is golang bindings to interface with unix_pam (e.g. github.com/msteinert/pam),
 	//		 these have the limitation that only the user running the glauth process is able to authenticate
 	//		 unless explicitly spawned as root which is not advisable.
@@ -122,12 +122,11 @@ func authenticateUserPAM(user *config.User, bindSimplePw string)error {
 	return err
 }
 
-
 type pamHandler struct {
-	backend   config.Backend
-	log       logr.Logger
-	ldohelper handler.LDAPOpsHelper
-	cfg       *config.Config
+	backend      config.Backend
+	log          logr.Logger
+	ldohelper    handler.LDAPOpsHelper
+	cfg          *config.Config
 	capSearchGid string
 }
 
@@ -182,8 +181,7 @@ func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, lda
 		return false, config.User{}, err
 	}
 
-
-	searchCapability := config.Capability{ Action:"search", Object:"*" }
+	searchCapability := config.Capability{Action: "search", Object: "*"}
 	ldapUser = config.User{}
 	ldapUser.Name = localUser.Username
 	ldapUser.PassAppCustom = authenticateUserPAM
@@ -365,16 +363,16 @@ func NewPamHandler(opts ...handler.Option) handler.Handler {
 	// determine which gid gets search capability
 	localGroup, err := user.LookupGroup(options.Backend.GroupWithSearchCapability)
 	if err != nil {
-		options.Logger.Error(err, "Failed to resolve handler.groupWithSearchCapability: No such group '" + options.Backend.GroupWithSearchCapability + "'")
+		options.Logger.Error(err, "Failed to resolve handler.groupWithSearchCapability: No such group '"+options.Backend.GroupWithSearchCapability+"'")
 	} else {
 		options.Logger.V(6).Info("Members of group '" + options.Backend.GroupWithSearchCapability + "' will get search capability")
 	}
 
 	return pamHandler{
-		backend:   options.Backend,
-		log:       options.Logger,
-		ldohelper: options.LDAPHelper,
-		cfg:       options.Config,
+		backend:      options.Backend,
+		log:          options.Logger,
+		ldohelper:    options.LDAPHelper,
+		cfg:          options.Config,
 		capSearchGid: localGroup.Gid,
-	} 
+	}
 }

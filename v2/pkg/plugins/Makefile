@@ -35,7 +35,7 @@ plugins_linux_amd64:
 	PLUGIN_OS=linux PLUGIN_ARCH=amd64 make plugins plugin_pam
 
 plugins_linux_arm64:
-	PLUGIN_OS=linux PLUGIN_ARCH=arm64 make plugins plugin_pam
+	PLUGIN_OS=linux PLUGIN_ARCH=arm64 make plugins
 
 plugins_darwin_amd64:
 	PLUGIN_OS=darwin PLUGIN_ARCH=amd64 make plugins
