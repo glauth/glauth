@@ -128,6 +128,7 @@ type pamHandler struct {
 	log       logr.Logger
 	ldohelper handler.LDAPOpsHelper
 	cfg       *config.Config
+	capSearchGid string
 }
 
 func (h pamHandler) GetBackend() config.Backend {
@@ -181,6 +182,8 @@ func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, lda
 		return false, config.User{}, err
 	}
 
+
+	searchCapability := config.Capability{ Action:"search", Object:"*" }
 	ldapUser = config.User{}
 	ldapUser.Name = localUser.Username
 	ldapUser.PassAppCustom = authenticateUserPAM
@@ -190,18 +193,22 @@ func (h pamHandler) FindUser(userName string, searchByUPN bool) (found bool, lda
 		ldapUser.GivenName = localUser.Username
 	}
 	ldapUser.PrimaryGroup = convertId(localUser.Gid)
+	if localUser.Gid == h.capSearchGid {
+		ldapUser.Capabilities = []config.Capability{searchCapability}
+	}
 	ldapUser.Disabled = false
 	ldapUser.UnixID = convertId(localUser.Uid)
 	ldapUser.UIDNumber = convertId(localUser.Uid)
 	ldapUser.Homedir = localUser.HomeDir
-	searchCapability := config.Capability{ Action:"search", Object:"*" }
-	ldapUser.Capabilities = []config.Capability{ searchCapability} // TODO: Make this configurable
 
 	localGroups, err := localUser.GroupIds()
 	if err == nil {
 		ldapUser.OtherGroups = make([]int, len(localGroups))
 		for index, gid := range localGroups {
 			ldapUser.OtherGroups[index] = convertId(gid)
+			if gid == h.capSearchGid {
+				ldapUser.Capabilities = []config.Capability{searchCapability}
+			}
 		}
 	} else {
 		// user has no groups
@@ -355,10 +362,19 @@ func (h pamHandler) Close(boundDN string, conn net.Conn) error {
 func NewPamHandler(opts ...handler.Option) handler.Handler {
 	options := handler.NewOptions(opts...)
 
+	// determine which gid gets search capability
+	localGroup, err := user.LookupGroup(options.Backend.GroupWithSearchCapability)
+	if err != nil {
+		options.Logger.Error(err, "Failed to resolve handler.groupWithSearchCapability: No such group '" + options.Backend.GroupWithSearchCapability + "'")
+	} else {
+		options.Logger.V(6).Info("Members of group '" + options.Backend.GroupWithSearchCapability + "' will get search capability")
+	}
+
 	return pamHandler{
 		backend:   options.Backend,
 		log:       options.Logger,
 		ldohelper: options.LDAPHelper,
 		cfg:       options.Config,
+		capSearchGid: localGroup.Gid,
 	} 
 }
