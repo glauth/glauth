@@ -339,7 +339,25 @@ By default, this query will return a very minimal schema (~5 objects) -- you can
 
 RFC 4511: "A list containing only the OID "1.1" indicates that no attributes are to be returned."
 
-## Stargazers over time
+# Contributing
+
+## Releasing
+
+Run `./scripts/release.sh`
+
+### Here is what this script does:
+
+On a local Linux system (mandatory):
+
+1. `localmake` -> `release` -> all `linux` and `win` targets
+2. `localmake` -> `plugins` -> all plugins on `linux` targets
+
+On a remote MacOS system:
+
+1. `remotemake` -> `release_darwin` -> all `darwin` targets
+2. `remotemake` -> `plugins_darwin` -> all plugins on `darwin` targets
+
+# Stargazers over time
 
 [![Stargazers over time](https://starchart.cc/glauth/glauth.svg)](https://starchart.cc/glauth/glauth)
 
