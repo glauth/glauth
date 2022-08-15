@@ -170,3 +170,15 @@ To authenticate against local users, edit the configuration file (see pkg/plugin
   plugin = "bin/pam.so"
 ...
 ```
+
+When building this plugin, one must first ensure that the proper development headers are installed. For instance, on Ubuntu:
+```
+sudo apt-get install libpam0g-dev
+```
+
+You will likely also wish to tweak the `groupWithSearchCapability` setting, to assign an appropriate secondary group.
+
+Then, to perform a search:
+```
+ldapsearch -LLL -H ldap://localhost:3893 -D cn=<unix user name>,ou=<a group the user belongs to>,dc=glauth,dc=com -w <unix user password> -x -bdc=glauth,dc=com  cn=<unix user name>
+```
