@@ -30,7 +30,7 @@ jobs:
         run: diff -u <(echo -n) <(gofmt -d ./)
       - name: Full compile test
         working-directory: ./v2
-        run: make all
+        run: make fast
       - name: Output hashes to the build log
         working-directory: ./v2
         run: cat bin/*/glauth.sha256
