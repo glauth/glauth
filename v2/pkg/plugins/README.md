@@ -158,3 +158,27 @@ Alternatively, in Postgres and MySQL, we could rely on the database engine's bui
 **So, what's the decision?**
 
 In GLAuth 2.x, when including information that does not benefit from being normalized (e.g. custom attributes) we are following the "nosql" trend (irony!) of storing this data in a JSON structure.
+
+## PAM Plugin
+
+To authenticate against local users, edit the configuration file (see pkg/plugins/sample-pam.cfg) so that:
+
+```
+...
+[backend]
+  datastore = "plugin"
+  plugin = "bin/pam.so"
+...
+```
+
+When building this plugin, one must first ensure that the proper development headers are installed. For instance, on Ubuntu:
+```
+sudo apt-get install libpam0g-dev
+```
+
+You will likely also wish to tweak the `groupWithSearchCapability` setting, to assign an appropriate secondary group.
+
+Then, to perform a search:
+```
+ldapsearch -LLL -H ldap://localhost:3893 -D cn=<unix user name>,ou=<a group the user belongs to>,dc=glauth,dc=com -w <unix user password> -x -bdc=glauth,dc=com  cn=<unix user name>
+```

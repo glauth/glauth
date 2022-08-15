@@ -35,7 +35,7 @@ test: runtest
 all: setup binaries verify
 
 # Run build process for only linuxamd64
-fast: setup linuxamd64 verify
+fast: setup linuxamd64
 
 # list of binary formats to build
 binaries: linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64
