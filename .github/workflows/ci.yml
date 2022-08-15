@@ -19,7 +19,7 @@ jobs:
       - name: Updating packages database
         run: sudo apt-get -qq update
       - name: Install CLI Dependencies
-        run: sudo apt-get install -y ldap-utils oathtool
+        run: sudo apt-get install -y ldap-utils oathtool libpam0g-dev
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Fetch Go dependencies
