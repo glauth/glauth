@@ -19,7 +19,7 @@ BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
 
 # Plugins
-include pkg/plugins/Makefile
+include pkg/plugins/*/Makefile
 
 #####################
 # High level commands
