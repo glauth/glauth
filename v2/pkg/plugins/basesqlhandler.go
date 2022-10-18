@@ -1,4 +1,4 @@
-package main
+package plugins
 
 import (
 	"database/sql"
@@ -581,5 +581,3 @@ func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry
 	}
 	return &ldap.Entry{dn, attrs}
 }
-
-func main() {}
