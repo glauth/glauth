@@ -97,7 +97,7 @@ release_darwin: darwinamd64 darwinarm64
 
 pull-plugin:
 	@git submodule add $U $M && \
-	bash -c "for pkg in $(cat $M/go.mod | awk '/^require [a-z]/ {print $2}'); do grep $pkg go.mod &>/dev/null; [ $? -ne 0 ] && { go get $pkg; }; done"
+	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
 pull-plugins:
 	@U=https://github.com/glauth/glauth-sqlite M=pkg/plugins/glauth-sqlite make pull-plugin && \
@@ -108,7 +108,8 @@ pull-plugins:
 forget-plugin:
 	rm -rf $M ../.git/modules/v2/$M && \
 	git config --remove-section submodule.v2/$M && \
-	git rm --cache $M
+	git rm --cache $M && \
+	go mod tidy
 
 forget-plugins:
 	@M=pkg/plugins/glauth-sqlite make forget-plugin && \
@@ -121,3 +122,6 @@ testxgo:
 
 testxgo3:
 	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth-plugin -buildvcs=false -buildmode=plugin --targets=linux/amd64 --pkg pkg/plugins/glauth-sqlite/sqlite.go .
+
+testxgo4:
+	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth-plugin -buildvcs=false -buildmode=plugin --targets=linux/amd64 --pkg pkg/plugins/glauth-mysql/mysql.go .
