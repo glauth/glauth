@@ -18,6 +18,10 @@ BUILD_VARS=-s -w -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH}
 BUILD_FILES=glauth.go
 TRIM_FLAGS=-gcflags "all=-trimpath=${PWD}" -asmflags "all=-trimpath=${PWD}"
 
+# Targets
+MAIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
+PLUGIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
+
 # Plugins
 include pkg/plugins/*/Makefile
 
@@ -91,15 +95,11 @@ winamd64:
 verify:
 	@for binary in linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
-release: linux386 linuxamd64 linuxarm linuxarm64 win386 winamd64
-
-release_darwin: darwinamd64 darwinarm64
-
 pull-plugin:
 	@git submodule add $U $M && \
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
-pull-plugins:
+pull-base-plugins:
 	@U=https://github.com/glauth/glauth-sqlite M=pkg/plugins/glauth-sqlite make pull-plugin && \
 	U=https://github.com/glauth/glauth-mysql M=pkg/plugins/glauth-mysql make pull-plugin && \
 	U=https://github.com/glauth/glauth-postgres M=pkg/plugins/glauth-postgres make pull-plugin && \
@@ -112,16 +112,18 @@ forget-plugin:
 	go mod tidy
 
 forget-plugins:
-	@M=pkg/plugins/glauth-sqlite make forget-plugin && \
-	M=pkg/plugins/glauth-mysql make forget-plugin && \
-	M=pkg/plugins/glauth-postgres make forget-plugin && \
-	M=pkg/plugins/glauth-pam make forget-plugin
+	for pkg in pkg/plugins/*/go.mod; do\
+		P=$$(echo $$pkg | cut -d'/' -f 3) M=$$(dirname $$pkg) make forget-plugin;\
+	done
 
-testxgo:
-	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth -buildvcs=false --targets=linux/amd64 .
+release:
+	@go -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
 
-testxgo3:
-	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth-plugin -buildvcs=false -buildmode=plugin --targets=linux/amd64 --pkg pkg/plugins/glauth-sqlite/sqlite.go .
+releaseplugin:
+	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
+	(cd bin && for lib in $$(ls $$P-*); do mv $$lib $$lib.so; done)
 
-testxgo4:
-	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth-plugin -buildvcs=false -buildmode=plugin --targets=linux/amd64 --pkg pkg/plugins/glauth-mysql/mysql.go .
+releaseplugins:
+	@for pkg in pkg/plugins/*/go.mod; do\
+		P=$$(echo $$pkg | cut -d'/' -f 3) && make release-$$P;\
+	done
