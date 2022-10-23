@@ -1,0 +1,12 @@
+[submodule "v2/pkg/plugins/glauth-sqlite"]
+	path = v2/pkg/plugins/glauth-sqlite
+	url = https://github.com/glauth/glauth-sqlite
+[submodule "v2/pkg/plugins/glauth-mysql"]
+	path = v2/pkg/plugins/glauth-mysql
+	url = https://github.com/glauth/glauth-mysql
+[submodule "v2/pkg/plugins/glauth-postgres"]
+	path = v2/pkg/plugins/glauth-postgres
+	url = https://github.com/glauth/glauth-postgres
+[submodule "v2/pkg/plugins/glauth-pam"]
+	path = v2/pkg/plugins/glauth-pam
+	url = https://github.com/glauth/glauth-pam

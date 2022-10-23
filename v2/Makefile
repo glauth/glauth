@@ -94,3 +94,30 @@ verify:
 release: linux386 linuxamd64 linuxarm linuxarm64 win386 winamd64
 
 release_darwin: darwinamd64 darwinarm64
+
+pull-plugin:
+	@git submodule add $U $M && \
+	bash -c "for pkg in $(cat $M/go.mod | awk '/^require [a-z]/ {print $2}'); do grep $pkg go.mod &>/dev/null; [ $? -ne 0 ] && { go get $pkg; }; done"
+
+pull-plugins:
+	@U=https://github.com/glauth/glauth-sqlite M=pkg/plugins/glauth-sqlite make pull-plugin && \
+	U=https://github.com/glauth/glauth-mysql M=pkg/plugins/glauth-mysql make pull-plugin && \
+	U=https://github.com/glauth/glauth-postgres M=pkg/plugins/glauth-postgres make pull-plugin && \
+	U=https://github.com/glauth/glauth-pam M=pkg/plugins/glauth-pam make pull-plugin
+
+forget-plugin:
+	rm -rf $M ../.git/modules/v2/$M && \
+	git config --remove-section submodule.v2/$M && \
+	git rm --cache $M
+
+forget-plugins:
+	@M=pkg/plugins/glauth-sqlite make forget-plugin && \
+	M=pkg/plugins/glauth-mysql make forget-plugin && \
+	M=pkg/plugins/glauth-postgres make forget-plugin && \
+	M=pkg/plugins/glauth-pam make forget-plugin
+
+testxgo:
+	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth -buildvcs=false --targets=linux/amd64 .
+
+testxgo3:
+	xgo -v -ldflags="${BUILD_VARS}" -go 1.18.1 -out glauth-plugin -buildvcs=false -buildmode=plugin --targets=linux/amd64 --pkg pkg/plugins/glauth-sqlite/sqlite.go .
