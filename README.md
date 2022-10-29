@@ -7,8 +7,6 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 ![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
 ![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
 
-![Docker Automated build](https://img.shields.io/docker/automated/glauth/glauth)
-
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/dev)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/glauth/glauth)
 
@@ -21,6 +19,14 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
+<hr>
+
+### Documentation
+
+<h4 align="center">:point_right: The latest version of GLauth's documentation is available at https://glauth.github.io/ :point_left:</h4>
+
+<hr>
+
 ### Contributing
 - Please base all Pull Requests on [dev](https://github.com/glauth/glauth/tree/dev), not master.
 - Format your code autonmatically using `gofmt -d ./` before committing
@@ -29,7 +35,7 @@ Use it to centralize account management across your Linux servers, your OSX mach
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
 
 1. Download a precompiled binary from the [releases](https://github.com/glauth/glauth/releases) page.
-2. Download the [example config file](https://github.com/glauth/glauth/blob/master/sample-simple.cfg).
+2. Download the [example config file](https://raw.githubusercontent.com/glauth/glauth/master/v2/sample-simple.cfg).
 3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
    - `./glauth64 -c sample-simple.cfg`
 4. Test with traditional LDAP tools
@@ -47,9 +53,17 @@ Note - makefile uses git data to inject build-time variables. For best results, 
 
 *make run* - wrapper for the 'go run' command, setting up the needed tooling
 
-*make plugins* - build additional (SQL) plugin backends
+*make pull-base-plugins* - add base plugins code as submodules for local build
+
+*make forget-plugins* - remove all plugins from current tree
 
 *make test* - run the integration test on linux64 binary
+
+*make releaseplugins* - build app plugins that we pulled locally
+
+*make releasedocker* - build main and plugins, push to docker hub
+
+*make testdocker* - quick docker sanity check
 
 ### Usage:
 ```

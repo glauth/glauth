@@ -13,12 +13,8 @@ require (
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-logr/logr v0.4.0
-	github.com/go-sql-driver/mysql v1.5.0
 	github.com/hydronica/toml v0.4.2
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
-	github.com/lib/pq v1.10.0
-	github.com/mattn/go-sqlite3 v1.14.6
-	github.com/msteinert/pam v1.0.0
 	github.com/nmcclain/ldap v0.0.0-20210720162743-7f8d1e44eeba
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pquerna/otp v1.3.0
