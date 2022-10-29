@@ -116,8 +116,8 @@ forget-plugins:
 		P=$$(echo $$pkg | cut -d'/' -f 3) M=$$(dirname $$pkg) make forget-plugin;\
 	done
 
-release:
-	@go -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
+releasemain:
+	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
 
 releaseplugin:
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
@@ -127,3 +127,70 @@ releaseplugins:
 	@for pkg in pkg/plugins/*/go.mod; do\
 		P=$$(echo $$pkg | cut -d'/' -f 3) && make release-$$P;\
 	done
+
+releasedockermain:
+	$(if $(TAG),,$(error Must set TAG))
+	$(if $(REPO),,$(error Must set REPO - glauth or other))
+	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
+	cp -f bin/glauth-linux-amd64 docker/assets/linux/amd64/glauth && \
+	cp -f bin/glauth-linux-arm64 docker/assets/linux/arm64/glauth && \
+	cp -f bin/glauth-linux-arm-7 docker/assets/linux/arm/v7/glauth && \
+	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
+
+releasedockerplugins:
+	$(if $(TAG),,$(error Must set TAG))
+	$(if $(REPO),,$(error Must set REPO - glauth or other))
+	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
+	cp -f bin/sqlite-linux-amd64.so docker/assets/linux/amd64/sqlite.so && \
+	cp -f bin/sqlite-linux-arm64.so docker/assets/linux/arm64/sqlite.so && \
+	cp -f bin/sqlite-linux-arm-7.so docker/assets/linux/arm/v7/sqlite.so && \
+	cp -f bin/mysql-linux-amd64.so docker/assets/linux/amd64/mysql.so && \
+	cp -f bin/mysql-linux-arm64.so docker/assets/linux/arm64/mysql.so && \
+	cp -f bin/mysql-linux-arm-7.so docker/assets/linux/arm/v7/mysql.so && \
+	cp -f bin/postgres-linux-amd64.so docker/assets/linux/amd64/postgres.so && \
+	cp -f bin/postgres-linux-arm64.so docker/assets/linux/arm64/postgres.so && \
+	cp -f bin/postgres-linux-arm-7.so docker/assets/linux/arm/v7/postgres.so && \
+	docker buildx build --tag $$REPO/glauth-plugins:$$TAG -t $$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
+
+releasedocker: releasedockermain releasedockerplugins
+
+testdocker:
+	$(if $(REPO),,$(error Must set REPO - glauth or other))
+	@echo "==> Cleaning up any existing image to be on the safe side..." && \
+	(for image in $$(docker image ls -q "$$REPO/glauth*"); do \
+		for container in $$(docker container ls -a -q -f ancestor=$$image); do \
+			docker stop $$container; \
+			while [ "$$(docker container ls -q -f ancestor=$$image)" != "" ]; do sleep 1; done; \
+			docker rm $$container; \
+		done; \
+		docker rmi $$image; \
+	done) && \
+	echo "==> Running glauth main container..." && \
+	docker run -d --name glauth-test -p 3893:3893 $$REPO/glauth:latest && \
+	sleep 5 && \
+	if [ "$$(ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers | grep posixAccount)" != "" ]; then \
+		echo "Checked: Glauth is responding properly to ldapsearch query."; \
+	else \
+		echo "glauth check did not pass. Aborting."; \
+		exit 1; \
+	fi && \
+	echo "==> Stopping glauth main container..." && \
+	docker stop glauth-test && \
+	while [ "$$(docker ps -q -f name=glauth-test)" != "" ]; do sleep 1; done; \
+	docker rm glauth-test && \
+	echo "==> Running glauth plugins container..." && \
+	docker run -d --name glauth-test -p 3893:3893 $$REPO/glauth-plugins:latest && \
+	sleep 5 && \
+	if [ "$$(ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers | grep posixAccount)" != "" ]; then \
+		echo "Checked: Glauth is responding properly to ldapsearch query."; \
+	else \
+		echo "glauth check did not pass. Aborting."; \
+		exit 1; \
+	fi && \
+	echo "==> Stopping glauth plugins container..." && \
+	docker stop glauth-test  && \
+	while [ "$$(docker ps -q -f name=glauth-test)" != "" ]; do sleep 1; done; \
+	docker rm glauth-test && \
+	echo "==> Testing complete."
+
+.PHONY: all run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins releasemain releaseplugin release releaseplugins releasedockermain releaserdockerplugins releasedocker testdocker
