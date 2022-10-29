@@ -23,7 +23,7 @@ Use it to centralize account management across your Linux servers, your OSX mach
 
 ### Documentation
 
-<h4 align="center">:point_right: The latest version of GLauth's documentation is available at [https://glauth.github.io/](https://glauth.github.io/) :point_left:</h4>
+<h4 align="center">:point_right: The latest version of GLauth's documentation is available at https://glauth.github.io/ :point_left:</h4>
 
 <hr>
 
