@@ -245,7 +245,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 					}
 					entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: key, Values: values})
 				default:
-					h.log.Info().Str("key", key).Interface("value", attr).Msg("Unable to map custom attribute")
+					h.log.Warn().Str("key", key).Interface("value", attr).Msg("Unable to map custom attribute")
 				}
 			}
 		}
@@ -441,7 +441,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.Info().Msg(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+					h.log.Warn().Msg(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 
