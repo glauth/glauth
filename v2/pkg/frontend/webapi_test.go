@@ -3,12 +3,12 @@ package frontend
 import (
 	"bytes"
 	"crypto/sha256"
+	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
-
-	"github.com/go-logr/logr"
 
 	"github.com/glauth/glauth/v2/pkg/assets"
 )
@@ -90,7 +90,8 @@ func TestAPI(t *testing.T) {
 	}
 
 	mux := http.NewServeMux()
-	register(mux, logr.Discard())
+	log := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
+	register(mux, log, true, "0.0.0.0:5555")
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	for _, tc := range tt {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
 	"net"
 	"os"
 	"regexp"
@@ -16,7 +17,6 @@ import (
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 )
 
@@ -40,7 +40,7 @@ type database struct {
 
 type databaseHandler struct {
 	backend     config.Backend
-	log         logr.Logger
+	log         *zerolog.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 	sqlBackend  SqlBackend
@@ -50,19 +50,18 @@ type databaseHandler struct {
 	attmatcher  *regexp.Regexp
 }
 
-// func NewDatabaseHandler_deprecated(log *logging.Logger, cfg *config.Config, yubikeyAuth *yubigo.YubiAuth, sqlBackend SqlBackend) handler.Handler {
 func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.Handler {
 	options := handler.NewOptions(opts...)
 
 	// Note: we will never terminate this connection pool.
 	db, err := sql.Open(sqlBackend.GetDriverName(), options.Backend.Database)
 	if err != nil {
-		options.Logger.Error(err, "Unable to open SQL database named '%s' error: %s", options.Backend.Database)
+		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to open SQL database named '%s'", options.Backend.Database))
 		os.Exit(1)
 	}
 	err = db.Ping()
 	if err != nil {
-		options.Logger.Error(err, "Unable to communicate with SQL database error: %s", options.Backend.Database)
+		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to communicate with SQL database error: %s", options.Backend.Database))
 		os.Exit(1)
 	}
 
@@ -84,7 +83,7 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	sqlBackend.CreateSchema(db)
 	sqlBackend.MigrateSchema(db, ColumnExists)
 
-	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
+	options.Logger.Info().Msg("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
 }
@@ -102,7 +101,7 @@ func ColumnExists(db *sql.DB, columnName string) bool {
 func (h databaseHandler) GetBackend() config.Backend {
 	return h.backend
 }
-func (h databaseHandler) GetLog() logr.Logger {
+func (h databaseHandler) GetLog() *zerolog.Logger {
 	return h.log
 }
 func (h databaseHandler) GetCfg() *config.Config {
@@ -246,7 +245,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 					}
 					entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: key, Values: values})
 				default:
-					h.log.V(2).Info("Unable to map custom attribute", "key", key, "value", attr)
+					h.log.Info().Str("key", key).Interface("value", attr).Msg("Unable to map custom attribute")
 				}
 			}
 		}
@@ -442,7 +441,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.V(3).Info(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+					h.log.Info().Msg(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 

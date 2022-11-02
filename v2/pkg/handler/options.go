@@ -2,10 +2,10 @@ package handler
 
 import (
 	"context"
+	"github.com/rs/zerolog"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
-	"github.com/go-logr/logr"
 )
 
 // Option defines a single option function.
@@ -15,7 +15,7 @@ type Option func(o *Options)
 type Options struct {
 	Backend    config.Backend
 	Handlers   HandlerWrapper
-	Logger     logr.Logger
+	Logger     *zerolog.Logger
 	Config     *config.Config
 	Context    *context.Context
 	YubiAuth   *yubigo.YubiAuth
@@ -34,7 +34,7 @@ func newOptions(opts ...Option) Options {
 	return opt
 }
 
-// newOptions initializes the available default options.
+// NewOptions initializes the available default options.
 func NewOptions(opts ...Option) Options {
 	opt := Options{}
 
@@ -52,7 +52,7 @@ func Backend(val config.Backend) Option {
 	}
 }
 
-// Our friendly handlers for all backends
+// Handlers Our friendly handlers for all backends
 func Handlers(val HandlerWrapper) Option {
 	return func(o *Options) {
 		o.Handlers = val
@@ -60,7 +60,7 @@ func Handlers(val HandlerWrapper) Option {
 }
 
 // Logger provides a function to set the logger option.
-func Logger(val logr.Logger) Option {
+func Logger(val *zerolog.Logger) Option {
 	return func(o *Options) {
 		o.Logger = val
 	}
@@ -87,14 +87,14 @@ func YubiAuth(val *yubigo.YubiAuth) Option {
 	}
 }
 
-// If we specified a helper, for instance for OTP injection
+// Helper If we specified a helper, for instance for OTP injection
 func Helper(val Handler) Option {
 	return func(o *Options) {
 		o.Helper = val
 	}
 }
 
-// Global LDAP Handler
+// LDAPHelper Global LDAP Handler
 func LDAPHelper(val LDAPOpsHelper) Option {
 	return func(o *Options) {
 		o.LDAPHelper = val

@@ -3,29 +3,28 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/GeertJohan/yubigo"
 	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
-	gologgingr "github.com/glauth/glauth/v2/pkg/gologgingr"
 	"github.com/glauth/glauth/v2/pkg/server"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/go-logr/logr"
 	"github.com/hydronica/toml"
 	"github.com/jinzhu/copier"
-	logging "github.com/op/go-logging"
+	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
+	"io"
+	"io/ioutil"
+	"log/syslog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
 )
 
 // Set with buildtime vars
@@ -59,9 +58,8 @@ Options:
 `
 
 var (
-	log      logr.Logger
+	log      zerolog.Logger
 	args     map[string]interface{}
-	stderr   *logging.LogBackend
 	yubiAuth *yubigo.YubiAuth
 
 	activeConfig = &config.Config{}
@@ -110,17 +108,17 @@ func getVersionString() string {
 }
 
 func main() {
-	stderr = initLogging()
-	log.V(6).Info("AP start")
-
 	if err := parseArgs(); err != nil {
-		log.Error(err, "Could not parse command-line arguments")
+		fmt.Println("Could not parse command-line arguments")
+		fmt.Println(err)
 		os.Exit(1)
 	}
 	if err := doConfig(); err != nil {
-		log.Error(err, "Configuration file error")
+		fmt.Println("Configuration file error")
+		fmt.Println(err)
 		os.Exit(1)
 	}
+	log.Info().Msg("AP start")
 
 	startService()
 }
@@ -131,7 +129,7 @@ func startService() {
 
 	// web API
 	if activeConfig.API.Enabled {
-		log.V(6).Info("Web API enabled")
+		log.Info().Msg("Web API enabled")
 
 		if activeConfig.API.Internals {
 			statsviz.Register(
@@ -154,7 +152,7 @@ func startService() {
 		server.Config(activeConfig),
 	)
 	if err != nil {
-		log.Error(err, "Could not create server")
+		log.Error().Err(err).Msg("could not create server")
 		os.Exit(1)
 	}
 
@@ -164,13 +162,13 @@ func startService() {
 
 		if shouldBlock {
 			if err := s.ListenAndServe(); err != nil {
-				log.Error(err, "Could not start LDAP server")
+				log.Error().Err(err).Msg("could not start LDAP server")
 				os.Exit(1)
 			}
 		} else {
 			go func() {
 				if err := s.ListenAndServe(); err != nil {
-					log.Error(err, "Could not start LDAP server")
+					log.Error().Err(err).Msg("could not start LDAP server")
 					os.Exit(1)
 				}
 			}()
@@ -180,12 +178,12 @@ func startService() {
 	if activeConfig.LDAPS.Enabled {
 		// Always block here
 		if err := s.ListenAndServeTLS(); err != nil {
-			log.Error(err, "Could not start LDAPS server")
+			log.Error().Err(err).Msg("could not start LDAPS server")
 			os.Exit(1)
 		}
 	}
 
-	log.V(0).Info("AP exit")
+	log.Info().Msg("AP exit")
 	os.Exit(1)
 }
 
@@ -197,7 +195,7 @@ func startConfigWatcher() {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Error(err, "Could not start config-watcher")
+		log.Error().Err(err).Msg("could not start config-watcher")
 		return
 	}
 
@@ -207,28 +205,28 @@ func startConfigWatcher() {
 		for {
 			select {
 			case event := <-watcher.Events:
-				log.V(6).Info("watcher got event", "e", event.Op.String())
+				log.Info().Str("e", event.Op.String()).Msg("watcher got event")
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					isChanged = true
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
 					isChanged, isRemoved = true, true
 				}
 			case err := <-watcher.Errors:
-				log.Error(err, "Error!")
+				log.Error().Err(err).Msg("watcher error")
 			case <-ticker.C:
 				// wakeup, try finding removed config
 			}
 			if _, err := os.Stat(configFileLocation); !os.IsNotExist(err) && (isRemoved || isChanged) {
 				if isRemoved {
-					log.V(6).Info("rewatching config", "file", configFileLocation)
+					log.Info().Str("file", configFileLocation).Msg("rewatching config")
 					watcher.Add(configFileLocation) // overwrite
 					isChanged, isRemoved = true, false
 				}
 				if isChanged {
 					if err := doConfig(); err != nil {
-						log.V(2).Info("Could not reload config. Holding on to old config", "error", err.Error())
+						log.Info().Err(err).Msg("Could not reload config. Holding on to old config")
 					} else {
-						log.V(3).Info("Config was reloaded")
+						log.Info().Msg("Config was reloaded")
 					}
 					isChanged = false
 				}
@@ -262,7 +260,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
 		if _, present := aws.Regions[args["-r"].(string)]; present == false {
-			return &cfg, fmt.Errorf("Invalid AWS region: %s", args["-r"])
+			return &cfg, fmt.Errorf("invalid AWS region: %s", args["-r"])
 		}
 		region := aws.Regions[args["-r"].(string)]
 		auth, err := aws.EnvAuth()
@@ -279,7 +277,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 		s3url := strings.TrimPrefix(configFileLocation, "s3://")
 		parts := strings.SplitN(s3url, "/", 2)
 		if len(parts) != 2 {
-			return &cfg, fmt.Errorf("Invalid S3 URL: %s", s3url)
+			return &cfg, fmt.Errorf("invalid S3 URL: %s", s3url)
 		}
 		b, err := s3.New(auth, region).Bucket(parts[0])
 		if err != nil {
@@ -295,7 +293,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	} else { // local config file
 		fInfo, err := os.Stat(configFileLocation)
 		if err != nil {
-			return &cfg, fmt.Errorf("Non-existent config path: %s", configFileLocation)
+			return &cfg, fmt.Errorf("non-existent config path: %s", configFileLocation)
 		}
 
 		var md toml.MetaData
@@ -364,7 +362,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 							case map[string]interface{}:
 								cfg.Users[idx].CustomAttrs = attributes
 							default:
-								log.V(2).Info("Unknown attribute structure in config file", "attributes", attributes)
+								log.Info().Interface("attributes", attributes).Msg("Unknown attribute structure in config file")
 							}
 							break
 						}
@@ -378,7 +376,7 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 	// Backward Compability
 	if cfg.Backend.Datastore != "" {
 		if cfg.Backends != nil {
-			return &cfg, fmt.Errorf("You cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
+			return &cfg, fmt.Errorf("you cannot specify both [Backend] and [[Backends]] directives in the same configuration ")
 		} else {
 			cfg.Backends = append(cfg.Backends, cfg.Backend)
 		}
@@ -410,11 +408,11 @@ func mergeConfigs(config1 interface{}, config2 interface{}) error {
 			//fmt.Println(strings.Repeat("     ", depth), " - A map")
 			element2, ok := cfg2.(map[string]interface{})
 			if !ok {
-				return fmt.Errorf("Config source: %s is not a map", keyName)
+				return fmt.Errorf("config source: %s is not a map", keyName)
 			}
 			element1, ok := cfg1.(*map[string]interface{})
 			if !ok {
-				return fmt.Errorf("Config dest: %s is not a map", keyName)
+				return fmt.Errorf("config dest: %s is not a map", keyName)
 			}
 			for k, _ := range element2 {
 				//fmt.Println(strings.Repeat("     ", depth), "  - key: ", k)
@@ -437,7 +435,7 @@ func mergeConfigs(config1 interface{}, config2 interface{}) error {
 							}
 							(*element1)[k] = asamapptr
 						} else {
-							return fmt.Errorf("Config dest: %s does not make a valid map/array ptr", keyName)
+							return fmt.Errorf("config dest: %s does not make a valid map/array ptr", keyName)
 						}
 					}
 				}
@@ -446,12 +444,12 @@ func mergeConfigs(config1 interface{}, config2 interface{}) error {
 			//fmt.Println(strings.Repeat("     ", depth), " - An array")
 			element2, ok := cfg2.([]map[string]interface{})
 			if !ok {
-				return fmt.Errorf("Config source: %s is not a map array", keyName)
+				return fmt.Errorf("config source: %s is not a map array", keyName)
 			}
 			//fmt.Println(strings.Repeat("     ", depth), "  - element2: ", element2)
 			element1, ok := cfg1.(*[]map[string]interface{})
 			if !ok {
-				return fmt.Errorf("Config dest: %s is not a map array", keyName)
+				return fmt.Errorf("config dest: %s is not a map array", keyName)
 			}
 			//fmt.Println(strings.Repeat("     ", depth), "  - element1: ", element1)
 			for index, _ := range element2 {
@@ -461,24 +459,24 @@ func mergeConfigs(config1 interface{}, config2 interface{}) error {
 			//fmt.Println(strings.Repeat("     ", depth), " - A string")
 			element2, ok := cfg2.(string)
 			if !ok {
-				return fmt.Errorf("Config: %s is not a string", keyName)
+				return fmt.Errorf("config: %s is not a string", keyName)
 			}
 		case bool:
 			//fmt.Println(strings.Repeat("     ", depth), " - A boolean")
 			element2, ok := cfg2.(bool)
 			if !ok {
-				return fmt.Errorf("Config: %s is not a boolean value", keyName)
+				return fmt.Errorf("config: %s is not a boolean value", keyName)
 			}
 		case float64:
 			//fmt.Println(strings.Repeat("     ", depth), " - A float64")
 			element2, ok := cfg2.(float64)
 			if !ok {
-				return fmt.Errorf("Config: %s is not a float64 value", keyName)
+				return fmt.Errorf("config: %s is not a float64 value", keyName)
 			}
 		case nil:
 			//fmt.Println(strings.Repeat("     ", depth), " - Nil")
 		default:
-			log.V(2).Info("Unknown element type found in configuration file. Ignoring.", "type", reflect.TypeOf(element2))
+			log.Info().Str("type", reflect.TypeOf(element2).String()).Msg("Unknown element type found in configuration file. Ignoring.")
 		}
 		return nil
 	}
@@ -499,12 +497,12 @@ func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error
 		case map[string]interface{}:
 			element2, ok := cfg2.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf("Config: %s is not a map", keyName)
+				return nil, fmt.Errorf("config: %s is not a map", keyName)
 			}
 			for k, value2 := range element2 {
 				value1, ok := element1[k]
 				if !ok {
-					return nil, fmt.Errorf("Config: %s not found in at least one config file", k)
+					return nil, fmt.Errorf("config: %s not found in at least one config file", k)
 				}
 				merged, err := merger(depth+1, k, value1, value2)
 				if err != nil {
@@ -516,7 +514,7 @@ func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error
 		case string:
 			element2, ok := cfg2.(string)
 			if !ok {
-				return nil, fmt.Errorf("Config: %s is not a string", keyName)
+				return nil, fmt.Errorf("config: %s is not a string", keyName)
 			}
 			if element2 != "" {
 				element1 = element2
@@ -525,7 +523,7 @@ func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error
 		case bool:
 			element2, ok := cfg2.(bool)
 			if !ok {
-				return nil, fmt.Errorf("Config: %s is not a boolean value", keyName)
+				return nil, fmt.Errorf("config: %s is not a boolean value", keyName)
 			}
 			if element2 {
 				element1 = true
@@ -534,7 +532,7 @@ func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error
 		case float64:
 			element2, ok := cfg2.(float64)
 			if !ok {
-				return nil, fmt.Errorf("Config: %s is not a float64 value", keyName)
+				return nil, fmt.Errorf("config: %s is not a float64 value", keyName)
 			}
 			if element2 != 0 {
 				element1 = element2
@@ -552,13 +550,13 @@ func mergeConfigsO(config1 interface{}, config2 interface{}) (interface{}, error
 					if ok {
 						returnElement = element3
 					} else {
-						log.V(2).Info("Unexpected interface type for an assignment. Ignoring.")
+						log.Info().Msg("Unexpected interface type for an assignment. Ignoring.")
 						returnElement = element1
 					}
 				}
 			}
 		default:
-			log.V(2).Info("Unknown element type found in configuration file. Ignoring.", "type", reflect.TypeOf(element1))
+			log.Info().Str("type", reflect.TypeOf(element1).String()).Msg("Unknown element type found in configuration file. Ignoring.")
 			returnElement = element1
 		}
 		fmt.Println(strings.Repeat("    ", depth), "Done with element: ", keyName, " for: ", returnElement)
@@ -633,12 +631,12 @@ func handleArgs(cfg config.Config) (*config.Config, error) {
 func handleLegacyConfig(cfg config.Config) (*config.Config, error) {
 	if len(cfg.Frontend.Listen) > 0 && (len(cfg.LDAP.Listen) > 0 || len(cfg.LDAPS.Listen) > 0) {
 		// Both old server-config and new - dont allow
-		return &cfg, fmt.Errorf("Both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
+		return &cfg, fmt.Errorf("both old and new server-config in use - please remove old format ([frontend]) and migrate to new format ([ldap], [ldaps])")
 	}
 
 	if len(cfg.Frontend.Listen) > 0 {
 		// We're going with old format - parse it into new
-		log.V(2).Info("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
+		log.Info().Msg("Config [frontend] is deprecated - please move to [ldap] and [ldaps] as-per documentation")
 
 		cfg.LDAP.Enabled = !cfg.Frontend.TLS
 		cfg.LDAPS.Enabled = cfg.Frontend.TLS
@@ -661,7 +659,7 @@ func handleLegacyConfig(cfg config.Config) (*config.Config, error) {
 func validateConfig(cfg config.Config) (*config.Config, error) {
 
 	if !cfg.LDAP.Enabled && !cfg.LDAPS.Enabled {
-		return &cfg, fmt.Errorf("No server configuration found: please provide either LDAP or LDAPS configuration")
+		return &cfg, fmt.Errorf("no server configuration found: please provide either LDAP or LDAPS configuration")
 	}
 
 	if cfg.LDAPS.Enabled {
@@ -671,14 +669,14 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 		}
 
 		if len(cfg.LDAPS.Listen) == 0 {
-			return &cfg, fmt.Errorf("No LDAPS bind address was specified: please disable LDAPS or use the 'listen' option")
+			return &cfg, fmt.Errorf("no LDAPS bind address was specified: please disable LDAPS or use the 'listen' option")
 		}
 	}
 
 	if cfg.LDAP.Enabled {
 		// LDAP enabled - verify listen
 		if len(cfg.LDAP.Listen) == 0 {
-			return &cfg, fmt.Errorf("No LDAP bind address was specified: please disable LDAP or use the 'listen' option")
+			return &cfg, fmt.Errorf("no LDAP bind address was specified: please disable LDAP or use the 'listen' option")
 		}
 	}
 
@@ -700,13 +698,13 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 	for _, user := range cfg.Users {
 		if user.UnixID != 0 {
 			user.UIDNumber = user.UnixID
-			log.V(2).Info(fmt.Sprintf("User '%s': 'unixid' is deprecated - please move to 'uidnumber' as per documentation", user.Name))
+			log.Info().Msg(fmt.Sprintf("User '%s': 'unixid' is deprecated - please move to 'uidnumber' as per documentation", user.Name))
 		}
 	}
 	for _, group := range cfg.Groups {
 		if group.UnixID != 0 {
 			group.GIDNumber = group.UnixID
-			log.V(2).Info(fmt.Sprintf("Group '%s': 'unixid' is deprecated - please move to 'gidnumber' as per documentation", group.Name))
+			log.Info().Msg(fmt.Sprintf("Group '%s': 'unixid' is deprecated - please move to 'gidnumber' as per documentation", group.Name))
 		}
 	}
 
@@ -758,50 +756,48 @@ func doConfig() error {
 
 	// Handle logging settings for new config
 	// - we do this last to make sure we only respect a fully validated config
-	stderr = initLogging()
+	initLogging(activeConfig.Debug, activeConfig.Syslog)
 
 	if activeConfig.Debug {
-		logging.SetLevel(logging.DEBUG, programName)
-		log.V(6).Info("Debugging enabled")
+		log.Info().Msg("Debugging enabled")
 	}
 	if activeConfig.Syslog {
-		enableSyslog(stderr)
+		log.Info().Msg("Syslog enabled")
 	}
 
 	return nil
 }
 
 // initLogging sets up logging to stderr
-func initLogging() *logging.LogBackend {
-
-	l := logging.MustGetLogger(programName)
-	l.ExtraCalldepth = 2 // add extra call depth for the logr wrapper
-
-	log = gologgingr.New(
-		gologgingr.Logger(l),
-	)
-	gologgingr.SetVerbosity(10) // do not filter by verbosity. glauth uses the go-logging lib to filter the levels
-
-	format := "%{color}%{time:15:04:05.000000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}"
-	logBackend := logging.NewLogBackend(os.Stderr, "", 0)
-
-	logging.SetBackend(logBackend)
-	logging.SetLevel(logging.NOTICE, programName)
-	logging.SetFormatter(logging.MustStringFormatter(format))
-	return logBackend
-}
-
-// enableSyslog turns on syslog and turns off color
-func enableSyslog(stderrBackend *logging.LogBackend) {
-	format := "%{time:15:04:05.000000} %{shortfunc} ▶ %{level:.4s} %{id:03x} %{message}"
-	logging.SetFormatter(logging.MustStringFormatter(format))
-	syslogBackend, err := logging.NewSyslogBackend("")
-	if err != nil {
-		log.Error(err, "Could not create new syslog backend")
-		os.Exit(1)
+func initLogging(reqdebug bool, reqsyslog bool) {
+	var level zerolog.Level
+	if reqdebug {
+		level = zerolog.DebugLevel
+	} else {
+		level = zerolog.InfoLevel
 	}
 
-	logging.SetBackend(stderrBackend, syslogBackend)
+	var mainWriter io.Writer
+	if true {
+		// This is the inefficient writer
+		mainWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}
+	} else {
+		// Vroom vroom
+		mainWriter = os.Stderr
+	}
 
-	log.V(6).Info("Syslog enabled")
+	if reqsyslog {
+		s, err := syslog.New(syslog.LOG_INFO, "glauth")
+		if err != nil {
+			fmt.Println("Unable to write to syslog: ignoring...")
+			reqsyslog = false
+		} else {
+			writers := zerolog.MultiLevelWriter(mainWriter, zerolog.SyslogLevelWriter(s))
+			log = zerolog.New(writers).Level(level).With().Timestamp().Logger()
+		}
+	}
+
+	if !reqsyslog {
+		log = zerolog.New(mainWriter).Level(level).With().Timestamp().Logger()
+	}
 }

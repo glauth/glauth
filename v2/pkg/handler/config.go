@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"net"
 	"regexp"
 	"sort"
@@ -10,13 +11,12 @@ import (
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 )
 
 type configHandler struct {
 	backend     config.Backend
-	log         logr.Logger
+	log         *zerolog.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 	ldohelper   LDAPOpsHelper
@@ -41,7 +41,7 @@ func NewConfigHandler(opts ...Option) Handler {
 func (h configHandler) GetBackend() config.Backend {
 	return h.backend
 }
-func (h configHandler) GetLog() logr.Logger {
+func (h configHandler) GetLog() *zerolog.Logger {
 	return h.log
 }
 func (h configHandler) GetCfg() *config.Config {
@@ -187,7 +187,7 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 					}
 					attrs = append(attrs, &ldap.EntryAttribute{Name: key, Values: values})
 				default:
-					h.log.V(2).Info("Unable to map custom attribute", "key", key, "value", attr)
+					h.log.Info().Str("key", key).Interface("value", attr).Msg("Unable to map custom attribute")
 				}
 			}
 		}
@@ -292,7 +292,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.V(2).Info("Ignoring myself as included group", "groupid", includegroupid)
+					h.log.Info().Int("groupid", includegroupid).Msg("Ignoring myself as included group")
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 

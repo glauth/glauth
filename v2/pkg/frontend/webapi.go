@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
-
-	"github.com/go-logr/logr"
 
 	"github.com/glauth/glauth/v2/pkg/assets"
 )
@@ -24,28 +23,28 @@ func RunAPI(opts ...Option) {
 
 	register(http.DefaultServeMux, log, cfg.TLS, cfg.Listen)
 	if cfg.TLS {
-		log.V(3).Info("Starting HTTPS server", "address", cfg.Listen)
+		log.Info().Str("address", cfg.Listen).Msg("Starting HTTPS server")
 		err := http.ListenAndServeTLS(cfg.Listen, cfg.Cert, cfg.Key, nil)
 		if err != nil {
-			log.Error(err, "Error starting HTTPS server")
+			log.Error().Err(err).Msg("error starting HTTPS server")
 			return
 		}
 	} else {
-		log.V(3).Info("Starting HTTP server", "address", cfg.Listen)
+		log.Info().Str("address", cfg.Listen).Msg("Starting HTTP server")
 		err := http.ListenAndServe(cfg.Listen, nil)
 		if err != nil {
-			log.Error(err, "Error starting HTTP server")
+			log.Error().Err(err).Msg("error starting HTTP server")
 			return
 		}
 	}
 }
 
-func register(mux *http.ServeMux, log logr.Logger, tls bool, listen string) {
+func register(mux *http.ServeMux, log zerolog.Logger, tls bool, listen string) {
 	fs := http.FileServer(http.FS(assets.Content))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.V(6).Info("Web", "path", r.URL.Path)
+		log.Info().Str("path", r.URL.Path).Msg("Web")
 		if r.URL.Path != "/" {
-			log.V(6).Info("Web 404")
+			log.Info().Msg("Web 404")
 			http.NotFound(w, r)
 			return
 		}
