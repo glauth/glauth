@@ -9,6 +9,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
+	"github.com/glauth/glauth/v2/pkg/logging"
 	"github.com/glauth/glauth/v2/pkg/server"
 	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/hydronica/toml"
@@ -756,7 +757,7 @@ func doConfig() error {
 
 	// Handle logging settings for new config
 	// - we do this last to make sure we only respect a fully validated config
-	initLogging(activeConfig.Debug, activeConfig.Syslog)
+	initLogging(activeConfig.Debug, activeConfig.Syslog, activeConfig.StructuredLog)
 
 	if activeConfig.Debug {
 		log.Info().Msg("Debugging enabled")
@@ -769,7 +770,7 @@ func doConfig() error {
 }
 
 // initLogging sets up logging to stderr
-func initLogging(reqdebug bool, reqsyslog bool) {
+func initLogging(reqdebug bool, reqsyslog bool, reqstructlog bool) {
 	var level zerolog.Level
 	if reqdebug {
 		level = zerolog.DebugLevel
@@ -778,12 +779,13 @@ func initLogging(reqdebug bool, reqsyslog bool) {
 	}
 
 	var mainWriter io.Writer
-	if true {
-		// This is the inefficient writer
-		mainWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}
-	} else {
+	if reqstructlog {
 		// Vroom vroom
 		mainWriter = os.Stderr
+		zerolog.TimeFieldFormat = time.RFC1123Z
+	} else {
+		// This is the inefficient writer
+		mainWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC1123Z}
 	}
 
 	if reqsyslog {
@@ -800,4 +802,6 @@ func initLogging(reqdebug bool, reqsyslog bool) {
 	if !reqsyslog {
 		log = zerolog.New(mainWriter).Level(level).With().Timestamp().Logger()
 	}
+
+	logging.RewireLogging(log, reqstructlog)
 }
