@@ -104,6 +104,8 @@ type Config struct {
 	Helper             Helper
 	Behaviors          Behaviors
 	Debug              bool
+	Syslog             bool
+	StructuredLog      bool
 	WatchConfig        bool
 	YubikeyClientID    string
 	YubikeySecret      string
@@ -111,7 +113,6 @@ type Config struct {
 	LDAP               LDAP
 	LDAPS              LDAPS
 	Groups             []Group
-	Syslog             bool
 	Users              []User
 	ConfigFile         string
 	AwsAccessKeyId     string
