@@ -54,6 +54,7 @@ Options:
   --ldaps <address>         Listen address for the LDAPS server.
   --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
   --ldaps-key <key-file>    Path to key file for the LDAPS server.
+  --check-config            Check configuration file and exit.
   -h, --help                Show this screen.
   --version                 Show version.
 `
@@ -114,10 +115,20 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if err := doConfig(); err != nil {
+	checkConfig := false
+	if cc, ok := args["--check-config"]; ok {
+		if cc == true {
+			checkConfig = true
+		}
+	}
+	if err := doConfig(checkConfig); err != nil {
 		fmt.Println("Configuration file error")
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	if checkConfig {
+		fmt.Println("Config file seems ok (but I am not checking much at this time)")
+		return
 	}
 	log.Info().Msg("AP start")
 
@@ -224,7 +235,7 @@ func startConfigWatcher() {
 					isChanged, isRemoved = true, false
 				}
 				if isChanged {
-					if err := doConfig(); err != nil {
+					if err := doConfig(false); err != nil {
 						log.Info().Err(err).Msg("Could not reload config. Holding on to old config")
 					} else {
 						log.Info().Msg("Config was reloaded")
@@ -713,7 +724,7 @@ func validateConfig(cfg config.Config) (*config.Config, error) {
 }
 
 // doConfig reads the cli flags and config file
-func doConfig() error {
+func doConfig(checkConfig bool) error {
 	// Parse config-file into config{} struct
 	cfg, err := parseConfigFile(getConfigLocation())
 	if err != nil {
@@ -750,7 +761,7 @@ func doConfig() error {
 		}
 	}
 
-	// All config is validated and alright, copy to ativeConfig
+	// All config is validated and alright, copy to activeConfig
 	if err := copier.Copy(activeConfig, cfg); err != nil {
 		return err
 	}
@@ -759,11 +770,13 @@ func doConfig() error {
 	// - we do this last to make sure we only respect a fully validated config
 	initLogging(activeConfig.Debug, activeConfig.Syslog, activeConfig.StructuredLog)
 
-	if activeConfig.Debug {
-		log.Info().Msg("Debugging enabled")
-	}
-	if activeConfig.Syslog {
-		log.Info().Msg("Syslog enabled")
+	if !checkConfig {
+		if activeConfig.Debug {
+			log.Info().Msg("Debugging enabled")
+		}
+		if activeConfig.Syslog {
+			log.Info().Msg("Syslog enabled")
+		}
 	}
 
 	return nil
