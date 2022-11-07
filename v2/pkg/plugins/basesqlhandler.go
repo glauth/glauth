@@ -1,10 +1,11 @@
-package main
+package plugins
 
 import (
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
 	"net"
 	"os"
 	"regexp"
@@ -16,7 +17,6 @@ import (
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 )
 
@@ -27,6 +27,8 @@ type SqlBackend interface {
 	GetDriverName() string
 	// Create db/schema if necessary
 	CreateSchema(db *sql.DB)
+	// Migrate schema if necessary
+	MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool)
 	//
 	GetPrepareSymbol() string
 }
@@ -38,7 +40,7 @@ type database struct {
 
 type databaseHandler struct {
 	backend     config.Backend
-	log         logr.Logger
+	log         *zerolog.Logger
 	cfg         *config.Config
 	yubikeyAuth *yubigo.YubiAuth
 	sqlBackend  SqlBackend
@@ -48,19 +50,18 @@ type databaseHandler struct {
 	attmatcher  *regexp.Regexp
 }
 
-// func NewDatabaseHandler_deprecated(log *logging.Logger, cfg *config.Config, yubikeyAuth *yubigo.YubiAuth, sqlBackend SqlBackend) handler.Handler {
 func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.Handler {
 	options := handler.NewOptions(opts...)
 
 	// Note: we will never terminate this connection pool.
 	db, err := sql.Open(sqlBackend.GetDriverName(), options.Backend.Database)
 	if err != nil {
-		options.Logger.Error(err, "Unable to open SQL database named '%s' error: %s", options.Backend.Database)
+		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to open SQL database named '%s'", options.Backend.Database))
 		os.Exit(1)
 	}
 	err = db.Ping()
 	if err != nil {
-		options.Logger.Error(err, "Unable to communicate with SQL database error: %s", options.Backend.Database)
+		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to communicate with SQL database error: %s", options.Backend.Database))
 		os.Exit(1)
 	}
 
@@ -80,16 +81,27 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 		attmatcher:  configattributematcher}
 
 	sqlBackend.CreateSchema(db)
+	sqlBackend.MigrateSchema(db, ColumnExists)
 
-	options.Logger.V(3).Info("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
+	options.Logger.Info().Msg("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
+}
+
+func ColumnExists(db *sql.DB, columnName string) bool {
+	var found string
+	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM users`, columnName)).Scan(
+		&found)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (h databaseHandler) GetBackend() config.Backend {
 	return h.backend
 }
-func (h databaseHandler) GetLog() logr.Logger {
+func (h databaseHandler) GetLog() *zerolog.Logger {
 	return h.log
 }
 func (h databaseHandler) GetCfg() *config.Config {
@@ -133,30 +145,34 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	user := config.User{}
 	found := false
 
+	var disabled int
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey
+			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.disabled
 			FROM users u WHERE %s=%s`,
 		criterion,
 		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
-		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey)
+		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey, &disabled)
 	if err == nil {
-		found = true
+		user.Disabled = h.intToBool(disabled)
+		if !user.Disabled {
+			found = true
 
-		if !h.cfg.Behaviors.IgnoreCapabilities {
-			capability := config.Capability{}
-			rows, err := h.database.cnx.Query(fmt.Sprintf(`
+			if !h.cfg.Behaviors.IgnoreCapabilities {
+				capability := config.Capability{}
+				rows, err := h.database.cnx.Query(fmt.Sprintf(`
 				SELECT c.action,c.object
 				FROM capabilities c WHERE userid=%s`,
-				h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
-			if err == nil {
-				for rows.Next() {
-					err := rows.Scan(&capability.Action, &capability.Object)
-					if err == nil {
-						user.Capabilities = append(user.Capabilities, capability)
+					h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
+				if err == nil {
+					for rows.Next() {
+						err := rows.Scan(&capability.Action, &capability.Object)
+						if err == nil {
+							user.Capabilities = append(user.Capabilities, capability)
+						}
 					}
 				}
+				defer rows.Close()
 			}
-			defer rows.Close()
 		}
 	}
 
@@ -186,7 +202,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 	}
 
 	rows, err := h.database.cnx.Query(`
-		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.custattr  
+		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.sshkeys,u.custattr  
 		FROM users u`)
 	if err != nil {
 		return entries, err
@@ -195,15 +211,17 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 
 	var otherGroups string
 	var disabled int
+	var sshKeys string
 	var custattrstr string
 	u := config.User{}
 	for rows.Next() {
-		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled, &custattrstr)
+		err := rows.Scan(&u.Name, &u.UIDNumber, &u.PrimaryGroup, &u.PassBcrypt, &u.PassSHA256, &u.OTPSecret, &u.Yubikey, &otherGroups, &u.GivenName, &u.SN, &u.Mail, &u.LoginShell, &u.Homedir, &disabled, &sshKeys, &custattrstr)
 		if err != nil {
 			return entries, err
 		}
-		u.OtherGroups = h.commaListToTable(otherGroups)
+		u.OtherGroups = h.commaListToIntTable(otherGroups)
 		u.Disabled = h.intToBool(disabled)
+		u.SSHKeys = h.commaListToStringTable(sshKeys)
 
 		entry := h.getAccount(hierarchy, u)
 
@@ -227,7 +245,7 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 					}
 					entry.Attributes = append(entry.Attributes, &ldap.EntryAttribute{Name: key, Values: values})
 				default:
-					h.log.V(2).Info("Unable to map custom attribute", "key", key, "value", attr)
+					h.log.Warn().Str("key", key).Interface("value", attr).Msg("Unable to map custom attribute")
 				}
 			}
 		}
@@ -269,7 +287,7 @@ func (h databaseHandler) intToBool(value int) bool {
 	return true
 }
 
-func (h databaseHandler) commaListToTable(commaList string) []int {
+func (h databaseHandler) commaListToIntTable(commaList string) []int {
 	if len(commaList) == 0 {
 		return make([]int, 0)
 	}
@@ -283,6 +301,13 @@ func (h databaseHandler) commaListToTable(commaList string) []int {
 		rowsAsInts[i] = iv
 	}
 	return rowsAsInts
+}
+
+func (h databaseHandler) commaListToStringTable(commaList string) []string {
+	if len(commaList) == 0 {
+		return make([]string, 0)
+	}
+	return strings.Split(commaList, ",")
 }
 
 func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
@@ -347,7 +372,7 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			members[dn] = true
 		} else {
-			u.OtherGroups = h.commaListToTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
 					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
@@ -403,7 +428,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if u.PrimaryGroup == gid {
 			members[u.Name] = true
 		} else {
-			u.OtherGroups = h.commaListToTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
 					members[u.Name] = true
@@ -416,7 +441,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid {
-					h.log.V(3).Info(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
+					h.log.Warn().Msg(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
 					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
 
@@ -555,5 +580,3 @@ func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry
 	}
 	return &ldap.Entry{dn, attrs}
 }
-
-func main() {}

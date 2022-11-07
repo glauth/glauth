@@ -1,6 +1,8 @@
 package stats
 
-import "expvar"
+import (
+	"expvar"
+)
 
 // exposed expvar variables
 var (
