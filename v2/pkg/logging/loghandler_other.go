@@ -1,9 +1,14 @@
+//go:build !windows
+// +build !windows
+
 package logging
 
 import (
 	"fmt"
 	"github.com/rs/zerolog"
+	"io"
 	"log"
+	"log/syslog"
 	"os"
 	"regexp"
 	"strings"
@@ -17,8 +22,43 @@ var (
 	ldapliblogmatcher = regexp.MustCompile(`^\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}\:\d{1,2}\:\d{1,2} `)
 )
 
-func RewireLogging(logr zerolog.Logger, reqstructlog bool) {
+func InitLogging(reqdebug bool, reqsyslog bool, reqstructlog bool) zerolog.Logger {
+	var level zerolog.Level
+	if reqdebug {
+		level = zerolog.DebugLevel
+	} else {
+		level = zerolog.InfoLevel
+	}
+
+	var mainWriter io.Writer
+	if reqstructlog {
+		// Vroom vroom
+		mainWriter = os.Stderr
+		zerolog.TimeFieldFormat = time.RFC1123Z
+	} else {
+		// This is the inefficient writer
+		mainWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC1123Z}
+	}
+
+	var logr zerolog.Logger
+	if reqsyslog {
+		s, err := syslog.New(syslog.LOG_INFO, "glauth")
+		if err != nil {
+			fmt.Println("Unable to write to syslog: ignoring...")
+			reqsyslog = false
+		} else {
+			writers := zerolog.MultiLevelWriter(mainWriter, zerolog.SyslogLevelWriter(s))
+			logr = zerolog.New(writers).Level(level).With().Timestamp().Logger()
+		}
+	}
+
+	if !reqsyslog {
+		logr = zerolog.New(mainWriter).Level(level).With().Timestamp().Logger()
+	}
+
 	log.SetOutput(customWriter{logr: logr, structlog: reqstructlog})
+
+	return logr
 }
 
 type customWriter struct {

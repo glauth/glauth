@@ -17,9 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	"io"
 	"io/ioutil"
-	"log/syslog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -768,7 +766,7 @@ func doConfig(checkConfig bool) error {
 
 	// Handle logging settings for new config
 	// - we do this last to make sure we only respect a fully validated config
-	initLogging(activeConfig.Debug, activeConfig.Syslog, activeConfig.StructuredLog)
+	log = logging.InitLogging(activeConfig.Debug, activeConfig.Syslog, activeConfig.StructuredLog)
 
 	if !checkConfig {
 		if activeConfig.Debug {
@@ -780,41 +778,4 @@ func doConfig(checkConfig bool) error {
 	}
 
 	return nil
-}
-
-// initLogging sets up logging to stderr
-func initLogging(reqdebug bool, reqsyslog bool, reqstructlog bool) {
-	var level zerolog.Level
-	if reqdebug {
-		level = zerolog.DebugLevel
-	} else {
-		level = zerolog.InfoLevel
-	}
-
-	var mainWriter io.Writer
-	if reqstructlog {
-		// Vroom vroom
-		mainWriter = os.Stderr
-		zerolog.TimeFieldFormat = time.RFC1123Z
-	} else {
-		// This is the inefficient writer
-		mainWriter = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC1123Z}
-	}
-
-	if reqsyslog {
-		s, err := syslog.New(syslog.LOG_INFO, "glauth")
-		if err != nil {
-			fmt.Println("Unable to write to syslog: ignoring...")
-			reqsyslog = false
-		} else {
-			writers := zerolog.MultiLevelWriter(mainWriter, zerolog.SyslogLevelWriter(s))
-			log = zerolog.New(writers).Level(level).With().Timestamp().Logger()
-		}
-	}
-
-	if !reqsyslog {
-		log = zerolog.New(mainWriter).Level(level).With().Timestamp().Logger()
-	}
-
-	logging.RewireLogging(log, reqstructlog)
 }
