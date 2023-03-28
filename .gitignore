@@ -3,3 +3,4 @@ v2/certs/
 v2/bin
 v2/docker/assets/linux
 v2/gl.db
+.vscode/
