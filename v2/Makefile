@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := help
+
 VERSION=$(shell bin/linuxamd64/glauth --version)
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
@@ -23,28 +25,32 @@ MAIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/a
 PLUGIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
 
 # Plugins
-include pkg/plugins/*/Makefile
+-include pkg/plugins/*/Makefile
 
 #####################
 # High level commands
 #####################
 
-# Build and run - used for development
+#help: @ List available tasks on this project
+help: 
+	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#' | sed -E 's/Makefile.//' | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+#run: @ build and run - used for development
 run: setup devrun
 
-# Run the integration test on linuxamd64 (eventually allow the binary to be set)
+#test: @ runs the integration test on linuxamd64 (eventually allow the binary to be set)
 test: runtest
 
-# Run build process for all binaries
+#all: @ run build process for all binaries
 all: setup binaries verify
 
-# Run build process for only linuxamd64
+#fast: @ run build process for only linuxamd64
 fast: setup linuxamd64
 
-# list of binary formats to build
+#binaries: @ list of binary formats to build
 binaries: linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64
 
-# Setup commands to always run
+#setup: @ setup commands to always run
 setup: getdeps format
 
 #####################
@@ -154,6 +160,7 @@ releasedockerplugins:
 
 releasedocker: releasedockermain releasedockerplugins
 
+#testdocker: @ run integration test using docker
 testdocker:
 	$(if $(REPO),,$(error Must set REPO - glauth or other))
 	@echo "==> Cleaning up any existing image to be on the safe side..." && \
