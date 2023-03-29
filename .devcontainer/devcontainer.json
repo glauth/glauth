@@ -32,22 +32,20 @@
 		"REPO": "glauth"
 	},
 
+	"capAdd": ["SYS_PTRACE"],
+
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [9000],
 
 	// Use 'portsAttributes' to set default properties for specific forwarded ports. 
 	// More info: https://containers.dev/implementors/json_reference/#port-attributes
 	"portsAttributes": {
-		"389": {
+		"3893": {
 			"label": "LDAP",
 			"onAutoForward": "notify"
 		},
-        "636": {
-			"label": "LDAPS",
-			"onAutoForward": "notify"
-		},
 		"5555": {
-			"label": "Web",
+			"label": "Web UI",
 			"onAutoForward": "openBrowser"
 		}
 	},
