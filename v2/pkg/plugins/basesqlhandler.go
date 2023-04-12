@@ -369,13 +369,13 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,ou=users,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s,ou=users,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
