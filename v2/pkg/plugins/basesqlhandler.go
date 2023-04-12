@@ -510,7 +510,7 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{h.backend.GroupFormat, []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberDNs(g.GIDNumber)})
@@ -526,7 +526,7 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 
 func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry {
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{u.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{h.backend.NameFormat, []string{u.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{u.Name}})
 
 	if len(u.GivenName) > 0 {

@@ -116,7 +116,7 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 
 	for _, u := range h.cfg.Users {
 		attrs := []*ldap.EntryAttribute{}
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{u.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{u.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{u.Name}})
 
 		if len(u.GivenName) > 0 {
@@ -210,7 +210,7 @@ func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entr
 
 	for _, g := range h.cfg.Groups {
 		attrs := []*ldap.EntryAttribute{}
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "cn", Values: []string{g.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{g.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
