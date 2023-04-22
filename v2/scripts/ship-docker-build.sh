@@ -82,6 +82,17 @@ push_to_docker() {
     push_profile_to_docker plugins $tag
 }
 
+clear
+cat <<EOB
+This script is now deprecated.
+Please use:
+
+make releasedocker
+make testdocker
+
+EOB
+exit 0
+
 TAG="$1"
 
 if [[ "$1" != "--force" ]]; then

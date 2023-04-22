@@ -4,18 +4,19 @@ import "time"
 
 // config file
 type Backend struct {
-	BaseDN        string
-	Datastore     string
-	Insecure      bool     // For LDAP and owncloud backend only
-	Servers       []string // For LDAP and owncloud backend only
-	NameFormat    string
-	GroupFormat   string
-	SSHKeyAttr    string
-	UseGraphAPI   bool   // For ownCloud backend only
-	Plugin        string // Path to plugin library, for plugin backend only
-	PluginHandler string // Name of plugin's main handler function
-	Database      string // For Database backends only
-	AnonymousDSE  bool   // For Config and Database backends only
+	BaseDN                    string
+	Datastore                 string
+	Insecure                  bool     // For LDAP and owncloud backend only
+	Servers                   []string // For LDAP and owncloud backend only
+	NameFormat                string
+	GroupFormat               string
+	SSHKeyAttr                string
+	UseGraphAPI               bool   // For ownCloud backend only
+	Plugin                    string // Path to plugin library, for plugin backend only
+	PluginHandler             string // Name of plugin's main handler function
+	Database                  string // For Database backends only
+	GroupWithSearchCapability string // For PamLinux backend only
+	AnonymousDSE              bool   // For Config and Database backends only
 }
 type Helper struct {
 	Enabled       bool
@@ -64,6 +65,9 @@ type Capability struct {
 	Action string
 	Object string
 }
+
+// UserAuthenticator authenticates a user via custom auth from a backend
+type UserAuthenticator func(user *User, pw string) error
 type User struct {
 	Name          string
 	OtherGroups   []int
@@ -71,6 +75,7 @@ type User struct {
 	PassBcrypt    string
 	PassAppSHA256 []string
 	PassAppBcrypt []string
+	PassAppCustom UserAuthenticator
 	PrimaryGroup  int
 	Capabilities  []Capability
 	SSHKeys       []string
@@ -99,6 +104,8 @@ type Config struct {
 	Helper             Helper
 	Behaviors          Behaviors
 	Debug              bool
+	Syslog             bool
+	StructuredLog      bool
 	WatchConfig        bool
 	YubikeyClientID    string
 	YubikeySecret      string
@@ -106,7 +113,6 @@ type Config struct {
 	LDAP               LDAP
 	LDAPS              LDAPS
 	Groups             []Group
-	Syslog             bool
 	Users              []User
 	ConfigFile         string
 	AwsAccessKeyId     string

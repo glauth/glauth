@@ -19,7 +19,7 @@ jobs:
       - name: Updating packages database
         run: sudo apt-get -qq update
       - name: Install CLI Dependencies
-        run: sudo apt-get install -y ldap-utils oathtool
+        run: sudo apt-get install -y ldap-utils oathtool libpam0g-dev
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Fetch Go dependencies
@@ -30,7 +30,7 @@ jobs:
         run: diff -u <(echo -n) <(gofmt -d ./)
       - name: Full compile test
         working-directory: ./v2
-        run: make all
+        run: make fast
       - name: Output hashes to the build log
         working-directory: ./v2
         run: cat bin/*/glauth.sha256

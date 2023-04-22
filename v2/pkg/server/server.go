@@ -3,17 +3,17 @@ package server
 import (
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
 	"plugin"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
-	"github.com/go-logr/logr"
 	"github.com/nmcclain/ldap"
 )
 
 type LdapSvc struct {
-	log      logr.Logger
+	log      zerolog.Logger
 	c        *config.Config
 	yubiAuth *yubigo.YubiAuth
 	l        *ldap.Server
@@ -46,7 +46,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		switch s.c.Helper.Datastore {
 		case "config":
 			helper = handler.NewConfigHandler(
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
@@ -58,17 +58,17 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			}
 			nph, err := plug.Lookup(s.c.Helper.PluginHandler)
 			if err != nil {
-				return nil, errors.New("Unable to find 'NewPluginHandler' in loaded helper plugin")
+				return nil, errors.New("unable to find 'NewPluginHandler' in loaded helper plugin")
 			}
 			initFunc, ok := nph.(func(...handler.Option) handler.Handler)
 
 			if !ok {
-				return nil, errors.New("Loaded helper plugin lacks a proper NewPluginHandler function")
+				return nil, errors.New("loaded helper plugin lacks a proper NewPluginHandler function")
 			}
 			// Normally, here, we would somehow have imported our plugin into our
 			// handler namespace. Oops?
 			helper = initFunc(
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
@@ -76,7 +76,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		default:
 			return nil, fmt.Errorf("unsupported helper %s - must be one of 'config', 'plugin'", s.c.Helper.Datastore)
 		}
-		s.log.V(3).Info("Using helper", "datastore", s.c.Helper.Datastore)
+		s.log.Info().Str("datastore", s.c.Helper.Datastore).Msg("Using helper")
 	}
 
 	backendCounter := -1
@@ -92,18 +92,18 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			h = handler.NewLdapHandler(
 				handler.Backend(backend),
 				handler.Handlers(allHandlers),
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 				handler.Helper(helper),
 			)
 		case "owncloud":
 			h = handler.NewOwnCloudHandler(
 				handler.Backend(backend),
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 			)
 		case "config":
 			h = handler.NewConfigHandler(
 				handler.Backend(backend),
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 				handler.Config(s.c), // TODO only used to access Users and Groups, move that to dedicated options
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
@@ -115,18 +115,18 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			}
 			nph, err := plug.Lookup(backend.PluginHandler)
 			if err != nil {
-				return nil, errors.New("Unable to find 'NewPluginHandler' in loaded backend plugin")
+				return nil, errors.New("unable to find 'NewPluginHandler' in loaded backend plugin")
 			}
 			initFunc, ok := nph.(func(...handler.Option) handler.Handler)
 
 			if !ok {
-				return nil, errors.New("Loaded backend plugin lacks a proper NewPluginHandler function")
+				return nil, errors.New("loaded backend plugin lacks a proper NewPluginHandler function")
 			}
 			// Normally, here, we would somehow have imported our plugin into our
 			// handler namespace. Oops?
 			h = initFunc(
 				handler.Backend(backend),
-				handler.Logger(s.log),
+				handler.Logger(&s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
@@ -134,7 +134,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		default:
 			return nil, fmt.Errorf("unsupported backend %s - must be one of 'config', 'ldap','owncloud' or 'plugin'", backend.Datastore)
 		}
-		s.log.V(3).Info("Loading backend", "datastore", backend.Datastore, "position", i)
+		s.log.Info().Str("datastore", backend.Datastore).Int("position", i).Msg("Loading backend")
 
 		// Only our first backend will answer proper LDAP queries.
 		// Note that this could evolve towars something nicer where we would maintain
@@ -153,13 +153,13 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 
 // ListenAndServe listens on the TCP network address s.c.LDAP.Listen
 func (s *LdapSvc) ListenAndServe() error {
-	s.log.V(3).Info("LDAP server listening", "address", s.c.LDAP.Listen)
+	s.log.Info().Str("address", s.c.LDAP.Listen).Msg("LDAP server listening")
 	return s.l.ListenAndServe(s.c.LDAP.Listen)
 }
 
 // ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
 func (s *LdapSvc) ListenAndServeTLS() error {
-	s.log.V(3).Info("LDAPS server listening", "address", s.c.LDAPS.Listen)
+	s.log.Info().Str("address", s.c.LDAPS.Listen).Msg("LDAPS server listening")
 	return s.l.ListenAndServeTLS(
 		s.c.LDAPS.Listen,
 		s.c.LDAPS.Cert,

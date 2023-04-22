@@ -2,9 +2,9 @@ package frontend
 
 import (
 	"context"
+	"github.com/rs/zerolog"
 
 	"github.com/glauth/glauth/v2/pkg/config"
-	"github.com/go-logr/logr"
 )
 
 // Option defines a single option function.
@@ -12,7 +12,7 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
-	Logger  logr.Logger
+	Logger  zerolog.Logger
 	Config  *config.API
 	Context context.Context
 }
@@ -29,7 +29,7 @@ func newOptions(opts ...Option) Options {
 }
 
 // Logger provides a function to set the logger option.
-func Logger(val logr.Logger) Option {
+func Logger(val zerolog.Logger) Option {
 	return func(o *Options) {
 		o.Logger = val
 	}

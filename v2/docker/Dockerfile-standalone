@@ -1,0 +1,33 @@
+#################
+# Build Step
+#################
+
+FROM alpine:latest as build
+
+RUN apk add --no-cache git make busybox-static dumb-init
+
+#################
+# Run Step
+#################
+
+FROM gcr.io/distroless/base-debian11 as run
+LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
+ARG TARGETPLATFORM
+
+# Copy docker specific scripts from build container
+COPY assets/start-standalone.sh /app/docker/start-standalone.sh
+COPY assets/default-config-standalone.cfg /app/docker/default-config-standalone.cfg
+COPY assets/$TARGETPLATFORM/glauth /app/glauth
+
+# Just what we need
+COPY --from=build /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --from=build /bin/busybox.static /bin/sh
+COPY --from=build /bin/busybox.static /bin/ln
+COPY --from=build /bin/busybox.static /bin/rm
+RUN ln /bin/sh /usr/bin/cp && ln /bin/sh /usr/bin/mkdir && rm /bin/ln /bin/rm
+
+# Expose web and LDAP ports
+EXPOSE 389 636 5555
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/bin/sh", "/app/docker/start-standalone.sh"]
