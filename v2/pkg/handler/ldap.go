@@ -88,7 +88,6 @@ func NewLdapHandler(opts ...Option) Handler {
 	return handler
 }
 
-//
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	h.log.Debug().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind request")
 
@@ -154,7 +153,6 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCod
 	return ldap.LDAPResultSuccess, nil
 }
 
-//
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
 	wantAttributes := true
 	wantTypesOnly := false
@@ -362,7 +360,6 @@ func (h *ldapHandler) monitorServers() {
 	}()
 }
 
-//
 func (h ldapHandler) getSession(conn net.Conn) (ldapSession, error) {
 	id := connID(conn)
 	h.lock.Lock()
@@ -399,7 +396,6 @@ func (h ldapHandler) getSession(conn net.Conn) (ldapSession, error) {
 	return s, nil
 }
 
-//
 func (h ldapHandler) ping() error {
 	healthy := false
 	for k, s := range h.servers {
@@ -442,7 +438,6 @@ func (h ldapHandler) ping() error {
 	return nil
 }
 
-//
 func (h ldapHandler) getBestServer() (ldapBackend, error) {
 	favorite := ldapBackend{}
 	forever, err := time.ParseDuration("30m")

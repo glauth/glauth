@@ -10,7 +10,7 @@ The sub-command github.com/BurntSushi/toml/cmd/tomlv can be used to verify
 whether a file is a valid TOML document. It can also be used to print the
 type of each key in a TOML document.
 
-Testing
+# Testing
 
 There are two important types of tests used for this package. The first is
 contained inside '*_test.go' files and uses the standard Go unit testing
