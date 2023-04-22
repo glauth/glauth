@@ -1,6 +1,6 @@
 module github.com/glauth/glauth/v2
 
-go 1.16
+go 1.19
 
 // Do not mistake /vendored for /vendor!
 replace github.com/hydronica/toml => ./vendored/toml
