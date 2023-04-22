@@ -530,10 +530,19 @@ func (l LDAPOpsHelper) searchMaybePosixAccounts(h LDAPOpsHandler, baseDN string,
 		hierarchyString = "ou=users"
 	}
 
-	entries, err := h.FindPosixAccounts(hierarchyString)
+	unscopedEntries, err := h.FindPosixAccounts(hierarchyString)
 	if err != nil {
 		return nil, ldap.LDAPResultOperationsError
 	}
+
+	// Filter out entries, that are not in the search base dn
+	entries := []*ldap.Entry{}
+	for _, e := range unscopedEntries {
+		if strings.HasSuffix(e.DN, searchBaseDN) {
+			entries = append(entries, e)
+		}
+	}
+
 	stats.Frontend.Add("search_successes", 1)
 	h.GetLog().Info().Str("filter", searchReq.Filter).Msg("AP: Account Search OK")
 	return entries, ldap.LDAPResultSuccess

@@ -642,7 +642,7 @@ func lexRawString(lx *lexer) stateFn {
 }
 
 // lexMultilineRawString consumes a raw string. Nothing can be escaped in such
-// a string. It assumes that the beginning "'''" has already been consumed and
+// a string. It assumes that the beginning "”'" has already been consumed and
 // ignored.
 func lexMultilineRawString(lx *lexer) stateFn {
 	switch lx.next() {

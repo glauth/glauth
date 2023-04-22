@@ -88,7 +88,7 @@ func (md *MetaData) PrimitiveDecode(primValue Primitive, v interface{}) error {
 // a byte string and given to the value's UnmarshalText method. See the
 // Unmarshaler example for a demonstration with time duration strings.
 //
-// Key mapping
+// # Key mapping
 //
 // TOML keys can map to either keys in a Go map or field names in a Go
 // struct. The special `toml` struct tag may be used to map TOML keys to
