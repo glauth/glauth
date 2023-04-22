@@ -19,7 +19,23 @@ Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ co
 
 Use it to centralize account management across your Linux servers, your OSX machines, and your support applications (Jenkins, Apache/Nginx, Graylog2, and many more!).
 
-<hr>
+### Contributing
+- Please base all Pull Requests on [dev](https://github.com/glauth/glauth/tree/dev), not master.
+- Format your code autonmatically using `gofmt -d ./` before committing
+
+### Quickstart
+This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*
+
+1. Download a precompiled binary from the [releases](https://github.com/glauth/glauth/releases) page.
+2. Download the [example config file](https://github.com/glauth/glauth/blob/master/v2/sample-simple.cfg).
+3. Start the GLAuth server, referencing the path to the desired config file with `-c`.
+   - `./glauth64 -c sample-simple.cfg`
+4. Test with traditional LDAP tools
+   - For example: `ldapsearch -LLL -H ldap://localhost:3893 -D cn=serviceuser,ou=svcaccts,dc=glauth,dc=com -w mysecret -x -bdc=glauth,dc=com cn=hackers`
+
+### Make Commands
+
+Note - makefile uses git data to inject build-time variables. For best results, run in the context of the git repo.
 
 ### Documentation
 
