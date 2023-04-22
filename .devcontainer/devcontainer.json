@@ -1,0 +1,54 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/go
+{
+	"name": "glauth",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/go:0-1.19-bullseye",
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"docker-in-docker": {
+			"version": "latest",
+			"moby": true
+		},
+		"ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+			"packages": "oathtool,ldap-utils"
+		}
+	},
+
+	// Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"golang.go",
+				"ms-azuretools.vscode-docker"
+			]
+		}
+	},
+
+	"containerEnv": {
+		"REPO": "glauth"
+	},
+
+	"capAdd": ["SYS_PTRACE"],
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [9000],
+
+	// Use 'portsAttributes' to set default properties for specific forwarded ports. 
+	// More info: https://containers.dev/implementors/json_reference/#port-attributes
+	"portsAttributes": {
+		"3893": {
+			"label": "LDAP",
+			"onAutoForward": "notify"
+		},
+		"5555": {
+			"label": "Web UI",
+			"onAutoForward": "openBrowser"
+		}
+	},
+
+	"postCreateCommand": "cd v2 && make setup"
+}
