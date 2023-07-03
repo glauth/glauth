@@ -350,6 +350,12 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 }
 
 func (h databaseHandler) getGroupMemberDNs(gid int) []string {
+	var insertOuUsers string
+	if h.cfg.Behaviors.LegacyVersion > 0 && h.cfg.Behaviors.LegacyVersion <= 20100 {
+		insertOuUsers = ""
+	} else {
+		insertOuUsers = ",ou=users"
+	}
 	members := make(map[string]bool)
 
 	rows, err := h.database.cnx.Query(`
@@ -369,13 +375,13 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s,ou=users,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s,ou=users,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}

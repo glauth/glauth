@@ -60,6 +60,7 @@ type Behaviors struct {
 	BlockFailedBindsFor   time.Duration
 	PruneSourceTableEvery time.Duration
 	PruneSourcesOlderThan time.Duration
+	LegacyVersion         int
 }
 type Capability struct {
 	Action string
