@@ -1,5 +1,5 @@
 dn: ou=superheros,ou=users,dc=glauth,dc=com
-cn: superheros
+ou: superheros
 uid: superheros
 description: superheros
 gidNumber: 5501
@@ -19,7 +19,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=svcaccts,ou=users,dc=glauth,dc=com
-cn: svcaccts
+ou: svcaccts
 uid: svcaccts
 description: svcaccts
 gidNumber: 5502
@@ -29,7 +29,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=vpnaccess,ou=users,dc=glauth,dc=com
-cn: vpnaccess
+ou: vpnaccess
 uid: vpnaccess
 description: vpnaccess
 gidNumber: 5503
@@ -49,7 +49,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=allaccs,ou=users,dc=glauth,dc=com
-cn: allaccs
+ou: allaccs
 uid: allaccs
 description: allaccs
 gidNumber: 5504
@@ -71,7 +71,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=mailadmin,ou=users,dc=glauth,dc=com
-cn: mailadmin
+ou: mailadmin
 uid: mailadmin
 description: mailadmin
 gidNumber: 5505
@@ -87,7 +87,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=webmail,ou=users,dc=glauth,dc=com
-cn: webmail
+ou: webmail
 uid: webmail
 description: webmail
 gidNumber: 5506
@@ -95,7 +95,7 @@ objectClass: posixGroup
 objectClass: top
 
 dn: ou=fulltime,ou=users,dc=glauth,dc=com
-cn: fulltime
+ou: fulltime
 uid: fulltime
 description: fulltime
 gidNumber: 5507
