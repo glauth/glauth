@@ -350,6 +350,12 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 }
 
 func (h databaseHandler) getGroupMemberDNs(gid int) []string {
+	var insertOuUsers string
+	if h.cfg.Behaviors.LegacyVersion > 0 && h.cfg.Behaviors.LegacyVersion <= 20100 {
+		insertOuUsers = ""
+	} else {
+		insertOuUsers = ",ou=users"
+	}
 	members := make(map[string]bool)
 
 	rows, err := h.database.cnx.Query(`
@@ -369,13 +375,13 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			u.OtherGroups = h.commaListToIntTable(otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -510,7 +516,7 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{g.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{h.backend.GroupFormat, []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberDNs(g.GIDNumber)})
@@ -526,7 +532,7 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 
 func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry {
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{"cn", []string{u.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{h.backend.NameFormat, []string{u.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{u.Name}})
 
 	if len(u.GivenName) > 0 {
