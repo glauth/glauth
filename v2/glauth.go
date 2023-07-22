@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -328,11 +327,11 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 				}
 			*/
 
-			files, _ := ioutil.ReadDir(configFileLocation)
+			files, _ := os.ReadDir(configFileLocation)
 			for _, f := range files {
 				canonicalName := filepath.Join(configFileLocation, f.Name())
 
-				bs, _ := ioutil.ReadFile(canonicalName)
+				bs, _ := os.ReadFile(canonicalName)
 				var curRawCfgStruct interface{}
 				if err := toml.Unmarshal(bs, &curRawCfgStruct); err != nil {
 					return &cfg, err

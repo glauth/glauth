@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -255,7 +255,7 @@ func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

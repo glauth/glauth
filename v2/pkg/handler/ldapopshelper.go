@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rs/zerolog"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -371,7 +370,7 @@ func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, s
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifiersName", Values: []string{"cn=Directory Manager"}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifyTimeStamp", Values: []string{"Mar 8, 2021, 12:46:29 PM PST (20210308204629Z)"}})
 	// Iterate through schema attributes provided in schema/ directory
-	filenames, _ := ioutil.ReadDir("schema")
+	filenames, _ := os.ReadDir("schema")
 	for _, filename := range filenames {
 		attributename := new(string)
 		*attributename = filename.Name()
