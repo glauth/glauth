@@ -127,7 +127,7 @@ releasemain:
 
 releaseplugin:
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
-	(cd bin && for lib in $$(ls $$P-*); do mv $$lib $$lib.so; done)
+	(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done)
 
 releaseplugins:
 	@for pkg in pkg/plugins/*/go.mod; do\
