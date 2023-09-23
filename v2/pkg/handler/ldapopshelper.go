@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rs/zerolog"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -371,7 +370,7 @@ func (l LDAPOpsHelper) searchMaybeSchemaQuery(h LDAPOpsHandler, baseDN string, s
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifiersName", Values: []string{"cn=Directory Manager"}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "modifyTimeStamp", Values: []string{"Mar 8, 2021, 12:46:29 PM PST (20210308204629Z)"}})
 	// Iterate through schema attributes provided in schema/ directory
-	filenames, _ := ioutil.ReadDir("schema")
+	filenames, _ := os.ReadDir("schema")
 	for _, filename := range filenames {
 		attributename := new(string)
 		*attributename = filename.Name()
@@ -623,7 +622,7 @@ func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool
 		userName := ""
 		if len(parts) == 1 {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == fmt.Sprintf("%s=users", h.GetBackend().GroupFormat)) {
+		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == "ou=users") {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
 			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
 		} else {

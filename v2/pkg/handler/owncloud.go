@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -133,7 +133,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: members})
 			}
-			dn := fmt.Sprintf("cn=%s,%s=groups,%s", *g.ID, h.backend.GroupFormat, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, *g.ID, h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "":
@@ -255,7 +255,7 @@ func (s ownCloudSession) getGroups() ([]msgraph.Group, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (s ownCloudSession) getUsers(userName string) ([]msgraph.User, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

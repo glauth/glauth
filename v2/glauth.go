@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -48,6 +47,7 @@ Options:
   -K <aws_key_id>           AWS Key ID.
   -S <aws_secret_key>       AWS Secret Key.
   -r <aws_region>           AWS Region [default: us-east-1].
+  --aws_endpoint_url <url>  Custom S3 endpoint.
   --ldap <address>          Listen address for the LDAP server.
   --ldaps <address>         Listen address for the LDAPS server.
   --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
@@ -269,10 +269,17 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
-		if _, present := aws.Regions[args["-r"].(string)]; present == false {
+		region, present := aws.Regions[args["-r"].(string)]
+		if present == false {
 			return &cfg, fmt.Errorf("invalid AWS region: %s", args["-r"])
 		}
-		region := aws.Regions[args["-r"].(string)]
+		if args["--aws_endpoint_url"] != nil {
+			region = aws.Region{
+				Name:       "User defined",
+				S3Endpoint: args["--aws_endpoint_url"].(string),
+			}
+			present = true
+		}
 		auth, err := aws.EnvAuth()
 		if err != nil {
 			if args["-K"] == nil || args["-S"] == nil {
@@ -328,11 +335,11 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 				}
 			*/
 
-			files, _ := ioutil.ReadDir(configFileLocation)
+			files, _ := os.ReadDir(configFileLocation)
 			for _, f := range files {
 				canonicalName := filepath.Join(configFileLocation, f.Name())
 
-				bs, _ := ioutil.ReadFile(canonicalName)
+				bs, _ := os.ReadFile(canonicalName)
 				var curRawCfgStruct interface{}
 				if err := toml.Unmarshal(bs, &curRawCfgStruct); err != nil {
 					return &cfg, err
