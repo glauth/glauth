@@ -24,6 +24,13 @@ TRIM_FLAGS>?=-trimpath
 MAIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
 PLUGIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
 
+
+
+# Build
+GOOS?=linux
+GOARCH?=amd64
+
+
 # Plugins
 -include pkg/plugins/*/Makefile
 
@@ -73,6 +80,20 @@ format:
 
 devrun:
 	go run ${BUILD_FILES} -c sample-simple.cfg
+
+mkbindir:
+	@echo "create directory bin/$(GOOS)$(GOARCH)"
+	@mkdir -p bin/$(GOOS)$(GOARCH)
+.PHONY: mkbindir
+
+build: mkbindir
+	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
+	$(MAKE) sha256
+.PHONY: build
+
+sha256:
+	@sha256sum bin/$(GOOS)$(GOARCH)/glauth > bin/$(GOOS)$(GOARCH)/glauth.sha256
+.PHONY: sha256
 
 linux386:
 	mkdir -p bin/$@ && GOOS=linux GOARCH=386 go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$@/glauth ${BUILD_FILES} && cd bin/$@ && sha256sum glauth > glauth.sha256
