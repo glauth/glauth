@@ -24,6 +24,9 @@ TRIM_FLAGS=-trimpath
 MAIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
 PLUGIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
 
+# For release process
+GO_RELEASE_V=$(shell go version | { read _ _ v _; echo $${v#go}; })
+
 # Plugins
 -include pkg/plugins/*/Makefile
 
@@ -105,6 +108,7 @@ pull-plugin:
 	@git submodule add $U $M && \
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
+#pull-base-plugins: @ pull plugins for local building
 pull-base-plugins:
 	@U=https://github.com/glauth/glauth-sqlite M=pkg/plugins/glauth-sqlite make pull-plugin && \
 	U=https://github.com/glauth/glauth-mysql M=pkg/plugins/glauth-mysql make pull-plugin && \
@@ -117,21 +121,24 @@ forget-plugin:
 	git rm --cache $M && \
 	go mod tidy
 
+#forget-plugin: @ remove plugins, restoring original file structure
 forget-plugins:
 	for pkg in pkg/plugins/*/go.mod; do\
 		P=$$(echo $$pkg | cut -d'/' -f 3) M=$$(dirname $$pkg) make forget-plugin;\
 	done
 
+#releasemain: @ build main binaries for distribution
 releasemain:
-	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
+	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
 
 releaseplugin:
-	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go 1.18.1 -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
+	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
 	(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done)
 
+#releaseplugins: @ build base plugins for distribution
 releaseplugins:
 	@for pkg in pkg/plugins/*/go.mod; do\
-		P=$$(echo $$pkg | cut -d'/' -f 3) && make release-$$P;\
+		M=pkg/plugins/$$(echo $$pkg | cut -d'/' -f 3) && P=$$(echo $$M | grep -oP 'glauth-\K\w+') && M=$$M P=$$P make releaseplugin;\
 	done
 
 releasedockermain:
