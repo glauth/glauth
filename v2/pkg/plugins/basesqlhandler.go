@@ -184,7 +184,7 @@ func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, er
 	found := false
 
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT g.gidnumber FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
+			SELECT g.gidnumber FROM ldapgroups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
 		&group.GIDNumber)
 	if err == nil {
 		found = true
@@ -314,9 +314,9 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	workMemGroups := make([]*config.Group, 0)
 	rows, err := h.database.cnx.Query(`
 		SELECT g1.name,g1.gidnumber,ig.includegroupid
-		FROM groups g1 
+		FROM ldapgroups g1
 		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
-		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`)
+		LEFT JOIN ldapgroups g2 ON ig.includegroupid=g2.gidnumber`)
 	if err != nil {
 		return nil, errors.New("Unable to memoize groups list")
 	}
