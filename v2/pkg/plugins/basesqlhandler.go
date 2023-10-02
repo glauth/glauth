@@ -28,7 +28,7 @@ type SqlBackend interface {
 	// Create db/schema if necessary
 	CreateSchema(db *sql.DB)
 	// Migrate schema if necessary
-	MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool)
+	MigrateSchema(db *sql.DB, checker func(*sql.DB, string, string) bool)
 	//
 	GetPrepareSymbol() string
 }
@@ -88,14 +88,11 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	return handler
 }
 
-func ColumnExists(db *sql.DB, columnName string) bool {
+func ColumnExists(db *sql.DB, tableName string, columnName string) bool {
 	var found string
-	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM users`, columnName)).Scan(
+	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
 		&found)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func (h databaseHandler) GetBackend() config.Backend {
@@ -313,8 +310,8 @@ func (h databaseHandler) commaListToStringTable(commaList string) []string {
 func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	workMemGroups := make([]*config.Group, 0)
 	rows, err := h.database.cnx.Query(`
-		SELECT g1.name,g1.gidnumber,ig.includegroupid
-		FROM ldapgroups g1
+		SELECT g1.name,g1.gidnumber,ig.includegroupid 
+		FROM ldapgroups g1 
 		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
 		LEFT JOIN ldapgroups g2 ON ig.includegroupid=g2.gidnumber`)
 	if err != nil {
