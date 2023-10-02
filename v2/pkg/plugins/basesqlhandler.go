@@ -28,7 +28,7 @@ type SqlBackend interface {
 	// Create db/schema if necessary
 	CreateSchema(db *sql.DB)
 	// Migrate schema if necessary
-	MigrateSchema(db *sql.DB, checker func(*sql.DB, string) bool)
+	MigrateSchema(db *sql.DB, checker func(*sql.DB, string, string) bool)
 	//
 	GetPrepareSymbol() string
 }
@@ -88,14 +88,11 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	return handler
 }
 
-func ColumnExists(db *sql.DB, columnName string) bool {
+func ColumnExists(db *sql.DB, tableName string, columnName string) bool {
 	var found string
-	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM users`, columnName)).Scan(
+	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
 		&found)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func (h databaseHandler) GetBackend() config.Backend {
@@ -184,7 +181,7 @@ func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, er
 	found := false
 
 	err = h.database.cnx.QueryRow(fmt.Sprintf(`
-			SELECT g.gidnumber FROM groups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
+			SELECT g.gidnumber FROM ldapgroups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
 		&group.GIDNumber)
 	if err == nil {
 		found = true
@@ -313,10 +310,10 @@ func (h databaseHandler) commaListToStringTable(commaList string) []string {
 func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	workMemGroups := make([]*config.Group, 0)
 	rows, err := h.database.cnx.Query(`
-		SELECT g1.name,g1.gidnumber,ig.includegroupid
-		FROM groups g1 
+		SELECT g1.name,g1.gidnumber,ig.includegroupid 
+		FROM ldapgroups g1 
 		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
-		LEFT JOIN groups g2 ON ig.includegroupid=g2.gidnumber`)
+		LEFT JOIN ldapgroups g2 ON ig.includegroupid=g2.gidnumber`)
 	if err != nil {
 		return nil, errors.New("Unable to memoize groups list")
 	}
