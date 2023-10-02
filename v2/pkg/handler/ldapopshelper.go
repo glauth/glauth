@@ -622,7 +622,7 @@ func (l LDAPOpsHelper) findUser(h LDAPOpsHandler, bindDN string, checkGroup bool
 		userName := ""
 		if len(parts) == 1 {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == fmt.Sprintf("%s=users", h.GetBackend().GroupFormat)) {
+		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == "ou=users") {
 			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
 			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
 		} else {

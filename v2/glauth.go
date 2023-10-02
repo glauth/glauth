@@ -47,6 +47,7 @@ Options:
   -K <aws_key_id>           AWS Key ID.
   -S <aws_secret_key>       AWS Secret Key.
   -r <aws_region>           AWS Region [default: us-east-1].
+  --aws_endpoint_url <url>  Custom S3 endpoint.
   --ldap <address>          Listen address for the LDAP server.
   --ldaps <address>         Listen address for the LDAPS server.
   --ldaps-cert <cert-file>  Path to cert file for the LDAPS server.
@@ -268,10 +269,17 @@ func parseConfigFile(configFileLocation string) (*config.Config, error) {
 
 	// parse the config file
 	if strings.HasPrefix(configFileLocation, "s3://") {
-		if _, present := aws.Regions[args["-r"].(string)]; present == false {
+		region, present := aws.Regions[args["-r"].(string)]
+		if present == false {
 			return &cfg, fmt.Errorf("invalid AWS region: %s", args["-r"])
 		}
-		region := aws.Regions[args["-r"].(string)]
+		if args["--aws_endpoint_url"] != nil {
+			region = aws.Region{
+				Name:       "User defined",
+				S3Endpoint: args["--aws_endpoint_url"].(string),
+			}
+			present = true
+		}
 		auth, err := aws.EnvAuth()
 		if err != nil {
 			if args["-K"] == nil || args["-S"] == nil {
