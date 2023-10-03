@@ -135,7 +135,7 @@ func main() {
 
 func startService() {
 	// stats
-	stats.General.Set("version", stats.Stringer(LastGitTag))
+	stats.General.Set("version", stats.Stringer(version.Version))
 
 	// web API
 	if activeConfig.API.Enabled {
