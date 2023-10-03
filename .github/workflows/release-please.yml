@@ -21,4 +21,5 @@ jobs:
           package-name: GLAuth
           path: v2
           default-branch: dev
+          pull-request-title-pattern: "ci: release ${version}"
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
