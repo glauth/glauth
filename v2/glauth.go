@@ -167,30 +167,21 @@ func startService() {
 	}
 
 	if activeConfig.LDAP.Enabled {
-		// Don't block if also starting a LDAPS server afterwards
-		shouldBlock := !activeConfig.LDAPS.Enabled
-
-		if shouldBlock {
+		go func() {
 			if err := s.ListenAndServe(); err != nil {
 				log.Error().Err(err).Msg("could not start LDAP server")
 				os.Exit(1)
 			}
-		} else {
-			go func() {
-				if err := s.ListenAndServe(); err != nil {
-					log.Error().Err(err).Msg("could not start LDAP server")
-					os.Exit(1)
-				}
-			}()
-		}
+		}()
 	}
 
 	if activeConfig.LDAPS.Enabled {
-		// Always block here
-		if err := s.ListenAndServeTLS(); err != nil {
-			log.Error().Err(err).Msg("could not start LDAPS server")
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.ListenAndServeTLS(); err != nil {
+				log.Error().Err(err).Msg("could not start LDAPS server")
+				os.Exit(1)
+			}
+		}()
 	}
 
 	log.Info().Msg("AP exit")
