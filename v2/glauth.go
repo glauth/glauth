@@ -3,6 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/GeertJohan/yubigo"
 	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
@@ -17,12 +26,6 @@ import (
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	"net/http"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
 )
 
 // Set with buildtime vars
@@ -161,6 +164,7 @@ func startService() {
 		server.Logger(log),
 		server.Config(activeConfig),
 	)
+
 	if err != nil {
 		log.Error().Err(err).Msg("could not create server")
 		os.Exit(1)
@@ -184,6 +188,19 @@ func startService() {
 		}()
 	}
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	// Block until we receive our signal.
+	<-c
+
+	// Doesn't block if no connections, but will otherwise wait
+	// until the timeout deadline.
+	s.Shutdown()
+
+	// Optionally, you could run srv.Shutdown in a goroutine and block on
+	// <-ctx.Done() if your application should wait for other services
+	// to finalize based on context cancellation.
 	log.Info().Msg("AP exit")
 	os.Exit(1)
 }
