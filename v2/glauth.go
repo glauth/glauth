@@ -202,7 +202,7 @@ func startService() {
 	// <-ctx.Done() if your application should wait for other services
 	// to finalize based on context cancellation.
 	log.Info().Msg("AP exit")
-	os.Exit(1)
+	os.Exit(0)
 }
 
 func startConfigWatcher() {
