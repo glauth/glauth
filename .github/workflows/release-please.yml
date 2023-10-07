@@ -20,5 +20,8 @@ jobs:
           release-type: go
           package-name: GLAuth
           path: v2
-          default-branch: dev
+          default-branch: master
+          pull-request-title-pattern: "ci: release ${version}"
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          extra-files: |
+            v2/internal/version/const.go
