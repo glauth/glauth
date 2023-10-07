@@ -16,7 +16,7 @@ GIT_IS_TAG_COMMIT=$(shell git describe --abbrev=0 --tags > /dev/null 2> /dev/nul
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 # Build variables
-BUILD_VARS?=-s -w -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH} -X main.BuildTime=${BUILD_TIME} -X main.GitClean=${GIT_CLEAN} -X main.LastGitTag=${LAST_GIT_TAG} -X main.GitTagIsCommit=${GIT_IS_TAG_COMMIT}
+BUILD_VARS?=-s -w
 BUILD_FILES=.
 TRIM_FLAGS>?=-trimpath
 
@@ -87,7 +87,7 @@ mkbindir:
 .PHONY: mkbindir
 
 build: mkbindir
-	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
+	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs=false .
 	$(MAKE) sha256
 .PHONY: build
 
