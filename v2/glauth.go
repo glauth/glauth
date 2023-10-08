@@ -3,6 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/GeertJohan/yubigo"
 	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
@@ -18,12 +27,6 @@ import (
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
-	"net/http"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
 )
 
 const programName = "glauth"
@@ -112,40 +115,45 @@ func startService() {
 		server.Logger(log),
 		server.Config(activeConfig),
 	)
+
 	if err != nil {
 		log.Error().Err(err).Msg("could not create server")
 		os.Exit(1)
 	}
 
 	if activeConfig.LDAP.Enabled {
-		// Don't block if also starting a LDAPS server afterwards
-		shouldBlock := !activeConfig.LDAPS.Enabled
-
-		if shouldBlock {
+		go func() {
 			if err := s.ListenAndServe(); err != nil {
 				log.Error().Err(err).Msg("could not start LDAP server")
 				os.Exit(1)
 			}
-		} else {
-			go func() {
-				if err := s.ListenAndServe(); err != nil {
-					log.Error().Err(err).Msg("could not start LDAP server")
-					os.Exit(1)
-				}
-			}()
-		}
+		}()
 	}
 
 	if activeConfig.LDAPS.Enabled {
-		// Always block here
-		if err := s.ListenAndServeTLS(); err != nil {
-			log.Error().Err(err).Msg("could not start LDAPS server")
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.ListenAndServeTLS(); err != nil {
+				log.Error().Err(err).Msg("could not start LDAPS server")
+				os.Exit(1)
+			}
+		}()
 	}
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	// Block until we receive our signal.
+	<-c
+
+	// Doesn't block if no connections, but will otherwise wait
+	// until the timeout deadline.
+	s.Shutdown()
+
+	// Optionally, you could run srv.Shutdown in a goroutine and block on
+	// <-ctx.Done() if your application should wait for other services
+	// to finalize based on context cancellation.
 	log.Info().Msg("AP exit")
-	os.Exit(1)
+	os.Exit(0)
 }
 
 func startConfigWatcher() {
