@@ -4,3 +4,4 @@ v2/bin
 v2/docker/assets/linux
 v2/gl.db
 .vscode/
+v2/coverage.out
