@@ -4,4 +4,14 @@ v2/bin
 v2/docker/assets/linux
 v2/gl.db
 .vscode/
-v2/coverage.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+### Go Patch ###
+/vendor/
+/Godeps/
+
+# gomocks auto-generated
+**/mock_*.go
+
