@@ -16,13 +16,16 @@ import (
 	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
+	"github.com/glauth/glauth/v2/internal/toml"
 	"github.com/glauth/glauth/v2/internal/version"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
 	"github.com/glauth/glauth/v2/pkg/logging"
 	"github.com/glauth/glauth/v2/pkg/server"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/hydronica/toml"
+
+	// "github.com/hydronica/toml"
+
 	"github.com/jinzhu/copier"
 	"github.com/rs/zerolog"
 	"gopkg.in/amz.v3/aws"
