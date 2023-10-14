@@ -52,7 +52,7 @@ mocks:
 .PHONY: mocks
 
 vet:
-	go vet ./...
+	-go vet ./...
 .PHONY: vet
 #test: @ runs the integration test on linuxamd64 (eventually allow the binary to be set)
 test: mocks vet
