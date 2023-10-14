@@ -1,21 +1,20 @@
-package frontend
+package assets
 
 import (
 	"bytes"
 	"crypto/sha256"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/glauth/glauth/v2/pkg/assets"
+	"github.com/rs/zerolog"
 )
 
 // TestAPI is a small test to make sure that behavior didn't change for the
 // worse when switching over to the go1.16+ "embed" package from go-bindata.
-func TestAPI(t *testing.T) {
+func TestAPIAssets(t *testing.T) {
 	tt := []struct {
 		Name  string
 		Path  string
@@ -26,7 +25,7 @@ func TestAPI(t *testing.T) {
 			Path: "/",
 			Check: func(t testing.TB, res *http.Response) {
 				if res.StatusCode != http.StatusOK {
-					t.Errorf("unexpected response: %v", res.Status)
+					t.Fatalf("unexpected response: %v", res.Status)
 					return
 				}
 				h := sha256.New()
@@ -34,7 +33,7 @@ func TestAPI(t *testing.T) {
 					t.Error(err)
 				}
 				if got, want := h.Sum(nil), mkDigest(t, "index.html"); !bytes.Equal(got, want) {
-					t.Errorf("bad digest: got: %x, want %x", got, want)
+					t.Fatalf("bad digest: got: %x, want %x", got, want)
 				}
 			},
 		},
@@ -42,48 +41,47 @@ func TestAPI(t *testing.T) {
 			Name: "NotFound",
 			Path: "/glauth.js",
 			Check: func(t testing.TB, res *http.Response) {
-				if res.StatusCode == http.StatusNotFound {
-					return
+				if res.StatusCode != http.StatusNotFound {
+					t.Fatalf("unexpected response: %v", res.Status)
 				}
-				t.Errorf("unexpected response: %v", res.Status)
 			},
 		},
 		{
 			Name: "Content-Type",
-			Path: "/assets/glauth.js",
+			Path: "/assets/js/glauth.js",
 			Check: func(t testing.TB, res *http.Response) {
 				if res.StatusCode != http.StatusOK {
-					t.Errorf("unexpected response: %v", res.Status)
+					t.Fatalf("unexpected response: %v", res.Status)
 				}
-				if got, want := res.Header.Get("Content-Type"), `application/javascript`; got != want {
-					t.Errorf("bad content-type: got: %q, want %q", got, want)
+				if got, want := res.Header.Get("Content-Type"), `text/javascript; charset=utf-8`; got != want {
+					t.Fatalf("bad content-type: got: %q, want %q", got, want)
 				}
 				h := sha256.New()
 				if _, err := io.Copy(h, res.Body); err != nil {
 					t.Error(err)
 				}
-				if got, want := h.Sum(nil), mkDigest(t, "glauth.js"); !bytes.Equal(got, want) {
-					t.Errorf("bad digest: got: %x, want %x", got, want)
+				if got, want := h.Sum(nil), mkDigest(t, "js/glauth.js"); !bytes.Equal(got, want) {
+					t.Fatalf("bad digest: got: %x, want %x", got, want)
 				}
 			},
 		},
 		{
 			Name: "Content-Type",
-			Path: "/assets/glauth.css",
+			Path: "/assets/css/glauth.css",
 			Check: func(t testing.TB, res *http.Response) {
 				if res.StatusCode != http.StatusOK {
-					t.Errorf("unexpected response: %v", res.Status)
+					t.Fatalf("unexpected response: %v", res.Status)
 				}
 				// This isn't exactly the same, it adds a charset argument.
 				if got, want := res.Header.Get("Content-Type"), `text/css; charset=utf-8`; got != want {
-					t.Errorf("bad content-type: got: %q, want %q", got, want)
+					t.Fatalf("bad content-type: got: %q, want %q", got, want)
 				}
 				h := sha256.New()
 				if _, err := io.Copy(h, res.Body); err != nil {
 					t.Error(err)
 				}
-				if got, want := h.Sum(nil), mkDigest(t, "glauth.css"); !bytes.Equal(got, want) {
-					t.Errorf("bad digest: got: %x, want %x", got, want)
+				if got, want := h.Sum(nil), mkDigest(t, "css/glauth.css"); !bytes.Equal(got, want) {
+					t.Fatalf("bad digest: got: %x, want %x", got, want)
 				}
 			},
 		},
@@ -91,7 +89,7 @@ func TestAPI(t *testing.T) {
 
 	mux := http.NewServeMux()
 	log := zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
-	register(mux, log, true, "0.0.0.0:5555")
+	NewAPI(log).RegisterEndpoints(mux)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	for _, tc := range tt {
@@ -112,7 +110,7 @@ func TestAPI(t *testing.T) {
 }
 
 func mkDigest(t testing.TB, path string) []byte {
-	f, err := assets.Content.Open(path)
+	f, err := Content.Open(path)
 	if err != nil {
 		t.Error(err)
 	}
