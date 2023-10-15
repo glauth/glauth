@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
-	"github.com/hydronica/toml"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/amz.v3/aws"
 	"gopkg.in/amz.v3/s3"
