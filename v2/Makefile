@@ -46,7 +46,7 @@ help:
 run: setup devrun
 
 mocks:
-	go install github.com/golang/mock/mockgen@v1.6.0
+	go install go.uber.org/mock/mockgen@v0.3.0
 	# generate gomocks
 	go generate ./...
 .PHONY: mocks

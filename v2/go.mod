@@ -10,7 +10,6 @@ require (
 	github.com/arl/statsviz v0.6.0
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/golang/mock v1.6.0
 	github.com/hydronica/toml v0.5.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/nmcclain/ldap v0.0.0-20210720162743-7f8d1e44eeba
@@ -20,6 +19,7 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/smartystreets/goconvey v1.6.4
 	github.com/yaegashi/msgraph.go v0.1.4
+	go.uber.org/mock v0.3.0
 	golang.org/x/crypto v0.14.0
 	gopkg.in/amz.v3 v3.0.0-20201001071545-24fc1eceb27b
 )

@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/nmcclain/ldap"
 	"github.com/rs/zerolog"
+	"go.uber.org/mock/gomock"
 )
 
 //go:generate mockgen -build_flags=--mod=mod -package monitoring -destination ./mock_interfaces.go -source=./interfaces.go
