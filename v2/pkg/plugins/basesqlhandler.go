@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
 	"net"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -513,67 +514,67 @@ func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry 
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{h.backend.GroupFormat, []string{g.Name}})
-	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", g.Name)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"uniqueMember", h.getGroupMemberDNs(g.GIDNumber)})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{g.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", g.Name)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(g.GIDNumber)})
 	if asGroupOfUniqueNames {
-		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"groupOfUniqueNames", "top"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"groupOfUniqueNames", "top"}})
 	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{"memberUid", h.getGroupMemberIDs(g.GIDNumber)})
-		attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixGroup", "top"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 	}
 	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
-	return &ldap.Entry{dn, attrs}
+	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
 
 func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry {
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{h.backend.NameFormat, []string{u.Name}})
-	attrs = append(attrs, &ldap.EntryAttribute{"uid", []string{u.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{u.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{u.Name}})
 
 	if len(u.GivenName) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"givenName", []string{u.GivenName}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{u.GivenName}})
 	}
 
 	if len(u.SN) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"sn", []string{u.SN}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "sn", Values: []string{u.SN}})
 	}
 
-	attrs = append(attrs, &ldap.EntryAttribute{"ou", []string{h.getGroupName(u.PrimaryGroup)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"uidNumber", []string{fmt.Sprintf("%d", u.UIDNumber)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(u.PrimaryGroup)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{fmt.Sprintf("%d", u.UIDNumber)}})
 
 	if u.Disabled {
-		attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"inactive"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "accountStatus", Values: []string{"inactive"}})
 	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{"accountStatus", []string{"active"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "accountStatus", Values: []string{"active"}})
 	}
 
 	if len(u.Mail) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"mail", []string{u.Mail}})
-		attrs = append(attrs, &ldap.EntryAttribute{"userPrincipalName", []string{u.Mail}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "mail", Values: []string{u.Mail}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "userPrincipalName", Values: []string{u.Mail}})
 	}
 
-	attrs = append(attrs, &ldap.EntryAttribute{"objectClass", []string{"posixAccount"}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount"}})
 
 	if len(u.LoginShell) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{u.LoginShell}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "loginShell", Values: []string{u.LoginShell}})
 	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{"loginShell", []string{"/bin/bash"}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "loginShell", Values: []string{"/bin/bash"}})
 	}
 
 	if len(u.Homedir) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{u.Homedir}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{u.Homedir}})
 	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{"homeDirectory", []string{"/home/" + u.Name}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "homeDirectory", Values: []string{"/home/" + u.Name}})
 	}
 
-	attrs = append(attrs, &ldap.EntryAttribute{"description", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"gecos", []string{fmt.Sprintf("%s via LDAP", u.Name)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-	attrs = append(attrs, &ldap.EntryAttribute{"memberOf", h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", u.Name)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "gecos", Values: []string{fmt.Sprintf("%s via LDAP", u.Name)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
 	if len(u.SSHKeys) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{"sshPublicKey", u.SSHKeys})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "sshPublicKey", Values: u.SSHKeys})
 	}
 	var dn string
 	if hierarchy == "" {
@@ -581,5 +582,5 @@ func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry
 	} else {
 		dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), hierarchy, h.backend.BaseDN)
 	}
-	return &ldap.Entry{dn, attrs}
+	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
