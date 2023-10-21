@@ -16,6 +16,7 @@ import (
 	"github.com/arl/statsviz"
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/internal/version"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
@@ -109,11 +110,14 @@ func startService() {
 		)
 	}
 
+	monitor := monitoring.NewMonitor(&log)
+
 	startConfigWatcher()
 
 	s, err := server.NewServer(
 		server.Logger(log),
 		server.Config(activeConfig),
+		server.Monitor(monitor),
 	)
 
 	if err != nil {

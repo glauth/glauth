@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog"
 	"net"
 	"net/url"
 	"os"
@@ -15,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/nmcclain/ldap"
@@ -34,6 +36,8 @@ type ldapHandler struct {
 	servers  []ldapBackend
 	helper   Handler
 	attm     *regexp.Regexp
+
+	monitor monitoring.MonitorInterface
 }
 
 // global lock for ldapHandler sessions & servers manipulation
@@ -71,6 +75,7 @@ func NewLdapHandler(opts ...Option) Handler {
 		helper:   options.Helper,
 		lock:     &ldaplock,
 		attm:     ldapattributematcher,
+		monitor:  options.Monitor,
 	}
 	// parse LDAP URLs
 	for _, ldapurl := range handler.backend.Servers {
@@ -88,7 +93,15 @@ func NewLdapHandler(opts ...Option) Handler {
 	return handler
 }
 
-func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "bind", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
+
 	h.log.Debug().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind request")
 
 	//	if h.helper != nil {
@@ -154,6 +167,14 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCod
 }
 
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "search", "status": fmt.Sprintf("%v", result.ResultCode)},
+			time.Since(start).Seconds(),
+		)
+	}()
+
 	wantAttributes := true
 	wantTypesOnly := false
 
@@ -297,16 +318,37 @@ func (h ldapHandler) buildReqAttributesList(filter string, filters []string) []s
 
 // Add is not yet supported for the ldap backend
 func (h ldapHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "add", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Modify is not yet supported for the ldap backend
 func (h ldapHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "modify", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Delete is not yet supported for the ldap backend
 func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "delete", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 

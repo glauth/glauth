@@ -2,13 +2,16 @@ package handler
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"net"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/GeertJohan/yubigo"
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/nmcclain/ldap"
@@ -21,6 +24,8 @@ type configHandler struct {
 	yubikeyAuth *yubigo.YubiAuth
 	ldohelper   LDAPOpsHelper
 	attmatcher  *regexp.Regexp
+
+	monitor monitoring.MonitorInterface
 }
 
 // NewConfigHandler creates a new config backed handler
@@ -34,6 +39,7 @@ func NewConfigHandler(opts ...Option) Handler {
 		yubikeyAuth: options.YubiAuth,
 		ldohelper:   options.LDAPHelper,
 		attmatcher:  configattributematcher,
+		monitor:     options.Monitor,
 	}
 	return handler
 }
@@ -52,27 +58,62 @@ func (h configHandler) GetYubikeyAuth() *yubigo.YubiAuth {
 }
 
 // Bind implements a bind request against the config file
-func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "bind", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return h.ldohelper.Bind(h, bindDN, bindSimplePw, conn)
 }
 
 // Search implements a search request against the config file
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "search", "status": fmt.Sprintf("%v", result.ResultCode)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return h.ldohelper.Search(h, bindDN, searchReq, conn)
 }
 
 // Add is not supported for a static config file
 func (h configHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "add", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Modify is not supported for a static config file
 func (h configHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "modify", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Delete is not supported for a static config file
 func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "delete", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
