@@ -3,28 +3,33 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
 	"plugin"
 
+	"github.com/rs/zerolog"
+
 	"github.com/GeertJohan/yubigo"
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/nmcclain/ldap"
 )
 
 type LdapSvc struct {
-	log      zerolog.Logger
 	c        *config.Config
 	yubiAuth *yubigo.YubiAuth
 	l        *ldap.Server
+
+	monitor monitoring.MonitorInterface
+	log     zerolog.Logger
 }
 
 func NewServer(opts ...Option) (*LdapSvc, error) {
 	options := newOptions(opts...)
 
 	s := LdapSvc{
-		log: options.Logger,
-		c:   options.Config,
+		log:     options.Logger,
+		c:       options.Config,
+		monitor: options.Monitor,
 	}
 
 	var err error
@@ -94,11 +99,13 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Handlers(allHandlers),
 				handler.Logger(&s.log),
 				handler.Helper(helper),
+				handler.Monitor(s.monitor),
 			)
 		case "owncloud":
 			h = handler.NewOwnCloudHandler(
 				handler.Backend(backend),
 				handler.Logger(&s.log),
+				handler.Monitor(s.monitor),
 			)
 		case "config":
 			h = handler.NewConfigHandler(
@@ -107,6 +114,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Config(s.c), // TODO only used to access Users and Groups, move that to dedicated options
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
+				handler.Monitor(s.monitor),
 			)
 		case "plugin":
 			plug, err := plugin.Open(backend.Plugin)
@@ -130,6 +138,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
+				handler.Monitor(s.monitor),
 			)
 		default:
 			return nil, fmt.Errorf("unsupported backend %s - must be one of 'config', 'ldap','owncloud' or 'plugin'", backend.Datastore)
@@ -147,6 +156,8 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		allHandlers.Handlers[i] = h
 		backendCounter++
 	}
+
+	monitoring.NewLDAPMonitorWatcher(s.l, s.monitor, &s.log)
 
 	return &s, nil
 }

@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+
 	"github.com/rs/zerolog"
 
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 )
 
@@ -14,6 +16,7 @@ type Option func(o *Options)
 type Options struct {
 	Logger  zerolog.Logger
 	Config  *config.Config
+	Monitor monitoring.MonitorInterface
 	Context context.Context
 }
 
@@ -46,5 +49,12 @@ func Config(val *config.Config) Option {
 func Context(val context.Context) Option {
 	return func(o *Options) {
 		o.Context = val
+	}
+}
+
+// Monitor provides a function to set the monitor option.
+func Monitor(val monitoring.MonitorInterface) Option {
+	return func(o *Options) {
+		o.Monitor = val
 	}
 }
