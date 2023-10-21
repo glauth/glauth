@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/rs/zerolog"
+
+	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
 	"github.com/nmcclain/ldap"
@@ -33,12 +36,22 @@ type ownCloudHandler struct {
 	client   *http.Client
 	sessions map[string]ownCloudSession
 	lock     *sync.Mutex
+
+	monitor monitoring.MonitorInterface
 }
 
 // global lock for ownCloudHandler sessions & servers manipulation
 var ownCloudLock sync.Mutex
 
-func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "bind", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
+
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.backend.BaseDN)
 
@@ -83,7 +96,15 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.
 	return ldap.LDAPResultSuccess, nil
 }
 
-func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
+func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "search", "status": fmt.Sprintf("%v", result.ResultCode)},
+			time.Since(start).Seconds(),
+		)
+	}()
+
 	bindDN = strings.ToLower(bindDN)
 	baseDN := strings.ToLower("," + h.backend.BaseDN)
 	searchBaseDN := strings.ToLower(searchReq.BaseDN)
@@ -174,16 +195,37 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 
 // Add is not yet supported for the owncloud backend
 func (h ownCloudHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "add", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Modify is not yet supported for the owncloud backend
 func (h ownCloudHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "modify", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Delete is not yet supported for the owncloud backend
 func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	start := time.Now()
+	defer func() {
+		h.monitor.SetResponseTimeMetric(
+			map[string]string{"operation": "delete", "status": fmt.Sprintf("%v", result)},
+			time.Since(start).Seconds(),
+		)
+	}()
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
@@ -371,5 +413,6 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 				},
 			},
 		},
+		monitor: options.Monitor,
 	}
 }

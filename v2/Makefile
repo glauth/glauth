@@ -45,11 +45,17 @@ help:
 #run: @ build and run - used for development
 run: setup devrun
 
+mocks:
+	go install go.uber.org/mock/mockgen@v0.3.0
+	# generate gomocks
+	go generate ./...
+.PHONY: mocks
+
 vet:
-	go vet ./...
+	-go vet ./...
 .PHONY: vet
 #test: @ runs the integration test on linuxamd64 (eventually allow the binary to be set)
-test: vet
+test: mocks vet
 	# also run unit tests for packages, skip glauth_test.go for now
 	go test -v -cover -coverprofile coverage.out ./pkg/... ./internal/...
 	$(MAKE) runtest
