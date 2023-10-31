@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelsql"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -52,6 +54,8 @@ type databaseHandler struct {
 	MemGroups   []config.Group
 	ldohelper   handler.LDAPOpsHelper
 	attmatcher  *regexp.Regexp
+
+	tracer trace.Tracer
 }
 
 func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.Handler {
@@ -88,7 +92,9 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 		sqlBackend:  sqlBackend,
 		database:    dbInfo,
 		ldohelper:   options.LDAPHelper,
-		attmatcher:  configattributematcher}
+		attmatcher:  configattributematcher,
+		tracer:      options.Tracer,
+	}
 
 	sqlBackend.CreateSchema(db)
 	sqlBackend.MigrateSchema(db, ColumnExists)
@@ -100,7 +106,7 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 
 func ColumnExists(db *sql.DB, tableName string, columnName string) bool {
 	var found string
-	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
+	err := db.QueryRowContext(context.Background(), fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
 		&found)
 	return err == nil
 }
@@ -132,29 +138,47 @@ func (h databaseHandler) GetYubikeyAuth() *yubigo.YubiAuth {
 }
 
 func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
-	return h.ldohelper.Bind(h, bindDN, bindSimplePw, conn)
+	ctx, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Bind")
+	defer span.End()
+
+	return h.ldohelper.Bind(ctx, h, bindDN, bindSimplePw, conn)
 }
 
 func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	return h.ldohelper.Search(h, bindDN, searchReq, conn)
+	ctx, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Search")
+	defer span.End()
+
+	return h.ldohelper.Search(ctx, h, bindDN, searchReq, conn)
 }
 
 // Add is not yet supported for the sql backend
 func (h databaseHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Add")
+	defer span.End()
+
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Modify is not yet supported for the sql backend
 func (h databaseHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Modify")
+	defer span.End()
+
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
 // Delete is not yet supported for the sql backend
 func (h databaseHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Delete")
+	defer span.End()
+
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error) {
+func (h databaseHandler) FindUser(ctx context.Context, userName string, searchByUPN bool) (f bool, u config.User, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.FindUser")
+	defer span.End()
+
 	var criterion string
 	if searchByUPN {
 		criterion = "lower(u.mail)"
@@ -166,11 +190,14 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	found := false
 
 	var disabled int
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
+	err = h.database.cnx.QueryRowContext(
+		ctx,
+		fmt.Sprintf(`
 			SELECT u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.disabled
 			FROM users u WHERE %s=%s`,
-		criterion,
-		h.sqlBackend.GetPrepareSymbol()), userName).Scan(
+			criterion,
+			h.sqlBackend.GetPrepareSymbol(),
+		), userName).Scan(
 		&user.UIDNumber, &user.PrimaryGroup, &user.PassBcrypt, &user.PassSHA256, &user.OTPSecret, &user.Yubikey, &disabled)
 	if err == nil {
 		user.Disabled = h.intToBool(disabled)
@@ -179,7 +206,7 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 
 			if !h.cfg.Behaviors.IgnoreCapabilities {
 				capability := config.Capability{}
-				rows, err := h.database.cnx.Query(fmt.Sprintf(`
+				rows, err := h.database.cnx.QueryContext(ctx, fmt.Sprintf(`
 				SELECT c.action,c.object
 				FROM capabilities c WHERE userid=%s`,
 					h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
@@ -199,11 +226,16 @@ func (h databaseHandler) FindUser(userName string, searchByUPN bool) (f bool, u 
 	return found, user, err
 }
 
-func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, err error) {
+func (h databaseHandler) FindGroup(ctx context.Context, groupName string) (f bool, g config.Group, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.FindGroup")
+	defer span.End()
+
 	group := config.Group{}
 	found := false
 
-	err = h.database.cnx.QueryRow(fmt.Sprintf(`
+	err = h.database.cnx.QueryRowContext(
+		ctx,
+		fmt.Sprintf(`
 			SELECT g.gidnumber FROM ldapgroups g WHERE lower(name)=%s`, h.sqlBackend.GetPrepareSymbol()), groupName).Scan(
 		&group.GIDNumber)
 	if err == nil {
@@ -213,15 +245,20 @@ func (h databaseHandler) FindGroup(groupName string) (f bool, g config.Group, er
 	return found, group, err
 }
 
-func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h databaseHandler) FindPosixAccounts(ctx context.Context, hierarchy string) (entrylist []*ldap.Entry, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.FindPosixAccounts")
+	defer span.End()
+
 	entries := []*ldap.Entry{}
 
-	h.MemGroups, err = h.memoizeGroups()
+	h.MemGroups, err = h.memoizeGroups(ctx)
 	if err != nil {
 		return entries, err
 	}
 
-	rows, err := h.database.cnx.Query(`
+	rows, err := h.database.cnx.QueryContext(
+		ctx,
+		`
 		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.sshkeys,u.custattr  
 		FROM users u`)
 	if err != nil {
@@ -239,11 +276,11 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 		if err != nil {
 			return entries, err
 		}
-		u.OtherGroups = h.commaListToIntTable(otherGroups)
+		u.OtherGroups = h.commaListToIntTable(ctx, otherGroups)
 		u.Disabled = h.intToBool(disabled)
-		u.SSHKeys = h.commaListToStringTable(sshKeys)
+		u.SSHKeys = h.commaListToStringTable(ctx, sshKeys)
 
-		entry := h.getAccount(hierarchy, u)
+		entry := h.getAccount(ctx, hierarchy, u)
 
 		if custattrstr != "{}" {
 			var r map[string]interface{}
@@ -276,16 +313,19 @@ func (h databaseHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.
 	return entries, nil
 }
 
-func (h databaseHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h databaseHandler) FindPosixGroups(ctx context.Context, hierarchy string) (entrylist []*ldap.Entry, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.FindPosixGroups")
+	defer span.End()
+
 	entries := []*ldap.Entry{}
 
-	h.MemGroups, err = h.memoizeGroups()
+	h.MemGroups, err = h.memoizeGroups(ctx)
 	if err != nil {
 		return entries, err
 	}
 
 	for _, g := range h.MemGroups {
-		info := h.getGroup(hierarchy, g)
+		info := h.getGroup(ctx, hierarchy, g)
 		if hierarchy != "groups" {
 			info.DN = strings.Replace(info.DN, ",ou=groups,", fmt.Sprintf(",%s,", hierarchy), 1)
 		}
@@ -296,6 +336,9 @@ func (h databaseHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.En
 }
 
 func (h databaseHandler) Close(boundDn string, conn net.Conn) error {
+	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Close")
+	defer span.End()
+
 	stats.Frontend.Add("closes", 1)
 	return nil
 }
@@ -307,7 +350,10 @@ func (h databaseHandler) intToBool(value int) bool {
 	return true
 }
 
-func (h databaseHandler) commaListToIntTable(commaList string) []int {
+func (h databaseHandler) commaListToIntTable(ctx context.Context, commaList string) []int {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.commaListToIntTable")
+	defer span.End()
+
 	if len(commaList) == 0 {
 		return make([]int, 0)
 	}
@@ -323,16 +369,24 @@ func (h databaseHandler) commaListToIntTable(commaList string) []int {
 	return rowsAsInts
 }
 
-func (h databaseHandler) commaListToStringTable(commaList string) []string {
+func (h databaseHandler) commaListToStringTable(ctx context.Context, commaList string) []string {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.commaListToStringTable")
+	defer span.End()
+
 	if len(commaList) == 0 {
 		return make([]string, 0)
 	}
 	return strings.Split(commaList, ",")
 }
 
-func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
+func (h databaseHandler) memoizeGroups(ctx context.Context) ([]config.Group, error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.memoizeGroups")
+	defer span.End()
+
 	workMemGroups := make([]*config.Group, 0)
-	rows, err := h.database.cnx.Query(`
+	rows, err := h.database.cnx.QueryContext(
+		ctx,
+		`
 		SELECT g1.name,g1.gidnumber,ig.includegroupid 
 		FROM ldapgroups g1 
 		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
@@ -369,7 +423,10 @@ func (h databaseHandler) memoizeGroups() ([]config.Group, error) {
 	return memGroups, nil
 }
 
-func (h databaseHandler) getGroupMemberDNs(gid int) []string {
+func (h databaseHandler) getGroupMemberDNs(ctx context.Context, gid int) []string {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.getGroupMemberDNs")
+	defer span.End()
+
 	var insertOuUsers string
 	if h.cfg.Behaviors.LegacyVersion > 0 && h.cfg.Behaviors.LegacyVersion <= 20100 {
 		insertOuUsers = ""
@@ -378,7 +435,9 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 	}
 	members := make(map[string]bool)
 
-	rows, err := h.database.cnx.Query(`
+	rows, err := h.database.cnx.QueryContext(
+		ctx,
+		`
 			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
 			FROM users u`)
 	if err != nil {
@@ -395,13 +454,13 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
-			u.OtherGroups = h.commaListToIntTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(ctx, otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -412,7 +471,7 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					includegroupmembers := h.getGroupMemberDNs(includegroupid)
+					includegroupmembers := h.getGroupMemberDNs(ctx, includegroupid)
 
 					for _, includegroupmember := range includegroupmembers {
 						members[includegroupmember] = true
@@ -433,9 +492,14 @@ func (h databaseHandler) getGroupMemberDNs(gid int) []string {
 }
 
 // Used exclusively when looking up Posix Groups
-func (h databaseHandler) getGroupMemberIDs(gid int) []string {
+func (h databaseHandler) getGroupMemberIDs(ctx context.Context, gid int) []string {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.getGroupMemberIDs")
+	defer span.End()
+
 	members := make(map[string]bool)
-	rows, err := h.database.cnx.Query(`
+	rows, err := h.database.cnx.QueryContext(
+		ctx,
+		`
 			SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups
 			FROM users u`)
 	if err != nil {
@@ -454,7 +518,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 		if u.PrimaryGroup == gid {
 			members[u.Name] = true
 		} else {
-			u.OtherGroups = h.commaListToIntTable(otherGroups)
+			u.OtherGroups = h.commaListToIntTable(ctx, otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
 					members[u.Name] = true
@@ -469,7 +533,7 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 				if includegroupid == gid {
 					h.log.Warn().Msg(fmt.Sprintf("Group: %d - Ignoring myself as included group", includegroupid))
 				} else {
-					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
+					includegroupmemberids := h.getGroupMemberIDs(ctx, includegroupid)
 
 					for _, includegroupmemberid := range includegroupmemberids {
 						members[includegroupmemberid] = true
@@ -490,7 +554,10 @@ func (h databaseHandler) getGroupMemberIDs(gid int) []string {
 }
 
 // Invoked for every user being returned from our database
-func (h databaseHandler) getGroupDNs(gids []int) []string {
+func (h databaseHandler) getGroupDNs(ctx context.Context, gids []int) []string {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.getGroupDNs")
+	defer span.End()
+
 	groups := make(map[string]bool)
 	for _, gid := range gids {
 		for _, g := range h.MemGroups {
@@ -501,7 +568,7 @@ func (h databaseHandler) getGroupDNs(gids []int) []string {
 
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid && g.GIDNumber != gid {
-					includegroupdns := h.getGroupDNs([]int{g.GIDNumber})
+					includegroupdns := h.getGroupDNs(ctx, []int{g.GIDNumber})
 
 					for _, includegroupdn := range includegroupdns {
 						groups[includegroupdn] = true
@@ -522,7 +589,10 @@ func (h databaseHandler) getGroupDNs(gids []int) []string {
 }
 
 // Invoked for every user being returned from our database
-func (h databaseHandler) getGroupName(gid int) string {
+func (h databaseHandler) getGroupName(ctx context.Context, gid int) string {
+	_, span := h.tracer.Start(ctx, "plugins.databaseHandler.getGroupName")
+	defer span.End()
+
 	for _, g := range h.MemGroups {
 		if g.GIDNumber == gid {
 			return g.Name
@@ -532,25 +602,31 @@ func (h databaseHandler) getGroupName(gid int) string {
 }
 
 // Toolbox
-func (h databaseHandler) getGroup(hierarchy string, g config.Group) *ldap.Entry {
+func (h databaseHandler) getGroup(ctx context.Context, hierarchy string, g config.Group) *ldap.Entry {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.getGroup")
+	defer span.End()
+
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
 	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
-	attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(g.GIDNumber)})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(ctx, g.GIDNumber)})
 	if asGroupOfUniqueNames {
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"groupOfUniqueNames", "top"}})
 	} else {
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(ctx, g.GIDNumber)})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 	}
 	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
 	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
 
-func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry {
+func (h databaseHandler) getAccount(ctx context.Context, hierarchy string, u config.User) *ldap.Entry {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.getAccount")
+	defer span.End()
+
 	attrs := []*ldap.EntryAttribute{}
 	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{u.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{u.Name}})
@@ -563,7 +639,7 @@ func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "sn", Values: []string{u.SN}})
 	}
 
-	attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(u.PrimaryGroup)}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(ctx, u.PrimaryGroup)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{fmt.Sprintf("%d", u.UIDNumber)}})
 
 	if u.Disabled {
@@ -594,15 +670,15 @@ func (h databaseHandler) getAccount(hierarchy string, u config.User) *ldap.Entry
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gecos", Values: []string{fmt.Sprintf("%s via LDAP", u.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-	attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(ctx, append(u.OtherGroups, u.PrimaryGroup))})
 	if len(u.SSHKeys) > 0 {
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "sshPublicKey", Values: u.SSHKeys})
 	}
 	var dn string
 	if hierarchy == "" {
-		dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+		dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
 	} else {
-		dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+		dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
 	}
 	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
