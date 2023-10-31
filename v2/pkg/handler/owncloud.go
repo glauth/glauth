@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -38,10 +39,34 @@ type ownCloudHandler struct {
 	lock     *sync.Mutex
 
 	monitor monitoring.MonitorInterface
+	tracer  trace.Tracer
 }
 
 // global lock for ownCloudHandler sessions & servers manipulation
 var ownCloudLock sync.Mutex
+
+func NewOwnCloudHandler(opts ...Option) Handler {
+	options := newOptions(opts...)
+
+	return ownCloudHandler{
+		backend:  options.Backend,
+		log:      options.Logger,
+		sessions: make(map[string]ownCloudSession),
+		lock:     &ownCloudLock,
+		client: &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: options.Backend.Insecure,
+				},
+			},
+		},
+		monitor: options.Monitor,
+		tracer:  options.Tracer,
+	}
+}
 
 func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
 	start := time.Now()
@@ -219,6 +244,9 @@ func (h ownCloudHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net
 
 // Delete is not yet supported for the owncloud backend
 func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "handler.configHandler.Delete")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -230,11 +258,17 @@ func (h ownCloudHandler) Delete(boundDN string, deleteDN string, conn net.Conn) 
 }
 
 // FindUser with the given username. Called by the ldap backend to authenticate the bind. Optional
-func (h ownCloudHandler) FindUser(userName string, searchByUPN bool) (found bool, user config.User, err error) {
+func (h ownCloudHandler) FindUser(ctx context.Context, userName string, searchByUPN bool) (found bool, user config.User, err error) {
+	_, span := h.tracer.Start(ctx, "handler.ownCloudHandler.FindUser")
+	defer span.End()
+
 	return false, config.User{}, nil
 }
 
-func (h ownCloudHandler) FindGroup(groupName string) (found bool, group config.Group, err error) {
+func (h ownCloudHandler) FindGroup(ctx context.Context, groupName string) (found bool, group config.Group, err error) {
+	_, span := h.tracer.Start(ctx, "handler.ownCloudHandler.FindGroup")
+	defer span.End()
+
 	return false, config.Group{}, nil
 }
 
@@ -393,26 +427,4 @@ func (s ownCloudSession) redirectPolicyFunc(req *http.Request, via []*http.Reque
 	s.log.Debug().Str("username", s.user).Msg("Setting user and password")
 	req.SetBasicAuth(s.user, s.password)
 	return nil
-}
-
-func NewOwnCloudHandler(opts ...Option) Handler {
-	options := newOptions(opts...)
-
-	return ownCloudHandler{
-		backend:  options.Backend,
-		log:      options.Logger,
-		sessions: make(map[string]ownCloudSession),
-		lock:     &ownCloudLock,
-		client: &http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: options.Backend.Insecure,
-				},
-			},
-		},
-		monitor: options.Monitor,
-	}
 }

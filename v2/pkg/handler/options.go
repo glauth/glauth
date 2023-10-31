@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/internal/monitoring"
@@ -24,6 +25,7 @@ type Options struct {
 	Helper     Handler
 	LDAPHelper LDAPOpsHelper
 	Monitor    monitoring.MonitorInterface
+	Tracer     trace.Tracer
 }
 
 // newOptions initializes the available default options.
@@ -108,5 +110,12 @@ func LDAPHelper(val LDAPOpsHelper) Option {
 func Monitor(val monitoring.MonitorInterface) Option {
 	return func(o *Options) {
 		o.Monitor = val
+	}
+}
+
+// Tracer provides a function to set the tracer option.
+func Tracer(val trace.Tracer) Option {
+	return func(o *Options) {
+		o.Tracer = val
 	}
 }
