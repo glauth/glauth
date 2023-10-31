@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -17,6 +18,7 @@ type Options struct {
 	Logger  zerolog.Logger
 	Config  *config.Config
 	Monitor monitoring.MonitorInterface
+	Tracer  trace.Tracer
 	Context context.Context
 }
 
@@ -56,5 +58,12 @@ func Context(val context.Context) Option {
 func Monitor(val monitoring.MonitorInterface) Option {
 	return func(o *Options) {
 		o.Monitor = val
+	}
+}
+
+// Tracer provides a function to set the tracer option.
+func Tracer(val trace.Tracer) Option {
+	return func(o *Options) {
+		o.Tracer = val
 	}
 }

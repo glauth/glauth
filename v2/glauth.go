@@ -15,6 +15,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/internal/toml"
+	"github.com/glauth/glauth/v2/internal/tracing"
 	"github.com/glauth/glauth/v2/internal/version"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
@@ -128,6 +129,7 @@ func startService() {
 	}
 
 	monitor := monitoring.NewMonitor(&log)
+	tracer := tracing.NewTracer(tracing.NewConfig(true, "", "", &log))
 
 	startConfigWatcher()
 
@@ -135,6 +137,7 @@ func startService() {
 		server.Logger(log),
 		server.Config(activeConfig),
 		server.Monitor(monitor),
+		server.Tracer(tracer),
 	)
 
 	if err != nil {
