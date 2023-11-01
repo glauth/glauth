@@ -15,6 +15,7 @@ require (
 	github.com/prometheus/client_model v0.5.0
 	github.com/rs/zerolog v1.31.0
 	github.com/smartystreets/goconvey v1.8.1
+	github.com/uptrace/opentelemetry-go-extra/otelsql v0.2.3
 	github.com/yaegashi/msgraph.go v0.1.4
 	go.opentelemetry.io/contrib/propagators/jaeger v1.20.0
 	go.opentelemetry.io/otel v1.19.0

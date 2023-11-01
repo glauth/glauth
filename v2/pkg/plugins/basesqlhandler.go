@@ -13,6 +13,9 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/uptrace/opentelemetry-go-extra/otelsql"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.10.0"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -55,7 +58,13 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	options := handler.NewOptions(opts...)
 
 	// Note: we will never terminate this connection pool.
-	db, err := sql.Open(sqlBackend.GetDriverName(), options.Backend.Database)
+	db, err := otelsql.Open(
+		sqlBackend.GetDriverName(),
+		options.Backend.Database,
+		otelsql.WithAttributes(otlpDriverAttribute(sqlBackend)),
+		otelsql.WithDBName(options.Backend.Database),
+	)
+
 	if err != nil {
 		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to open SQL database named '%s'", options.Backend.Database))
 		os.Exit(1)
@@ -94,6 +103,19 @@ func ColumnExists(db *sql.DB, tableName string, columnName string) bool {
 	err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
 		&found)
 	return err == nil
+}
+
+func otlpDriverAttribute(backend SqlBackend) attribute.KeyValue {
+	switch backend.GetDriverName() {
+	case "sqlite3":
+		return semconv.DBSystemSqlite
+	case "postgres":
+		return semconv.DBSystemPostgreSQL
+	case "mysql":
+		return semconv.DBSystemMySQL
+	default:
+		return semconv.DBSystemOtherSQL
+	}
 }
 
 func (h databaseHandler) GetBackend() config.Backend {

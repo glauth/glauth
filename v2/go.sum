@@ -89,6 +89,8 @@ github.com/smartystreets/goconvey v1.8.1/go.mod h1:+/u4qLyY6x1jReYOp7GOM2FSt8aP9
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
+github.com/uptrace/opentelemetry-go-extra/otelsql v0.2.3 h1:LNi0Qa7869/loPjz2kmMvp/jwZZnMZ9scMJKhDJ1DIo=
+github.com/uptrace/opentelemetry-go-extra/otelsql v0.2.3/go.mod h1:jyigonKik3C5V895QNiAGpKYKEvFuqjw9qAEZks1mUg=
 github.com/yaegashi/msgraph.go v0.1.4 h1:leDXSczAbwBpYFSmmZrdByTiPoUw8dbTfNMetAjJvbw=
 github.com/yaegashi/msgraph.go v0.1.4/go.mod h1:vgeYhHa5skJt/3lTyjGXThTZhwbhRnGo6uUxzoJIGME=
 github.com/yaegashi/wtz.go v0.0.2/go.mod h1:nOLA5QXsmdkRxBkP5tljhua13ADHCKirLBrzPf4PEJc=
