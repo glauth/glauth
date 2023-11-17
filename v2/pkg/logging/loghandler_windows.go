@@ -5,13 +5,14 @@ package logging
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"io"
 	"log"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // We will use this package to wrap log messages coming from libraries who have no interest
