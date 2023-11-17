@@ -90,6 +90,12 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	// configure the backends
 	s.l = ldap.NewServer()
 	s.l.EnforceLDAP = true
+
+	if tlsConfig := options.TLSConfig; tlsConfig != nil {
+		s.l.TLSConfig = tlsConfig
+		s.log.Info().Interface("tls.certificates", tlsConfig.Certificates).Msg("enabling LDAP over TLS")
+	}
+
 	for i, backend := range s.c.Backends {
 		var h handler.Handler
 		switch backend.Datastore {
