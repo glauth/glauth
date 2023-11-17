@@ -400,6 +400,25 @@ func validateConfig(cfg *config.Config) (*config.Config, error) {
 		if len(cfg.LDAP.Listen) == 0 {
 			return cfg, fmt.Errorf("no LDAP bind address was specified: please disable LDAP or use the 'listen' option")
 		}
+
+		if cfg.LDAP.TLS && cfg.LDAP.TLSCert == "" && cfg.LDAP.TLSCertPath != "" {
+			byteData, err := os.ReadFile(cfg.LDAP.TLSCertPath)
+			cfg.LDAP.TLSCert = string(byteData)
+
+			if err != nil {
+				return cfg, fmt.Errorf("unable to read TLS certificate file")
+			}
+		}
+
+		if cfg.LDAP.TLS && cfg.LDAP.TLSKey == "" && cfg.LDAP.TLSKeyPath != "" {
+			byteData, err := os.ReadFile(cfg.LDAP.TLSKeyPath)
+			cfg.LDAP.TLSKey = string(byteData)
+
+			if err != nil {
+				return cfg, fmt.Errorf("unable to read TLS key file")
+			}
+		}
+
 	}
 
 	//spew.Dump(cfg)

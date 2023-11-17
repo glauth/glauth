@@ -36,6 +36,12 @@ type Frontend struct {
 type LDAP struct {
 	Enabled bool
 	Listen  string
+	// StartTLS parameters
+	TLS         bool
+	TLSCert     string
+	TLSKey      string
+	TLSCertPath string
+	TLSKeyPath  string
 }
 type LDAPS struct {
 	Enabled bool
