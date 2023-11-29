@@ -25,3 +25,4 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           extra-files: |
             v2/internal/version/const.go
+          release-as: v2.3.1
