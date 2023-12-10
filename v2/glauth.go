@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	docopt "github.com/docopt/docopt-go"
 	"github.com/fsnotify/fsnotify"
 	"github.com/glauth/glauth/v2/internal/monitoring"
+	_tls "github.com/glauth/glauth/v2/internal/tls"
 	"github.com/glauth/glauth/v2/internal/toml"
 	"github.com/glauth/glauth/v2/internal/version"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -131,10 +133,22 @@ func startService() {
 
 	startConfigWatcher()
 
+	var err error
+	var tlsConfig *tls.Config
+	if c := activeConfig.LDAP; c.Enabled && c.TLS {
+		// TODO check if tls params are string or bytes and change config accordingly
+		tlsConfig, err = _tls.MakeTLS([]byte(c.TLSCert), []byte(c.TLSKey))
+
+		if err != nil {
+			log.Warn().Err(err).Msg("unable to configure TLS, proceeding without....StartTLS won't be supported")
+		}
+	}
+
 	s, err := server.NewServer(
 		server.Logger(log),
 		server.Config(activeConfig),
 		server.Monitor(monitor),
+		server.TLSConfig(tlsConfig),
 	)
 
 	if err != nil {
