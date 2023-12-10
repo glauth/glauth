@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nmcclain/ldap"
+	"github.com/glauth/ldap"
 	"github.com/rs/zerolog"
 	"go.uber.org/mock/gomock"
 )
