@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -26,50 +27,61 @@ type testEnv struct {
 
 func TestIntegerStuff(t *testing.T) {
 
-	Convey("Testing sample-simple local file-based LDAP server", t, func() {
-		svc := startSvc(SD, "bin/glauth", "-c", "sample-simple.cfg")
-		batteryOfTests(
-			t,
-			svc, testEnv{
-				checkanonymousrootDSE: true,
-				checkTOTP:             true,
-				checkbindUPN:          true,
-				expectedinfo:          "supportedLDAPVersion: 3",
-				svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
-				svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
-				otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-				expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-				scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-				expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-				expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
-				checkemployeetype:     "cn=hackers",
-			})
-		stopSvc(svc)
-	})
+	Convey("Preflight: Testing pre-requisites", t, func() {
+		Convey("bin/glauth should exist", func() {
+			info, err := os.Stat("bin/glauth")
+			So(err, ShouldEqual, nil)
+			Convey("bin/glauth should be executable", func() {
+				mode := uint32(info.Mode())
+				So(mode&0b001001001, ShouldNotEqual, 0)
 
-	matchingLibrary := doRunGetFirst(RD, "ls", "bin/sqlite.so")
-	if matchingLibrary == "bin/sqlite.so" {
-		Convey("Testing sample-database LDAP server", t, func() {
-			svc := startSvc(SD, "bin/glauth", "-c", "pkg/plugins/sample-database.cfg")
-			batteryOfTests(
-				t,
-				svc, testEnv{
-					checkanonymousrootDSE: true,
-					checkTOTP:             false,
-					checkbindUPN:          true,
-					expectedinfo:          "supportedLDAPVersion: 3",
-					svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
-					svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
-					otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-					expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-					scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-					expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-					expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
-					checkemployeetype:     "",
+				Convey("Testing sample-simple local file-based LDAP server", func() {
+					svc := startSvc(SD, "bin/glauth", "-c", "sample-simple.cfg")
+					batteryOfTests(
+						t,
+						svc, testEnv{
+							checkanonymousrootDSE: true,
+							checkTOTP:             true,
+							checkbindUPN:          true,
+							expectedinfo:          "supportedLDAPVersion: 3",
+							svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+							svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
+							otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
+							expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+							scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+							expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+							expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+							checkemployeetype:     "cn=hackers",
+						})
+					stopSvc(svc)
 				})
-			stopSvc(svc)
+
+				matchingLibrary := doRunGetFirst(RD, "ls", "bin/sqlite.so")
+				if matchingLibrary == "bin/sqlite.so" {
+					Convey("Testing sample-database LDAP server", func() {
+						svc := startSvc(SD, "bin/glauth", "-c", "pkg/plugins/sample-database.cfg")
+						batteryOfTests(
+							t,
+							svc, testEnv{
+								checkanonymousrootDSE: true,
+								checkTOTP:             false,
+								checkbindUPN:          true,
+								expectedinfo:          "supportedLDAPVersion: 3",
+								svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+								svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
+								otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
+								expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+								scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+								expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+								expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+								checkemployeetype:     "",
+							})
+						stopSvc(svc)
+					})
+				}
+			})
 		})
-	}
+	})
 
 	matchingContainers := doRunGetFirst(RD, "sh", "-c", "docker ps | grep openldap-service | wc -l")
 	if matchingContainers == "1" {

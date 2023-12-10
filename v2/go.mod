@@ -42,3 +42,7 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
+
+replace github.com/nmcclain/ldap => github.com/shipperizer/ldap v0.0.0-20231117095347-c1d6afe484ca
+
+// replace github.com/nmcclain/ldap => ../../../ldap
