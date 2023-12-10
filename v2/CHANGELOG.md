@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.2](https://github.com/glauth/glauth/compare/v2.2.1...v2.2.2) (2023-12-10)
+
+
+### Bug Fixes
+
+* drop vendored toml ([24455e3](https://github.com/glauth/glauth/commit/24455e39889716ce7ae1e7e8a7dacfa7d4c96080))
+* formatting ([c90cbfe](https://github.com/glauth/glauth/commit/c90cbfe5fb090fc19a55d64e01cd0e31c38bf2f0))
+* move all toml parsing into a new internal package, drop the mappings in favour of toml.Primitive decoding ([3ba8e11](https://github.com/glauth/glauth/commit/3ba8e1113217be647d240261322453d213ea7da4))
+* removed config setup from main, reshoring log configuration ([5fe8aca](https://github.com/glauth/glauth/commit/5fe8aca852bdfe7e375ea99b87074bae35fc3407))
+* upgrade to use BurntSushi/toml ([f9addbc](https://github.com/glauth/glauth/commit/f9addbc2c5b13ccc2779dbabc4c55bc8706f53d6))
+
 ## [2.3.0](https://github.com/glauth/glauth/compare/v2.2.0...v2.3.0) (2023-10-02)
 
 
