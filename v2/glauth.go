@@ -129,7 +129,14 @@ func startService() {
 	}
 
 	monitor := monitoring.NewMonitor(&log)
-	tracer := tracing.NewTracer(tracing.NewConfig(true, "", "", &log))
+	tracer := tracing.NewTracer(
+		tracing.NewConfig(
+			activeConfig.Tracing.Enabled,
+			activeConfig.Tracing.GRPCEndpoint,
+			activeConfig.Tracing.HTTPEndpoint,
+			&log,
+		),
+	)
 
 	startConfigWatcher()
 
