@@ -8,8 +8,8 @@ require (
 	github.com/arl/statsviz v0.6.0
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.6.0
+	github.com/glauth/ldap v0.0.0-20231210225823-b9bf4d1baf6e
 	github.com/jinzhu/copier v0.4.0
-	github.com/nmcclain/ldap v0.0.0-20210720162743-7f8d1e44eeba
 	github.com/pquerna/otp v1.4.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/client_model v0.5.0
