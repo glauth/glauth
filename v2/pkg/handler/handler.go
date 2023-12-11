@@ -1,13 +1,15 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/ldap"
 )
 
 type HelperMaker interface {
-	FindUser(userName string, searchByUPN bool) (bool, config.User, error)
-	FindGroup(groupName string) (bool, config.Group, error)
+	FindUser(ctx context.Context, userName string, searchByUPN bool) (bool, config.User, error)
+	FindGroup(ctx context.Context, groupName string) (bool, config.Group, error)
 }
 
 // Handler is the common interface for all datastores

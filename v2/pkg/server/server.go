@@ -6,6 +6,7 @@ import (
 	"plugin"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/internal/monitoring"
@@ -20,6 +21,7 @@ type LdapSvc struct {
 	l        *ldap.Server
 
 	monitor monitoring.MonitorInterface
+	tracer  trace.Tracer
 	log     zerolog.Logger
 }
 
@@ -30,6 +32,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		log:     options.Logger,
 		c:       options.Config,
 		monitor: options.Monitor,
+		tracer:  options.Tracer,
 	}
 
 	var err error
@@ -44,7 +47,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 
 	var helper handler.Handler
 
-	loh := handler.NewLDAPOpsHelper()
+	loh := handler.NewLDAPOpsHelper(s.tracer)
 
 	// instantiate the helper, if any
 	if s.c.Helper.Enabled {
@@ -55,6 +58,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
+				handler.Tracer(s.tracer),
 			)
 		case "plugin":
 			plug, err := plugin.Open(s.c.Helper.Plugin)
@@ -77,6 +81,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
+				handler.Tracer(s.tracer),
 			)
 		default:
 			return nil, fmt.Errorf("unsupported helper %s - must be one of 'config', 'plugin'", s.c.Helper.Datastore)
@@ -106,12 +111,14 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Logger(&s.log),
 				handler.Helper(helper),
 				handler.Monitor(s.monitor),
+				handler.Tracer(s.tracer),
 			)
 		case "owncloud":
 			h = handler.NewOwnCloudHandler(
 				handler.Backend(backend),
 				handler.Logger(&s.log),
 				handler.Monitor(s.monitor),
+				handler.Tracer(s.tracer),
 			)
 		case "config":
 			h = handler.NewConfigHandler(
@@ -121,6 +128,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
 				handler.Monitor(s.monitor),
+				handler.Tracer(s.tracer),
 			)
 		case "plugin":
 			plug, err := plugin.Open(backend.Plugin)
@@ -145,6 +153,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.YubiAuth(s.yubiAuth),
 				handler.LDAPHelper(loh),
 				handler.Monitor(s.monitor),
+				handler.Tracer(s.tracer),
 			)
 		default:
 			return nil, fmt.Errorf("unsupported backend %s - must be one of 'config', 'ldap','owncloud' or 'plugin'", backend.Datastore)

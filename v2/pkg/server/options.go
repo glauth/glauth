@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
@@ -15,11 +16,12 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
-	Logger    zerolog.Logger
-	Config    *config.Config
-	Monitor   monitoring.MonitorInterface
-	TLSConfig *tls.Config
-	Context   context.Context
+	Logger  zerolog.Logger
+	Config  *config.Config
+	TLSConfig *tls.Config  
+	Monitor monitoring.MonitorInterface
+	Tracer  trace.Tracer
+	Context context.Context
 }
 
 // newOptions initializes the available default options.
@@ -65,5 +67,12 @@ func TLSConfig(val *tls.Config) Option {
 func Monitor(val monitoring.MonitorInterface) Option {
 	return func(o *Options) {
 		o.Monitor = val
+	}
+}
+
+// Tracer provides a function to set the tracer option.
+func Tracer(val trace.Tracer) Option {
+	return func(o *Options) {
+		o.Tracer = val
 	}
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/internal/monitoring"
@@ -26,6 +28,7 @@ type configHandler struct {
 	attmatcher  *regexp.Regexp
 
 	monitor monitoring.MonitorInterface
+	tracer  trace.Tracer
 }
 
 // NewConfigHandler creates a new config backed handler
@@ -40,6 +43,7 @@ func NewConfigHandler(opts ...Option) Handler {
 		ldohelper:   options.LDAPHelper,
 		attmatcher:  configattributematcher,
 		monitor:     options.Monitor,
+		tracer:      options.Tracer,
 	}
 	return handler
 }
@@ -59,6 +63,9 @@ func (h configHandler) GetYubikeyAuth() *yubigo.YubiAuth {
 
 // Bind implements a bind request against the config file
 func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	ctx, span := h.tracer.Start(context.Background(), "handler.configHandler.Bind")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -66,11 +73,14 @@ func (h configHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result 
 			time.Since(start).Seconds(),
 		)
 	}()
-	return h.ldohelper.Bind(h, bindDN, bindSimplePw, conn)
+	return h.ldohelper.Bind(ctx, h, bindDN, bindSimplePw, conn)
 }
 
 // Search implements a search request against the config file
 func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+	ctx, span := h.tracer.Start(context.Background(), "handler.configHandler.Search")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -78,11 +88,14 @@ func (h configHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn 
 			time.Since(start).Seconds(),
 		)
 	}()
-	return h.ldohelper.Search(h, bindDN, searchReq, conn)
+	return h.ldohelper.Search(ctx, h, bindDN, searchReq, conn)
 }
 
 // Add is not supported for a static config file
 func (h configHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "handler.configHandler.Add")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -95,6 +108,9 @@ func (h configHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (
 
 // Modify is not supported for a static config file
 func (h configHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "handler.configHandler.Modify")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -107,6 +123,9 @@ func (h configHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.C
 
 // Delete is not supported for a static config file
 func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
+	_, span := h.tracer.Start(context.Background(), "handler.configHandler.Delete")
+	defer span.End()
+
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
@@ -117,7 +136,9 @@ func (h configHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (r
 	return ldap.LDAPResultInsufficientAccessRights, nil
 }
 
-func (h configHandler) FindUser(userName string, searchByUPN bool) (f bool, u config.User, err error) {
+func (h configHandler) FindUser(ctx context.Context, userName string, searchByUPN bool) (f bool, u config.User, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.FindUser")
+	defer span.End()
 	user := config.User{}
 	found := false
 
@@ -138,7 +159,9 @@ func (h configHandler) FindUser(userName string, searchByUPN bool) (f bool, u co
 	return found, user, nil
 }
 
-func (h configHandler) FindGroup(groupName string) (f bool, g config.Group, err error) {
+func (h configHandler) FindGroup(ctx context.Context, groupName string) (f bool, g config.Group, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.FindGroup")
+	defer span.End()
 	// TODO Does g get erased, and above does u get erased?
 	// TODO and what about f?
 	group := config.Group{}
@@ -152,7 +175,10 @@ func (h configHandler) FindGroup(groupName string) (f bool, g config.Group, err 
 	return found, group, nil
 }
 
-func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixAccounts(ctx context.Context, hierarchy string) (entrylist []*ldap.Entry, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.FindPosixAccounts")
+	defer span.End()
+
 	entries := []*ldap.Entry{}
 
 	for _, u := range h.cfg.Users {
@@ -168,7 +194,7 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "sn", Values: []string{u.SN}})
 		}
 
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(u.PrimaryGroup)}})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "ou", Values: []string{h.getGroupName(ctx, u.PrimaryGroup)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uidNumber", Values: []string{fmt.Sprintf("%d", u.UIDNumber)}})
 
 		if u.Disabled {
@@ -199,7 +225,7 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", u.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gecos", Values: []string{fmt.Sprintf("%s", u.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(append(u.OtherGroups, u.PrimaryGroup))})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(ctx, append(u.OtherGroups, u.PrimaryGroup))})
 
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowExpire", Values: []string{"-1"}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "shadowFlag", Values: []string{"134538308"}})
@@ -234,9 +260,9 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 		}
 		var dn string
 		if hierarchy == "" {
-			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), h.backend.BaseDN)
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
 		} else {
-			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
 		}
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
@@ -244,7 +270,10 @@ func (h configHandler) FindPosixAccounts(hierarchy string) (entrylist []*ldap.En
 	return entries, nil
 }
 
-func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entry, err error) {
+func (h configHandler) FindPosixGroups(ctx context.Context, hierarchy string) (entrylist []*ldap.Entry, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.FindPosixGroups")
+	defer span.End()
+
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	entries := []*ldap.Entry{}
@@ -255,11 +284,11 @@ func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entr
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(g.GIDNumber)})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(ctx, g.GIDNumber)})
 		if asGroupOfUniqueNames {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"groupOfUniqueNames", "top"}})
 		} else {
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(g.GIDNumber)})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(ctx, g.GIDNumber)})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 		}
 		dn := fmt.Sprintf("%s=%s,%s,%s", h.backend.GroupFormat, g.Name, hierarchy, h.backend.BaseDN)
@@ -271,11 +300,17 @@ func (h configHandler) FindPosixGroups(hierarchy string) (entrylist []*ldap.Entr
 
 // Close does not actually close anything, because the config data is kept in memory
 func (h configHandler) Close(boundDn string, conn net.Conn) error {
+	_, span := h.tracer.Start(context.Background(), "handler.configHandler.Close")
+	defer span.End()
+
 	stats.Frontend.Add("closes", 1)
 	return nil
 }
 
-func (h configHandler) getGroupMemberDNs(gid int) []string {
+func (h configHandler) getGroupMemberDNs(ctx context.Context, gid int) []string {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.getGroupMemberDNs")
+	defer span.End()
+
 	var insertOuUsers string
 	if h.cfg.Behaviors.LegacyVersion > 0 && h.cfg.Behaviors.LegacyVersion <= 20100 {
 		insertOuUsers = ""
@@ -285,12 +320,12 @@ func (h configHandler) getGroupMemberDNs(gid int) []string {
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -301,7 +336,7 @@ func (h configHandler) getGroupMemberDNs(gid int) []string {
 		if gid == g.GIDNumber {
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid != gid {
-					includegroupmembers := h.getGroupMemberDNs(includegroupid)
+					includegroupmembers := h.getGroupMemberDNs(ctx, includegroupid)
 
 					for _, includegroupmember := range includegroupmembers {
 						members[includegroupmember] = true
@@ -321,7 +356,10 @@ func (h configHandler) getGroupMemberDNs(gid int) []string {
 	return m
 }
 
-func (h configHandler) getGroupMemberIDs(gid int) []string {
+func (h configHandler) getGroupMemberIDs(ctx context.Context, gid int) []string {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.getGroupMemberIDs")
+	defer span.End()
+
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
@@ -341,7 +379,7 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 				if includegroupid == gid {
 					h.log.Warn().Int("groupid", includegroupid).Msg("Ignoring myself as included group")
 				} else {
-					includegroupmemberids := h.getGroupMemberIDs(includegroupid)
+					includegroupmemberids := h.getGroupMemberIDs(ctx, includegroupid)
 
 					for _, includegroupmemberid := range includegroupmemberids {
 						members[includegroupmemberid] = true
@@ -362,7 +400,10 @@ func (h configHandler) getGroupMemberIDs(gid int) []string {
 }
 
 // Converts an array of GUIDs into an array of DNs
-func (h configHandler) getGroupDNs(gids []int) []string {
+func (h configHandler) getGroupDNs(ctx context.Context, gids []int) []string {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.getGroupDNs")
+	defer span.End()
+
 	groups := make(map[string]bool)
 	for _, gid := range gids {
 		for _, g := range h.cfg.Groups {
@@ -373,7 +414,7 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 
 			for _, includegroupid := range g.IncludeGroups {
 				if includegroupid == gid && g.GIDNumber != gid {
-					includegroupdns := h.getGroupDNs([]int{g.GIDNumber})
+					includegroupdns := h.getGroupDNs(ctx, []int{g.GIDNumber})
 
 					for _, includegroupdn := range includegroupdns {
 						groups[includegroupdn] = true
@@ -393,7 +434,10 @@ func (h configHandler) getGroupDNs(gids []int) []string {
 	return g
 }
 
-func (h configHandler) getGroupName(gid int) string {
+func (h configHandler) getGroupName(ctx context.Context, gid int) string {
+	ctx, span := h.tracer.Start(ctx, "handler.configHandler.getGroupName")
+	defer span.End()
+
 	for _, g := range h.cfg.Groups {
 		if g.GIDNumber == gid {
 			return g.Name

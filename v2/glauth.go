@@ -17,6 +17,7 @@ import (
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	_tls "github.com/glauth/glauth/v2/internal/tls"
 	"github.com/glauth/glauth/v2/internal/toml"
+	"github.com/glauth/glauth/v2/internal/tracing"
 	"github.com/glauth/glauth/v2/internal/version"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/frontend"
@@ -130,6 +131,14 @@ func startService() {
 	}
 
 	monitor := monitoring.NewMonitor(&log)
+	tracer := tracing.NewTracer(
+		tracing.NewConfig(
+			activeConfig.Tracing.Enabled,
+			activeConfig.Tracing.GRPCEndpoint,
+			activeConfig.Tracing.HTTPEndpoint,
+			&log,
+		),
+	)
 
 	startConfigWatcher()
 
@@ -147,8 +156,9 @@ func startService() {
 	s, err := server.NewServer(
 		server.Logger(log),
 		server.Config(activeConfig),
+		server.TLSConfig(tlsConfig),    
 		server.Monitor(monitor),
-		server.TLSConfig(tlsConfig),
+		server.Tracer(tracer),
 	)
 
 	if err != nil {
