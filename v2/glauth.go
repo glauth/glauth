@@ -156,7 +156,7 @@ func startService() {
 	s, err := server.NewServer(
 		server.Logger(log),
 		server.Config(activeConfig),
-		server.TLSConfig(tlsConfig),    
+		server.TLSConfig(tlsConfig),
 		server.Monitor(monitor),
 		server.Tracer(tracer),
 	)

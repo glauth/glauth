@@ -17,9 +17,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.18.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/embedded"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 type Tracer struct {
+    embedded.Tracer
+
 	tracer trace.Tracer
 
 	logger *zerolog.Logger
@@ -87,7 +91,7 @@ func NewTracer(cfg *Config) *Tracer {
 
 	// if tracing disabled skip the config
 	if !cfg.Enabled {
-		t.tracer = trace.NewNoopTracerProvider().Tracer("github.com/glauth/glauth")
+		t.tracer = noop.NewTracerProvider().Tracer("github.com/glauth/glauth")
 
 		return t
 	}
