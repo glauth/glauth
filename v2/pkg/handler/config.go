@@ -16,7 +16,7 @@ import (
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/nmcclain/ldap"
+	"github.com/glauth/ldap"
 )
 
 type configHandler struct {

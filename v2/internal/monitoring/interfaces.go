@@ -1,6 +1,6 @@
 package monitoring
 
-import "github.com/nmcclain/ldap"
+import "github.com/glauth/ldap"
 
 type MonitorInterface interface {
 	SetResponseTimeMetric(map[string]string, float64) error

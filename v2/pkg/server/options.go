@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
@@ -17,6 +18,7 @@ type Option func(o *Options)
 type Options struct {
 	Logger  zerolog.Logger
 	Config  *config.Config
+	TLSConfig *tls.Config  
 	Monitor monitoring.MonitorInterface
 	Tracer  trace.Tracer
 	Context context.Context
@@ -51,6 +53,13 @@ func Config(val *config.Config) Option {
 func Context(val context.Context) Option {
 	return func(o *Options) {
 		o.Context = val
+	}
+}
+
+// TLSConfig provides a function to set the TLS config option.
+func TLSConfig(val *tls.Config) Option {
+	return func(o *Options) {
+		o.TLSConfig = val
 	}
 }
 
