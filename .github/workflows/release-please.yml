@@ -2,7 +2,7 @@ on:
   pull_request:
   push:
     branches:
-      - dev
+      - master
 
 permissions:
   contents: write
