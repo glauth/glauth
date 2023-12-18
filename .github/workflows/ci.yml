@@ -13,7 +13,7 @@ jobs:
         go-version: [1.21.x]
     steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
       - name: Updating packages database
