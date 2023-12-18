@@ -22,7 +22,7 @@ import (
 )
 
 type Tracer struct {
-    embedded.Tracer
+	embedded.Tracer
 
 	tracer trace.Tracer
 
