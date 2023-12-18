@@ -16,12 +16,12 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
-	Logger  zerolog.Logger
-	Config  *config.Config
-	TLSConfig *tls.Config  
-	Monitor monitoring.MonitorInterface
-	Tracer  trace.Tracer
-	Context context.Context
+	Logger    zerolog.Logger
+	Config    *config.Config
+	TLSConfig *tls.Config
+	Monitor   monitoring.MonitorInterface
+	Tracer    trace.Tracer
+	Context   context.Context
 }
 
 // newOptions initializes the available default options.

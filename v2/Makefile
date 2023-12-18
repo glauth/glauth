@@ -87,7 +87,7 @@ updatetest:
 	./scripts/ci/integration-test.sh
 
 format:
-	go fmt
+	go fmt ./...
 
 devrun:
 	go run ${BUILD_FILES} -c sample-simple.cfg
