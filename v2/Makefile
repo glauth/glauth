@@ -1,5 +1,7 @@
 .DEFAULT_GOAL := help
 
+MAKEFLAGS += --no-print-directory
+
 VERSION=$(shell bin/linuxamd64/glauth --version)
 
 GIT_COMMIT=$(shell git rev-list -1 HEAD )
@@ -21,8 +23,8 @@ BUILD_FILES=.
 TRIM_FLAGS>?=-trimpath
 
 # Targets
-MAIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
-PLUGIN_TARGETS=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
+MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
+PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
 
 # For release process
 GO_RELEASE_V=$(shell go version | { read _ _ v _; echo $${v#go}; })
@@ -74,6 +76,12 @@ setup: getdeps format
 #####################
 # Subcommands
 #####################
+
+prepbuild:
+	@if [ ! -e $M/.ignore ] ; \
+	then \
+		mkdir -p buildlogs;\
+	fi
 
 # Run integration test
 runtest:
@@ -133,16 +141,15 @@ winamd64:
 verify:
 	@for binary in linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
-pull-plugin:
-	@git submodule add $U $M && \
+pull-plugin-dependencies:
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
-#pull-base-plugins: @ pull plugins for local building
-pull-base-plugins:
-	@U=https://github.com/glauth/glauth-sqlite M=pkg/plugins/glauth-sqlite make pull-plugin && \
-	U=https://github.com/glauth/glauth-mysql M=pkg/plugins/glauth-mysql make pull-plugin && \
-	U=https://github.com/glauth/glauth-postgres M=pkg/plugins/glauth-postgres make pull-plugin && \
-	U=https://github.com/glauth/glauth-pam M=pkg/plugins/glauth-pam make pull-plugin
+#prepare-plugins-release: @ pull plugins dependencies for local building
+prepare-plugins-release:
+	@M=pkg/plugins/glauth-sqlite make pull-plugin-dependencies && \
+	M=pkg/plugins/glauth-mysql make pull-plugin-dependencies && \
+	M=pkg/plugins/glauth-postgres make pull-plugin-dependencies && \
+	M=pkg/plugins/glauth-pam make pull-plugin-dependencies
 
 forget-plugin:
 	rm -rf $M ../.git/modules/v2/$M && \
@@ -157,12 +164,16 @@ forget-plugins:
 	done
 
 #releasemain: @ build main binaries for distribution
-releasemain:
+releasemain: prepbuild
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
 
-releaseplugin:
-	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
-	(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done)
+releaseplugin: prepbuild
+	@echo "Building $P plugin"; \
+	if [ ! -e $M/.ignore ] ; \
+	then \
+		xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
+		(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done); \
+	fi
 
 #releaseplugins: @ build base plugins for distribution
 releaseplugins:
@@ -236,4 +247,4 @@ testdocker:
 	docker rm glauth-test && \
 	echo "==> Testing complete."
 
-.PHONY: all run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins releasemain releaseplugin release releaseplugins releasedockermain releaserdockerplugins releasedocker testdocker
+.PHONY: all prepbuild run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins releasemain releaseplugin release releaseplugins releasedockermain releaserdockerplugins releasedocker testdocker
