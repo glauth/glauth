@@ -82,7 +82,7 @@ type User struct {
 	PassBcrypt    string
 	PassAppSHA256 []string
 	PassAppBcrypt []string
-	PassAppCustom UserAuthenticator
+	PassAppCustom UserAuthenticator `toml:"-"`
 	PrimaryGroup  int
 	Capabilities  []Capability
 	SSHKeys       []string
