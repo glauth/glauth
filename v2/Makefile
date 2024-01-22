@@ -106,7 +106,7 @@ mkbindir:
 .PHONY: mkbindir
 
 build: mkbindir
-	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs=false .
+	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
 	$(MAKE) sha256
 .PHONY: build
 
