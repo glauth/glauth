@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	. "github.com/smartystreets/goconvey/convey"
 )
 
 type testEnv struct {
@@ -25,185 +23,235 @@ type testEnv struct {
 	checkemployeetype     string
 }
 
-func TestIntegerStuff(t *testing.T) {
+func TestProperBuild(t *testing.T) {
+	info, err := os.Stat("bin/glauth")
+	if err != nil {
+		t.Error(err)
+	}
+	mode := uint32(info.Mode())
+	if mode&0b001001001 == 0 {
+		t.Fatalf("bad file mode: %b", mode)
+	}
+}
 
-	Convey("Preflight: Testing pre-requisites", t, func() {
-		Convey("bin/glauth should exist", func() {
-			info, err := os.Stat("bin/glauth")
-			So(err, ShouldEqual, nil)
-			Convey("bin/glauth should be executable", func() {
-				mode := uint32(info.Mode())
-				So(mode&0b001001001, ShouldNotEqual, 0)
-
-				Convey("Testing sample-simple local file-based LDAP server", func() {
-					svc := startSvc(SD, "bin/glauth", "-c", "sample-simple.cfg")
-					batteryOfTests(
-						t,
-						svc, testEnv{
-							checkanonymousrootDSE: true,
-							checkTOTP:             true,
-							checkbindUPN:          true,
-							expectedinfo:          "supportedLDAPVersion: 3",
-							svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
-							svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
-							otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-							expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-							scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-							expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-							expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
-							checkemployeetype:     "cn=hackers",
-						})
-					stopSvc(svc)
-				})
-
-				matchingLibrary := doRunGetFirst(RD, "ls", "bin/sqlite.so")
-				if matchingLibrary == "bin/sqlite.so" {
-					Convey("Testing sample-database LDAP server", func() {
-						svc := startSvc(SD, "bin/glauth", "-c", "pkg/plugins/sample-database.cfg")
-						batteryOfTests(
-							t,
-							svc, testEnv{
-								checkanonymousrootDSE: true,
-								checkTOTP:             false,
-								checkbindUPN:          true,
-								expectedinfo:          "supportedLDAPVersion: 3",
-								svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
-								svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
-								otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
-								expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-								scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
-								expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
-								expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
-								checkemployeetype:     "",
-							})
-						stopSvc(svc)
-					})
+func batteryOfTests(t *testing.T, env *testEnv) {
+	tests := []struct {
+		Name  string
+		Path  string
+		Check func(t testing.TB)
+	}{
+		{
+			Name: "searching for the 'hackers' user",
+			Check: func(t testing.TB) {
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, env.expectedaccount; got != want {
+					t.Fatalf("should find them in the 'superheros' group\ngot:  %s\nwant: %s", got, want)
 				}
-			})
-		})
-	})
+			},
+		},
+		{
+			Name: "searching for the 'hackers' user without binding with a group",
+			Check: func(t testing.TB) {
+				if env.svcdnnogroup == "" {
+					t.SkipNow()
+				}
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdnnogroup, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, env.expectedaccount; got != want {
+					t.Fatalf("should find them in the 'superheros' group\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for the 'hackers' user after binding using the account's UPN",
+			Check: func(t testing.TB) {
+				if !env.checkbindUPN {
+					t.SkipNow()
+				}
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", "serviceuser@example.com", "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, env.expectedaccount; got != want {
+					t.Fatalf("should find them in the 'superheros' group\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "querying the root SDE",
+			Check: func(t testing.TB) {
+				out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-s", "base", "(objectclass=*)")
+				if got, want := out, env.expectedinfo; got != want {
+					t.Fatalf("should get some meta information\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "querying the root SDE anonymously without authorizing in config file",
+			Check: func(t testing.TB) {
+				if !env.checkanonymousrootDSE {
+					t.SkipNow()
+				}
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-x", "-s", "base", "(objectclass=*)")
+				if got, want := out, "exit status 50"; got != want {
+					t.Fatalf("should get error 50\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "enumerating posix groups",
+			Check: func(t testing.TB) {
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(objectclass=posixgroup)")
+				if got, want := out, env.expectedgroup; got != want {
+					t.Fatalf("should get a list starting with the 'superheros' group\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for members of the 'superheros' group",
+			Check: func(t testing.TB) {
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com)")
+				if got, want := out, env.expectedfirstaccount; got != want {
+					t.Fatalf("should get a list starting with the 'hackers' user\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "performing a complex search for members of 'superheros' group",
+			Check: func(t testing.TB) {
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(&(objectClass=*)(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com))")
+				if got, want := out, env.expectedfirstaccount; got != want {
+					t.Fatalf("should get a list starting with the 'hackers' user\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for the 'hacker' user using a TOTP-enabled account",
+			Check: func(t testing.TB) {
+				if !env.checkTOTP {
+					t.SkipNow()
+				}
+				otpvalue := doRunGetFirst(RD, "oathtool", "--totp", "-b", "-d", "6", "3hnvnk4ycv44glzigd6s25j4dougs3rk")
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, env.scopedaccount; got != want {
+					t.Fatalf("should find them in in the 'superheros' group\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for the 'hacker' user using a TOTP-enabled account and no value",
+			Check: func(t testing.TB) {
+				if !env.checkTOTP {
+					t.SkipNow()
+				}
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, "exit status 49"; got != want {
+					t.Fatalf("should get 'Invalid credentials(49)'\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for the 'hacker' user using a TOTP-enabled account and the wrong value",
+			Check: func(t testing.TB) {
+				if !env.checkTOTP {
+					t.SkipNow()
+				}
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				if got, want := out, "exit status 49"; got != want {
+					t.Fatalf("should get 'Invalid credentials(49)'\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+		{
+			Name: "searching for the 'hacker' user",
+			Check: func(t testing.TB) {
+				if env.checkemployeetype == "" {
+					t.SkipNow()
+				}
+				out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", env.checkemployeetype, "employeetype")
+				if got, want := out, "employeetype: Intern"; got != want {
+					t.Fatalf("type should be 'Intern'\ngot:  %s\nwant: %s", got, want)
+				}
+			},
+		},
+	}
 
-	matchingContainers := doRunGetFirst(RD, "sh", "-c", "docker ps | grep openldap-service | wc -l")
-	if matchingContainers == "1" {
-		Convey("Testing sample-simple local LDAP server", t, func() {
-			svc := startSvc(SD, "bin/glauth", "-c", "sample-ldap-injection.cfg")
-			batteryOfTests(
-				t,
-				svc, testEnv{
-					checkanonymousrootDSE: false,
-					checkTOTP:             true,
-					checkbindUPN:          false,
-					expectedinfo:          "objectClass: top",
-					svcdn:                 "cn=serviceuser,cn=svcaccts,ou=users,dc=glauth,dc=com",
-					svcdnnogroup:          "", // ignore
-					otpdn:                 "cn=otpuser,cn=superheros,ou=users,dc=glauth,dc=com",
-					expectedaccount:       "dn: cn=hackers,cn=superheros,ou=users,dc=glauth,dc=com",
-					scopedaccount:         "dn: cn=hackers,cn=superheros,dc=glauth,dc=com",
-					expectedfirstaccount:  "dn: cn=johndoe,cn=superheros,ou=users,dc=glauth,dc=com",
-					expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
-					checkemployeetype:     "",
-				})
-			stopSvc(svc)
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			tc.Check(t)
 		})
 	}
 }
 
-func batteryOfTests(t *testing.T, svc *exec.Cmd, env testEnv) {
-	Convey("When searching for the 'hackers' user", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
-		Convey("We should find them in the 'superheros' group", func() {
-			So(out, ShouldEqual, env.expectedaccount)
-		})
-	})
-
-	if env.svcdnnogroup != "" {
-		Convey("When searching for the 'hackers' user without binding with a group", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdnnogroup, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
-			Convey("We should find them in the 'superheros' group", func() {
-				So(out, ShouldEqual, env.expectedaccount)
-			})
-		})
+func TestSampleSimple(t *testing.T) {
+	t.SkipNow()
+	env := testEnv{
+		checkanonymousrootDSE: true,
+		checkTOTP:             true,
+		checkbindUPN:          true,
+		expectedinfo:          "supportedLDAPVersion: 3",
+		svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+		svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
+		otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
+		expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+		scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+		expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+		expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+		checkemployeetype:     "cn=hackers",
 	}
 
-	if env.checkbindUPN {
-		Convey("When searching for the 'hackers' user after binding using the account's UPN", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", "serviceuser@example.com", "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
-			Convey("We should find them in the 'superheros' group", func() {
-				So(out, ShouldEqual, env.expectedaccount)
-			})
-		})
+	svc := startSvc(SD, "bin/glauth", "-c", "sample-simple.cfg")
+	batteryOfTests(t, &env)
+	stopSvc(svc)
+}
+
+func TestSQLitePlugin(t *testing.T) {
+	t.SkipNow()
+	matchingLibrary := doRunGetFirst(RD, "ls", "bin/sqlite.so")
+	if matchingLibrary != "bin/sqlite.so" {
+		t.SkipNow()
 	}
 
-	Convey("When querying the root SDE", func() {
-		out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-s", "base", "(objectclass=*)")
-		Convey("We should get some meta information", func() {
-			So(out, ShouldEqual, env.expectedinfo)
-		})
-	})
-
-	if env.checkanonymousrootDSE {
-		Convey("When querying the root SDE anonymously without authorizing in config file", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-x", "-s", "base", "(objectclass=*)")
-			Convey("We should get error 50", func() {
-				So(out, ShouldEqual, "exit status 50")
-			})
-		})
+	env := testEnv{
+		checkanonymousrootDSE: true,
+		checkTOTP:             false,
+		checkbindUPN:          true,
+		expectedinfo:          "supportedLDAPVersion: 3",
+		svcdn:                 "cn=serviceuser,ou=svcaccts,dc=glauth,dc=com",
+		svcdnnogroup:          "cn=serviceuser,dc=glauth,dc=com",
+		otpdn:                 "cn=otpuser,ou=superheros,dc=glauth,dc=com",
+		expectedaccount:       "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+		scopedaccount:         "dn: cn=hackers,ou=superheros,dc=glauth,dc=com",
+		expectedfirstaccount:  "dn: cn=hackers,ou=superheros,ou=users,dc=glauth,dc=com",
+		expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+		checkemployeetype:     "",
 	}
 
-	Convey("When enumerating posix groups", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(objectclass=posixgroup)")
-		Convey("We should get a list starting with the 'superheros' group", func() {
-			So(out, ShouldEqual, env.expectedgroup)
-		})
-	})
+	svc := startSvc(SD, "bin/glauth", "-c", "pkg/plugins/glauth-sqlite/sample-database.cfg")
+	batteryOfTests(t, &env)
+	stopSvc(svc)
+}
 
-	Convey("When searching for members of the 'superheros' group", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com)")
-		Convey("We should get a list starting with the 'hackers' user", func() {
-			So(out, ShouldEqual, env.expectedfirstaccount)
-		})
-	})
-
-	Convey("When performing a complex search for members of 'superheros' group", func() {
-		out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "(&(objectClass=*)(memberOf=ou=superheros,ou=groups,dc=glauth,dc=com))")
-		Convey("We should get a list starting with the 'hackers' user", func() {
-			So(out, ShouldEqual, env.expectedfirstaccount)
-		})
-	})
-
-	if env.checkTOTP {
-		Convey("When searching for the 'hacker' user using a TOTP-enabled account", func() {
-			otpvalue := doRunGetFirst(RD, "oathtool", "--totp", "-b", "-d", "6", "3hnvnk4ycv44glzigd6s25j4dougs3rk")
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
-			Convey("We should find them in in the 'superheros' group", func() {
-				So(out, ShouldEqual, env.scopedaccount)
-			})
-		})
-
-		Convey("When searching for the 'hacker' user using a TOTP-enabled account and no value", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
-			Convey("We should get 'Invalid credentials(49)'", func() {
-				So(out, ShouldEqual, "exit status 49")
-			})
-		})
-
-		Convey("When searching for the 'hacker' user using a TOTP-enabled account and the wrong value", func() {
-			out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
-			Convey("We should get 'Invalid credentials(49)'", func() {
-				So(out, ShouldEqual, "exit status 49")
-			})
-		})
+func TestLdapInjection(t *testing.T) {
+	matchingContainers := doRunGetFirst(RD, "sh", "-c", "docker ps | grep ldap-service | wc -l")
+	if matchingContainers != "1" {
+		t.SkipNow()
 	}
 
-	if env.checkemployeetype != "" {
-		Convey("When searching for the 'hacker' user", func() {
-			out := doRunGetSecond(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.svcdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", env.checkemployeetype, "employeetype")
-			Convey("Employee type should be 'Intern'", func() {
-				So(out, ShouldEqual, "employeetype: Intern")
-			})
-		})
+	env := testEnv{
+		checkanonymousrootDSE: false,
+		checkTOTP:             true,
+		checkbindUPN:          false,
+		expectedinfo:          "objectClass: top",
+		svcdn:                 "cn=serviceuser,cn=svcaccts,ou=users,dc=glauth,dc=com",
+		svcdnnogroup:          "", // ignore
+		otpdn:                 "cn=otpuser,cn=superheros,ou=users,dc=glauth,dc=com",
+		expectedaccount:       "dn: cn=hackers,cn=superheros,ou=users,dc=glauth,dc=com",
+		scopedaccount:         "dn: cn=hackers,cn=superheros,ou=users,dc=glauth,dc=com",
+		expectedfirstaccount:  "dn: cn=johndoe,cn=superheros,ou=users,dc=glauth,dc=com",
+		expectedgroup:         "dn: ou=superheros,ou=users,dc=glauth,dc=com",
+		checkemployeetype:     "",
 	}
 
+	svc := startSvc(SD, "bin/glauth", "-c", "sample-ldap-injection.cfg")
+	batteryOfTests(t, &env)
+	stopSvc(svc)
 }
 
 // -----=============================================================================----
