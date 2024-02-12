@@ -128,7 +128,7 @@ func batteryOfTests(t *testing.T, env *testEnv) {
 					t.SkipNow()
 				}
 				otpvalue := doRunGetFirst(RD, "oathtool", "--totp", "-b", "-d", "6", "3hnvnk4ycv44glzigd6s25j4dougs3rk")
-				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret"+otpvalue, "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 				if got, want := out, env.scopedaccount; got != want {
 					t.Fatalf("should find them in in the 'superheros' group\ngot:  %s\nwant: %s", got, want)
 				}
@@ -140,7 +140,7 @@ func batteryOfTests(t *testing.T, env *testEnv) {
 				if !env.checkTOTP {
 					t.SkipNow()
 				}
-				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 				if got, want := out, "exit status 49"; got != want {
 					t.Fatalf("should get 'Invalid credentials(49)'\ngot:  %s\nwant: %s", got, want)
 				}
@@ -152,7 +152,7 @@ func batteryOfTests(t *testing.T, env *testEnv) {
 				if !env.checkTOTP {
 					t.SkipNow()
 				}
-				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bdc=glauth,dc=com", "cn=hackers")
+				out := doRunGetFirst(RD, "ldapsearch", "-LLL", "-H", "ldap://localhost:3893", "-D", env.otpdn, "-w", "mysecret123456", "-x", "-bou=superheros,dc=glauth,dc=com", "cn=hackers")
 				if got, want := out, "exit status 49"; got != want {
 					t.Fatalf("should get 'Invalid credentials(49)'\ngot:  %s\nwant: %s", got, want)
 				}
@@ -180,7 +180,6 @@ func batteryOfTests(t *testing.T, env *testEnv) {
 }
 
 func TestSampleSimple(t *testing.T) {
-	t.SkipNow()
 	env := testEnv{
 		checkanonymousrootDSE: true,
 		checkTOTP:             true,
@@ -202,7 +201,6 @@ func TestSampleSimple(t *testing.T) {
 }
 
 func TestSQLitePlugin(t *testing.T) {
-	t.SkipNow()
 	matchingLibrary := doRunGetFirst(RD, "ls", "bin/sqlite.so")
 	if matchingLibrary != "bin/sqlite.so" {
 		t.SkipNow()
