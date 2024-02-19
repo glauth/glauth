@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/glauth/glauth/compare/v2.3.1...v2.3.2) (2024-02-19)
+
+
+### Bug Fixes
+
+* remove spinlock in monitoring code ([#405](https://github.com/glauth/glauth/issues/405)) ([a2c151b](https://github.com/glauth/glauth/commit/a2c151b0d025332462369a846a51ef4deff5332b))
+
 ## [2.3.1](https://github.com/glauth/glauth/compare/v2.2.1...v2.3.1) (2024-02-12)
 
 
