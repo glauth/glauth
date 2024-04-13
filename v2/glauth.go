@@ -224,6 +224,8 @@ func startConfigWatcher() {
 					isChanged = true
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove { // vim edit file with rename/remove
 					isChanged, isRemoved = true, true
+				} else if event.Op&fsnotify.Create == fsnotify.Create { // only when watching a directory
+					isChanged = true
 				}
 			case err := <-watcher.Errors:
 				log.Error().Err(err).Msg("watcher error")
