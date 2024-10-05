@@ -22,6 +22,8 @@ import (
 	"github.com/glauth/ldap"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
@@ -659,10 +661,10 @@ func (l LDAPOpsHelper) findUser(ctx context.Context, h LDAPOpsHandler, bindDN st
 		groupName := ""
 		userName := ""
 		if len(parts) == 1 {
-			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormatAsArray[0]+"=")
 		} else if len(parts) == 2 || (len(parts) == 3 && parts[2] == "ou=users") {
-			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormat+"=")
-			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormat+"=")
+			userName = strings.TrimPrefix(parts[0], h.GetBackend().NameFormatAsArray[0]+"=")
+			groupName = strings.TrimPrefix(parts[1], h.GetBackend().GroupFormatAsArray[0]+"=")
 		} else {
 			h.GetLog().Info().Str("binddn", bindDN).Int("numparts", len(parts)).Msg("BindDN should have only one or two parts")
 			for _, part := range parts {
@@ -702,6 +704,7 @@ func (l LDAPOpsHelper) findUser(ctx context.Context, h LDAPOpsHandler, bindDN st
 }
 
 func (l LDAPOpsHelper) checkCapability(ctx context.Context, user config.User, action string, objects []string) bool {
+	// User-level?
 	for _, capability := range user.Capabilities {
 		if capability.Action == action {
 			for _, object := range objects {
@@ -711,6 +714,8 @@ func (l LDAPOpsHelper) checkCapability(ctx context.Context, user config.User, ac
 			}
 		}
 	}
+	// Group-level?
+	spew.Dump(user)
 	return false
 }
 

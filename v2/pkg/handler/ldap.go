@@ -117,7 +117,7 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 		lowerBindDN := strings.ToLower(bindDN)
 		baseDN := strings.ToLower("," + h.backend.BaseDN)
 		parts := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")
-		userName := strings.TrimPrefix(parts[0], h.backend.NameFormat+"=")
+		userName := strings.TrimPrefix(parts[0], h.backend.NameFormatAsArray[0]+"=")
 
 		validotp := false
 

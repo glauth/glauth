@@ -133,7 +133,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 		case "plugin":
 			plug, err := plugin.Open(backend.Plugin)
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("Unable to load specified backend plugin: %s", err))
+				return nil, fmt.Errorf("unable to load specified backend plugin: %s", err)
 			}
 			nph, err := plug.Lookup(backend.PluginHandler)
 			if err != nil {
@@ -155,6 +155,19 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 				handler.Monitor(s.monitor),
 				handler.Tracer(s.tracer),
 			)
+		case "embed":
+			h, err = NewEmbed(
+				handler.Backend(backend),
+				handler.Logger(&s.log),
+				handler.Config(s.c),
+				handler.YubiAuth(s.yubiAuth),
+				handler.LDAPHelper(loh),
+				handler.Monitor(s.monitor),
+				handler.Tracer(s.tracer),
+			)
+			if err != nil {
+				return nil, err
+			}
 		default:
 			return nil, fmt.Errorf("unsupported backend %s - must be one of 'config', 'ldap','owncloud' or 'plugin'", backend.Datastore)
 		}

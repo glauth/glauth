@@ -183,8 +183,9 @@ func (h configHandler) FindPosixAccounts(ctx context.Context, hierarchy string) 
 
 	for _, u := range h.cfg.Users {
 		attrs := []*ldap.EntryAttribute{}
-		attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{u.Name}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{u.Name}})
+		for _, nameAttr := range h.backend.NameFormatAsArray {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: nameAttr, Values: []string{u.Name}})
+		}
 
 		if len(u.GivenName) > 0 {
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{u.GivenName}})
@@ -260,9 +261,9 @@ func (h configHandler) FindPosixAccounts(ctx context.Context, hierarchy string) 
 		}
 		var dn string
 		if hierarchy == "" {
-			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
 		} else {
-			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+			dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
 		}
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
@@ -280,8 +281,10 @@ func (h configHandler) FindPosixGroups(ctx context.Context, hierarchy string) (e
 
 	for _, g := range h.cfg.Groups {
 		attrs := []*ldap.EntryAttribute{}
-		attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{g.Name}})
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{g.Name}})
+		for _, groupAttr := range h.backend.GroupFormatAsArray {
+			attrs = append(attrs, &ldap.EntryAttribute{Name: groupAttr, Values: []string{g.Name}})
+		}
+
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s", g.Name)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(ctx, g.GIDNumber)})
@@ -291,7 +294,7 @@ func (h configHandler) FindPosixGroups(ctx context.Context, hierarchy string) (e
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(ctx, g.GIDNumber)})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 		}
-		dn := fmt.Sprintf("%s=%s,%s,%s", h.backend.GroupFormat, g.Name, hierarchy, h.backend.BaseDN)
+		dn := fmt.Sprintf("%s=%s,%s,%s", h.backend.GroupFormatAsArray[0], g.Name, hierarchy, h.backend.BaseDN)
 		entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 	}
 
@@ -320,12 +323,12 @@ func (h configHandler) getGroupMemberDNs(ctx context.Context, gid int) []string 
 	members := make(map[string]bool)
 	for _, u := range h.cfg.Users {
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -408,7 +411,7 @@ func (h configHandler) getGroupDNs(ctx context.Context, gids []int) []string {
 	for _, gid := range gids {
 		for _, g := range h.cfg.Groups {
 			if g.GIDNumber == gid {
-				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
+				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormatAsArray[0], g.Name, h.backend.BaseDN)
 				groups[dn] = true
 			}
 

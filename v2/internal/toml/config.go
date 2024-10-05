@@ -179,11 +179,13 @@ func parseConfigFile(configFileLocation string, args map[string]interface{}) (*c
 	// Patch with default values where not specified
 	for i := range cfg.Backends {
 		if cfg.Backends[i].NameFormat == "" {
-			cfg.Backends[i].NameFormat = "cn"
+			cfg.Backends[i].NameFormat = "cn,uid"
 		}
+		cfg.Backends[i].NameFormatAsArray = strings.Split(cfg.Backends[i].NameFormat, ",")
 		if cfg.Backends[i].GroupFormat == "" {
-			cfg.Backends[i].GroupFormat = "ou"
+			cfg.Backends[i].GroupFormat = "ou,cn"
 		}
+		cfg.Backends[i].GroupFormatAsArray = strings.Split(cfg.Backends[i].GroupFormat, ",")
 		if cfg.Backends[i].SSHKeyAttr == "" {
 			cfg.Backends[i].SSHKeyAttr = "sshPublicKey"
 		}
@@ -430,8 +432,9 @@ func validateConfig(cfg *config.Config) (*config.Config, error) {
 		case "ldap":
 		case "owncloud":
 		case "plugin":
+		case "embed":
 		default:
-			return cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud' or 'plugin'", cfg.Backends[i].Datastore)
+			return cfg, fmt.Errorf("invalid backend %s - must be 'config', 'ldap', 'owncloud', 'plugin' or 'embed", cfg.Backends[i].Datastore)
 		}
 	}
 

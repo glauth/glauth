@@ -167,7 +167,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 		for _, g := range groups {
 			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{*g.ID}})
+			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormatAsArray[0], Values: []string{*g.ID}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *g.ID)}})
 			//			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
@@ -179,7 +179,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: members})
 			}
-			dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, *g.ID, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormatAsArray[0], *g.ID, h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	case "posixaccount", "":
@@ -197,8 +197,9 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 		for _, u := range users {
 			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{*u.ID}})
-			attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{*u.ID}})
+			for _, nameAttr := range h.backend.NameFormatAsArray {
+				attrs = append(attrs, &ldap.EntryAttribute{Name: nameAttr, Values: []string{*u.ID}})
+			}
 			if u.DisplayName != nil {
 				attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{*u.DisplayName}})
 			}
@@ -209,7 +210,7 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixAccount"}})
 
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *u.ID)}})
-			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, *u.ID, h.backend.GroupFormat, "users", h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormatAsArray[0], *u.ID, h.backend.GroupFormatAsArray[0], "users", h.backend.BaseDN)
 			entries = append(entries, &ldap.Entry{DN: dn, Attributes: attrs})
 		}
 	}

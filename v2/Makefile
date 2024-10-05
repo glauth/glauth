@@ -21,10 +21,12 @@ GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 BUILD_VARS?=-s -w
 BUILD_FILES=.
 TRIM_FLAGS>?=-trimpath
+BUILD_TAGS?=noembed
 
 # Targets
 MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
 PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
+EMBED_TARGETS?=windows/amd64
 
 # For release process
 GO_RELEASE_V=$(shell go version | { read _ _ v _; echo $${v#go}; })
@@ -106,7 +108,7 @@ mkbindir:
 .PHONY: mkbindir
 
 build: mkbindir
-	@go build ${TRIM_FLAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
+	@go build ${TRIM_FLAGS} -tags ${BUILD_TAGS} -ldflags "${BUILD_VARS}" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
 	$(MAKE) sha256
 .PHONY: build
 
@@ -125,6 +127,13 @@ linuxarm:
 
 linuxarm64:
 	GOOS=linux GOARCH=arm64 $(MAKE) build
+
+testing:
+	mkdir -p pkg/embed && \
+	cat pkg/plugins/glauth-sqlite/sqlite.go | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/sqlite.go  && \
+	go mod tidy && \
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 BUILD_TAGS=embedsqlite $(MAKE) build && \
+	rm -rf pkg/embed
 
 darwinamd64:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 $(MAKE) build
@@ -166,6 +175,24 @@ forget-plugins:
 #releasemain: @ build main binaries for distribution
 releasemain: prepbuild
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
+
+releasesingleembed:
+	git checkout -b build_embeds && \
+	mkdir -p pkg/embed && \
+	cat pkg/plugins/$P/$M | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/$M  && \
+	go mod tidy && \
+	git add pkg/embed/$M go.mod go.sum && \
+	git commit -m "build cruft" && \
+	git push -u origin build_embeds && \
+	xgo -v -ldflags="${BUILD_VARS}" --tags=$T -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${EMBED_TARGETS}" . && \
+	rm -rf pkg/embed && \
+	git checkout master && \
+	git push -d origin build_embeds && \
+	git branch -D build_embeds
+
+#releasemainembeds: @ build main binaries for distribution, including embedded plugins
+releasemainembeds: prepbuild
+	P=glauth-sqlite M=sqlite.go T=embedsqlite make releasesingleembed
 
 releaseplugin: prepbuild
 	@echo "Building $P plugin"; \

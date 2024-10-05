@@ -9,8 +9,10 @@ type (
 		Datastore                 string
 		Insecure                  bool     // For LDAP and owncloud backend only
 		Servers                   []string // For LDAP and owncloud backend only
-		NameFormat                string
-		GroupFormat               string
+		NameFormat                string   // e.g. cn, ou, uid, or a comma separated list of them
+		NameFormatAsArray         []string // we will explode NameFormat on commas
+		GroupFormat               string   // e.g. cn, ou, gid, or a comma separated list of them
+		GroupFormatAsArray        []string // we will explode GroupFormat on commas
 		SSHKeyAttr                string
 		UseGraphAPI               bool   // For ownCloud backend only
 		Plugin                    string // Path to plugin library, for plugin backend only
@@ -111,6 +113,7 @@ type (
 		Name          string
 		UnixID        int // TODO: remove after deprecating UnixID on User and Group
 		GIDNumber     int
+		Capabilities  []Capability
 		IncludeGroups []int
 	}
 

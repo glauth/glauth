@@ -454,13 +454,13 @@ func (h databaseHandler) getGroupMemberDNs(ctx context.Context, gid int) []strin
 			return []string{}
 		}
 		if u.PrimaryGroup == gid {
-			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+			dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 			members[dn] = true
 		} else {
 			u.OtherGroups = h.commaListToIntTable(ctx, otherGroups)
 			for _, othergid := range u.OtherGroups {
 				if othergid == gid {
-					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
+					dn := fmt.Sprintf("%s=%s,%s=%s%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), insertOuUsers, h.backend.BaseDN)
 					members[dn] = true
 				}
 			}
@@ -562,7 +562,7 @@ func (h databaseHandler) getGroupDNs(ctx context.Context, gids []int) []string {
 	for _, gid := range gids {
 		for _, g := range h.MemGroups {
 			if g.GIDNumber == gid {
-				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
+				dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormatAsArray[0], g.Name, h.backend.BaseDN)
 				groups[dn] = true
 			}
 
@@ -609,7 +609,7 @@ func (h databaseHandler) getGroup(ctx context.Context, hierarchy string, g confi
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormat, Values: []string{g.Name}})
+	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormatAsArray[0], Values: []string{g.Name}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(ctx, g.GIDNumber)})
@@ -619,7 +619,7 @@ func (h databaseHandler) getGroup(ctx context.Context, hierarchy string, g confi
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "memberUid", Values: h.getGroupMemberIDs(ctx, g.GIDNumber)})
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup", "top"}})
 	}
-	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormat, g.Name, h.backend.BaseDN)
+	dn := fmt.Sprintf("%s=%s,ou=groups,%s", h.backend.GroupFormatAsArray[0], g.Name, h.backend.BaseDN)
 	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
 
@@ -628,8 +628,9 @@ func (h databaseHandler) getAccount(ctx context.Context, hierarchy string, u con
 	defer span.End()
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.NameFormat, Values: []string{u.Name}})
-	attrs = append(attrs, &ldap.EntryAttribute{Name: "uid", Values: []string{u.Name}})
+	for _, nameAttr := range h.backend.NameFormatAsArray {
+		attrs = append(attrs, &ldap.EntryAttribute{Name: nameAttr, Values: []string{u.Name}})
+	}
 
 	if len(u.GivenName) > 0 {
 		attrs = append(attrs, &ldap.EntryAttribute{Name: "givenName", Values: []string{u.GivenName}})
@@ -676,9 +677,9 @@ func (h databaseHandler) getAccount(ctx context.Context, hierarchy string, u con
 	}
 	var dn string
 	if hierarchy == "" {
-		dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
+		dn = fmt.Sprintf("%s=%s,%s=%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), h.backend.BaseDN)
 	} else {
-		dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormat, u.Name, h.backend.GroupFormat, h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
+		dn = fmt.Sprintf("%s=%s,%s=%s,%s,%s", h.backend.NameFormatAsArray[0], u.Name, h.backend.GroupFormatAsArray[0], h.getGroupName(ctx, u.PrimaryGroup), hierarchy, h.backend.BaseDN)
 	}
 	return &ldap.Entry{DN: dn, Attributes: attrs}
 }
