@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.4.0](https://github.com/glauth/glauth/compare/v2.3.2...v2.4.0) (2024-08-04)
+
+
+### Features
+
+* proxying ldap paging compat ([#422](https://github.com/glauth/glauth/issues/422)) ([8476506](https://github.com/glauth/glauth/commit/8476506b8c51e993eb90c73d612f69fec5350b89))
+
+
+### Bug Fixes
+
+* config watcher now updates whenf ile added to dir ([#424](https://github.com/glauth/glauth/issues/424)) ([a90f37b](https://github.com/glauth/glauth/commit/a90f37b23b76af22c700392d68bf227b7aee1894))
+* update ldap library to fix [#389](https://github.com/glauth/glauth/issues/389) ([#430](https://github.com/glauth/glauth/issues/430)) ([a5ecc26](https://github.com/glauth/glauth/commit/a5ecc26e064cea9e4dab3dd234ebd5d5eb06be0e))
+
 ## [2.3.2](https://github.com/glauth/glauth/compare/v2.3.1...v2.3.2) (2024-02-19)
 
 
