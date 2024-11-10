@@ -22,8 +22,6 @@ import (
 	"github.com/glauth/ldap"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
