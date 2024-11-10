@@ -78,12 +78,16 @@ setup: getdeps format
 #####################
 # Subcommands
 #####################
+#	@echo \- removing any changes and pulling latest master && \
+#	git reset --hard HEAD >/dev/null 2>&1 && \
+#	git checkout master >/dev/null 2>&1 && \
+#	git pull >/dev/null 2>&1 && \
 
 prepbuild:
-	@if [ ! -e $M/.ignore ] ; \
-	then \
-		mkdir -p buildlogs;\
-	fi
+	echo \- taking care of ignore files && \
+	sudo rm -rf bin/* >/dev/null && \
+	echo \- cleaning up plugins remnants && \
+	make forget-plugins
 
 # Run integration test
 runtest:
@@ -153,30 +157,34 @@ verify:
 pull-plugin-dependencies:
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
-#prepare-plugins-release: @ pull plugins dependencies for local building
-prepare-plugins-release:
+#prepare-plugins-buid: @ pull plugins dependencies for local building
+prepare-plugins-build:
 	@M=pkg/plugins/glauth-sqlite make pull-plugin-dependencies && \
 	M=pkg/plugins/glauth-mysql make pull-plugin-dependencies && \
 	M=pkg/plugins/glauth-postgres make pull-plugin-dependencies && \
 	M=pkg/plugins/glauth-pam make pull-plugin-dependencies
 
 forget-plugin:
-	rm -rf $M ../.git/modules/v2/$M && \
-	git config --remove-section submodule.v2/$M && \
-	git rm --cache $M && \
-	go mod tidy
+	rm -rf $M ../.git/modules/v2/$M; \
+	git config --remove-section submodule.v2/$M; \
+	git rm --cache $M; \
+	go mod tidy; \
+	true
 
 #forget-plugin: @ remove plugins, restoring original file structure
 forget-plugins:
-	for pkg in pkg/plugins/*/go.mod; do\
-		P=$$(echo $$pkg | cut -d'/' -f 3) M=$$(dirname $$pkg) make forget-plugin;\
-	done
+	for pkg in pkg/plugins/*; do \
+		if [ -d "$$pkg" ]; then \
+			P=$$(echo $$pkg | cut -d'/' -f 3) M=$$pkg make forget-plugin >/dev/null 2>&1;\
+		fi; \
+	done; \
+	rm -rf buildlogs
 
-#releasemain: @ build main binaries for distribution
-releasemain: prepbuild
+#buildmain: @ build main binaries for distribution
+buildmain: prepbuild
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
 
-releasesingleembed:
+buildsingleembed:
 	git checkout -b build_embeds && \
 	mkdir -p pkg/embed && \
 	cat pkg/plugins/$P/$M | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/$M  && \
@@ -190,11 +198,11 @@ releasesingleembed:
 	git push -d origin build_embeds && \
 	git branch -D build_embeds
 
-#releasemainembeds: @ build main binaries for distribution, including embedded plugins
-releasemainembeds: prepbuild
-	P=glauth-sqlite M=sqlite.go T=embedsqlite make releasesingleembed
+#buildmainembeds: @ build main binaries for distribution, including embedded plugins
+buildmainembeds: prepbuild
+	P=glauth-sqlite M=sqlite.go T=embedsqlite make buildsingleembed
 
-releaseplugin: prepbuild
+buildplugin: prepbuild
 	@echo "Building $P plugin"; \
 	if [ ! -e $M/.ignore ] ; \
 	then \
@@ -202,13 +210,13 @@ releaseplugin: prepbuild
 		(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done); \
 	fi
 
-#releaseplugins: @ build base plugins for distribution
-releaseplugins:
+#buildplugins: @ build base plugins for distribution
+buildplugins:
 	@for pkg in pkg/plugins/*/go.mod; do\
-		M=pkg/plugins/$$(echo $$pkg | cut -d'/' -f 3) && P=$$(echo $$M | grep -oP 'glauth-\K\w+') && M=$$M P=$$P make releaseplugin;\
+		M=pkg/plugins/$$(echo $$pkg | cut -d'/' -f 3) && P=$$(echo $$M | grep -oP 'glauth-\K\w+') && M=$$M P=$$P make buildplugin;\
 	done
 
-releasedockermain:
+builddockermain:
 	$(if $(TAG),,$(error Must set TAG))
 	$(if $(REPO),,$(error Must set REPO - glauth or other))
 	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
@@ -217,7 +225,7 @@ releasedockermain:
 	cp -f bin/glauth-linux-arm-7 docker/assets/linux/arm/v7/glauth && \
 	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
 
-releasedockerplugins:
+builddockerplugins:
 	$(if $(TAG),,$(error Must set TAG))
 	$(if $(REPO),,$(error Must set REPO - glauth or other))
 	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
@@ -232,7 +240,10 @@ releasedockerplugins:
 	cp -f bin/postgres-linux-arm-7.so docker/assets/linux/arm/v7/postgres.so && \
 	docker buildx build --tag $$REPO/glauth-plugins:$$TAG -t $$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
 
-releasedocker: releasedockermain releasedockerplugins
+builddocker: builddockermain builddockerplugins
+
+buildeverything: prepbuild buildmain
+#buildeverything: prepbuild buildmain buildmainembeds buildplugins builddocker
 
 #testdocker: @ run integration test using docker
 testdocker:
@@ -274,4 +285,4 @@ testdocker:
 	docker rm glauth-test && \
 	echo "==> Testing complete."
 
-.PHONY: all prepbuild run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins releasemain releaseplugin release releaseplugins releasedockermain releaserdockerplugins releasedocker testdocker
+.PHONY: all prepbuild run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins buildmain buildplugin build buildplugins builddockermain builddockerplugins builddocker testdocker
