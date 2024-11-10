@@ -714,8 +714,6 @@ func (l LDAPOpsHelper) checkCapability(ctx context.Context, user config.User, ac
 			}
 		}
 	}
-	// Group-level?
-	spew.Dump(user)
 	return false
 }
 
