@@ -87,7 +87,18 @@ prepbuild:
 	echo \- taking care of ignore files && \
 	sudo rm -rf bin/* >/dev/null && \
 	echo \- cleaning up plugins remnants && \
-	make forget-plugins
+	make forget-plugins && \
+	make remember-plugins
+
+forget-embed:
+	@if [ -f pkg/server/embed_sqlite.go ]; then \
+		mv pkg/server/embed_sqlite.go /tmp/; \
+	fi
+
+remember-embed:
+	@if [ ! -f pkg/server/embed_sqlite.go ]; then \
+		mv /tmp/embed_sqlite.go pkg/server/; \
+	fi
 
 # Run integration test
 runtest:
@@ -180,9 +191,18 @@ forget-plugins:
 	done; \
 	rm -rf buildlogs
 
-#buildmain: @ build main binaries for distribution
-buildmain: prepbuild
+remember-plugins:
+	cd ../ && \
+	for module in $$(cat .gitmodules | awk '/path =/{P=$$3} /url =/{print $$3 "," P}'); do \
+		git submodule add $${module%%,*} $${module#*,}; \
+	done; \
+	git submodule update --init --recursive
+
+_buildmain:
 	@xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${MAIN_TARGETS}" .
+
+#buildmain: @ build main binaries for distribution
+buildmain: prepbuild _buildmain
 
 buildsingleembed:
 	git checkout -b build_embeds && \
@@ -198,23 +218,29 @@ buildsingleembed:
 	git push -d origin build_embeds && \
 	git branch -D build_embeds
 
-#buildmainembeds: @ build main binaries for distribution, including embedded plugins
-buildmainembeds: prepbuild
+_buildmainembeds:
 	P=glauth-sqlite M=sqlite.go T=embedsqlite make buildsingleembed
 
-buildplugin: prepbuild
-	@echo "Building $P plugin"; \
-	if [ ! -e $M/.ignore ] ; \
-	then \
-		xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . && \
-		(cd bin && for lib in $$(ls $$P-*); do sudo mv $$lib $$lib.so; done); \
-	fi
+#buildmainembeds: @ build main binaries for distribution, including embedded plugins
+buildmainembeds: prepbuild _buildmainembeds
+
+buildplugin: 
+ifeq ($P,pam)
+	xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go --bringupcmd 'apt update && apt install -y libpam0g-dev' .
+else
+	xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . 
+endif
+	(cd bin && for lib in $$(ls $$P-* | grep -v \.so$$); do sudo mv $$lib $$lib.so; done); 
+
+_buildplugins: prepare-plugins-build
+	for pkg in pkg/plugins/*; do \
+		if [ -d "$$pkg" ]; then \
+			M=pkg/plugins/$$(echo $$pkg | cut -d'/' -f 3) && P=$$(echo $$M | grep -oP 'glauth-\K\w+') && M=$$M P=$$P make buildplugin;\
+		fi; \
+	done; \
 
 #buildplugins: @ build base plugins for distribution
-buildplugins:
-	@for pkg in pkg/plugins/*/go.mod; do\
-		M=pkg/plugins/$$(echo $$pkg | cut -d'/' -f 3) && P=$$(echo $$M | grep -oP 'glauth-\K\w+') && M=$$M P=$$P make buildplugin;\
-	done
+buildplugins: forget-embed _buildplugins remember-embed
 
 builddockermain:
 	$(if $(TAG),,$(error Must set TAG))
@@ -242,8 +268,7 @@ builddockerplugins:
 
 builddocker: builddockermain builddockerplugins
 
-buildeverything: prepbuild buildmain
-#buildeverything: prepbuild buildmain buildmainembeds buildplugins builddocker
+buildeverything: prepbuild forget-embed _buildmain _buildplugins remember-embed _buildmainembeds builddocker
 
 #testdocker: @ run integration test using docker
 testdocker:
@@ -285,4 +310,8 @@ testdocker:
 	docker rm glauth-test && \
 	echo "==> Testing complete."
 
-.PHONY: all prepbuild run test fast binaries setup getdeps runtest updatetest format devrun linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify pull-plugin pull-base-plugins forget-plugin forget-plugins buildmain buildplugin build buildplugins builddockermain builddockerplugins builddocker testdocker
+.PHONY: all \
+	prepbuild run test fast binaries setup getdeps runtest updatetest format devrun \
+	linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify \
+	pull-plugin pull-base-plugins forget-plugin forget-plugins buildmain buildplugin build \
+	buildplugins builddockermain builddockerplugins builddocker testdocker buildeverything
