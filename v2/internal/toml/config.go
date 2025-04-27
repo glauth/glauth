@@ -223,9 +223,7 @@ func usersCustomAttributes(location string, config *config.Config) {
 			x := make(map[string]interface{})
 
 			for _, attribute := range user.CustomAttributes {
-				err := md.PrimitiveDecode(attribute, x)
-
-				fmt.Println(err, x)
+				_ = md.PrimitiveDecode(attribute, x)
 
 				for k, v := range x {
 

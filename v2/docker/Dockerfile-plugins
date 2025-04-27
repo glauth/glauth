@@ -11,7 +11,16 @@ RUN apk add --no-cache git make busybox-static dumb-init
 #################
 
 FROM gcr.io/distroless/base-debian11 as run
-LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>"
+
+LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>" \
+      org.opencontainers.image.title="GLauth" \
+      org.opencontainers.image.description="A simple LDAP server for development, home use, or CI pipelines" \
+      org.opencontainers.image.authors="Ben Yanke, Jörn Friedrich Dreyer, Chris F Ravenscroft" \
+      org.opencontainers.image.source="https://github.com/glauth/glauth" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="latest" \
+      org.opencontainers.image.url="https://github.com/glauth/glauth"
+
 ARG TARGETPLATFORM
 
 # Copy docker specific scripts from build container

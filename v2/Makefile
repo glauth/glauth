@@ -242,18 +242,29 @@ _buildplugins: prepare-plugins-build
 #buildplugins: @ build base plugins for distribution
 buildplugins: forget-embed _buildplugins remember-embed
 
+_checkdockerauth:
+	@if ! grep -q "index.docker.io" $(HOME)/.docker/config.json; then \
+		echo "❌ Not logged in to Docker Hub (index.docker.io not found in config)."; \
+		exit 1; \
+	fi; \
+	if ! grep -q "ghcr.io" $(HOME)/.docker/config.json; then \
+		echo "❌ Not logged in to GitHub Hub (ghcr.io not found in config)."; \
+		exit 1; \
+	fi
+
 builddockermain:
-	$(if $(TAG),,$(error Must set TAG))
-	$(if $(REPO),,$(error Must set REPO - glauth or other))
+	$(if $(TAG),,$(error ❌ Must set TAG))
+	$(if $(REPO),,$(error ❌ Must set REPO - glauth or other))
 	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
 	cp -f bin/glauth-linux-amd64 docker/assets/linux/amd64/glauth && \
 	cp -f bin/glauth-linux-arm64 docker/assets/linux/arm64/glauth && \
 	cp -f bin/glauth-linux-arm-7 docker/assets/linux/arm/v7/glauth && \
+	docker buildx build --tag ghcr.io/$$REPO/glauth:$$TAG -t ghcr.io/$$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker && \
 	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
 
 builddockerplugins:
-	$(if $(TAG),,$(error Must set TAG))
-	$(if $(REPO),,$(error Must set REPO - glauth or other))
+	$(if $(TAG),,$(error ❌ Must set TAG))
+	$(if $(REPO),,$(error ❌ Must set REPO - glauth or other))
 	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 && \
 	cp -f bin/sqlite-linux-amd64.so docker/assets/linux/amd64/sqlite.so && \
 	cp -f bin/sqlite-linux-arm64.so docker/assets/linux/arm64/sqlite.so && \
@@ -264,9 +275,10 @@ builddockerplugins:
 	cp -f bin/postgres-linux-amd64.so docker/assets/linux/amd64/postgres.so && \
 	cp -f bin/postgres-linux-arm64.so docker/assets/linux/arm64/postgres.so && \
 	cp -f bin/postgres-linux-arm-7.so docker/assets/linux/arm/v7/postgres.so && \
+	docker buildx build --tag ghcr.io/$$REPO/glauth-plugins:$$TAG -t ghcr.io/$$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker && \
 	docker buildx build --tag $$REPO/glauth-plugins:$$TAG -t $$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
 
-builddocker: builddockermain builddockerplugins
+builddocker: _checkdockerauth builddockermain builddockerplugins
 
 buildeverything: prepbuild forget-embed _buildmain _buildplugins remember-embed _buildmainembeds builddocker
 
