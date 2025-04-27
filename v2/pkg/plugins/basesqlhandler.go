@@ -609,7 +609,9 @@ func (h databaseHandler) getGroup(ctx context.Context, hierarchy string, g confi
 	asGroupOfUniqueNames := hierarchy == "ou=groups"
 
 	attrs := []*ldap.EntryAttribute{}
-	attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormatAsArray[0], Values: []string{g.Name}})
+	for _, groupAttr := range h.backend.GroupFormatAsArray {
+		attrs = append(attrs, &ldap.EntryAttribute{Name: groupAttr, Values: []string{g.Name}})
+	}
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s via LDAP", g.Name)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", g.GIDNumber)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "uniqueMember", Values: h.getGroupMemberDNs(ctx, g.GIDNumber)})

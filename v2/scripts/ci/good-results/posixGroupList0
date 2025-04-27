@@ -1,6 +1,6 @@
 dn: ou=superheros,ou=users,dc=glauth,dc=com
 ou: superheros
-uid: superheros
+cn: superheros
 description: superheros
 gidNumber: 5501
 uniqueMember: cn=alexdoe,ou=superheros,ou=users,dc=glauth,dc=com
@@ -20,7 +20,7 @@ objectClass: top
 
 dn: ou=svcaccts,ou=users,dc=glauth,dc=com
 ou: svcaccts
-uid: svcaccts
+cn: svcaccts
 description: svcaccts
 gidNumber: 5502
 uniqueMember: cn=serviceuser,ou=svcaccts,ou=users,dc=glauth,dc=com
@@ -30,7 +30,7 @@ objectClass: top
 
 dn: ou=vpnaccess,ou=users,dc=glauth,dc=com
 ou: vpnaccess
-uid: vpnaccess
+cn: vpnaccess
 description: vpnaccess
 gidNumber: 5503
 uniqueMember: cn=alexdoe,ou=superheros,ou=users,dc=glauth,dc=com
@@ -50,7 +50,7 @@ objectClass: top
 
 dn: ou=allaccs,ou=users,dc=glauth,dc=com
 ou: allaccs
-uid: allaccs
+cn: allaccs
 description: allaccs
 gidNumber: 5504
 uniqueMember: cn=alexdoe,ou=superheros,ou=users,dc=glauth,dc=com
@@ -72,7 +72,7 @@ objectClass: top
 
 dn: ou=mailadmin,ou=users,dc=glauth,dc=com
 ou: mailadmin
-uid: mailadmin
+cn: mailadmin
 description: mailadmin
 gidNumber: 5505
 uniqueMember: cn=alexdoe,ou=superheros,ou=users,dc=glauth,dc=com
@@ -88,7 +88,7 @@ objectClass: top
 
 dn: ou=webmail,ou=users,dc=glauth,dc=com
 ou: webmail
-uid: webmail
+cn: webmail
 description: webmail
 gidNumber: 5506
 objectClass: posixGroup
@@ -96,7 +96,7 @@ objectClass: top
 
 dn: ou=fulltime,ou=users,dc=glauth,dc=com
 ou: fulltime
-uid: fulltime
+cn: fulltime
 description: fulltime
 gidNumber: 5507
 uniqueMember: cn=alexdoe,ou=superheros,ou=users,dc=glauth,dc=com

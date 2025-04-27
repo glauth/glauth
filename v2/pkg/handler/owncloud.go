@@ -167,7 +167,9 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 		}
 		for _, g := range groups {
 			attrs := []*ldap.EntryAttribute{}
-			attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.GroupFormatAsArray[0], Values: []string{*g.ID}})
+			for _, groupAttr := range h.backend.GroupFormatAsArray {
+				attrs = append(attrs, &ldap.EntryAttribute{Name: groupAttr, Values: []string{*g.ID}})
+			}
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "description", Values: []string{fmt.Sprintf("%s from ownCloud", *g.ID)}})
 			//			attrs = append(attrs, &ldap.EntryAttribute{"gidNumber", []string{fmt.Sprintf("%d", g.GIDNumber)}})
 			attrs = append(attrs, &ldap.EntryAttribute{Name: "objectClass", Values: []string{"posixGroup"}})
