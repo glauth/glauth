@@ -98,7 +98,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 
 	if tlsConfig := options.TLSConfig; tlsConfig != nil {
 		s.l.TLSConfig = tlsConfig
-		s.log.Info().Interface("tls.certificates", tlsConfig.Certificates).Msg("enabling LDAP over TLS")
+		s.log.Debug().Interface("tls.certificates", tlsConfig.Certificates).Msg("enabling LDAP over TLS")
 	}
 
 	for i, backend := range s.c.Backends {
