@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/glauth/glauth/compare/v2.4.0...v2.4.1) (2025-05-11)
+
+
+### Bug Fixes
+
+* Credentials leaked on INFO log level ([#451](https://github.com/glauth/glauth/issues/451)) ([645dbb2](https://github.com/glauth/glauth/commit/645dbb226683ae57f3d5382e21ea42444e940752))
+
 ## [2.4.0](https://github.com/glauth/glauth/compare/v2.3.2...v2.4.0) (2024-08-04)
 
 
