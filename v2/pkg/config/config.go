@@ -48,13 +48,18 @@ type (
 		TLSKey      string
 		TLSCertPath string
 		TLSKeyPath  string
+		LegacyTLS   bool
 	}
 
 	LDAPS struct {
 		Enabled bool
 		Listen  string
-		Cert    string
-		Key     string
+		// LDAPS TLS parameters
+		Cert      string
+		Key       string
+		CertPath  string
+		KeyPath   string
+		LegacyTLS bool
 	}
 
 	API struct {

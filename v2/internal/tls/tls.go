@@ -12,8 +12,29 @@ var (
 	log zerolog.Logger
 )
 
+var secureCipherSuites = []uint16{
+	// TLS 1.3 cipher suites (automatically used when TLS 1.3 is negotiated)
+	tls.TLS_AES_128_GCM_SHA256,
+	tls.TLS_AES_256_GCM_SHA384,
+	tls.TLS_CHACHA20_POLY1305_SHA256,
+
+	// TLS 1.2 ECDHE cipher suites (Forward Secrecy)
+	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+
+	// Additional secure TLS 1.2 cipher suites (CBC with HMAC-SHA256)
+	tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
+	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+	// tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
+}
+
 // MakeTLS generates a tls.Config
-func MakeTLS(clientCert, key []byte) (*tls.Config, error) {
+func MakeTLS(clientCert, key []byte, legacy bool) (*tls.Config, error) {
 	if clientCert == nil && key == nil {
 		return new(tls.Config), nil
 	}
@@ -55,11 +76,24 @@ func MakeTLS(clientCert, key []byte) (*tls.Config, error) {
 	log.Debug().Interface("root.ca", rootCAs)
 	log.Debug().Interface("certificates", []tls.Certificate{cert})
 
+	if legacy {
+		return &tls.Config{
+			RootCAs:                  rootCAs,
+			MinVersion:               tls.VersionTLS10,
+			MaxVersion:               tls.VersionTLS13,
+			PreferServerCipherSuites: true,
+			CipherSuites:             nil,
+			Certificates:             []tls.Certificate{cert},
+		}, nil
+	}
+
 	return &tls.Config{
-		RootCAs:      rootCAs,
-		MinVersion:   tls.VersionTLS10,
-		MaxVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{cert},
+		RootCAs:                  rootCAs,
+		MinVersion:               tls.VersionTLS12,
+		MaxVersion:               tls.VersionTLS13,
+		PreferServerCipherSuites: true,
+		CipherSuites:             secureCipherSuites,
+		Certificates:             []tls.Certificate{cert},
 	}, nil
 }
 
@@ -78,4 +112,12 @@ func DecodePEM(certPEM []byte) tls.Certificate {
 	}
 
 	return cert
+}
+
+func CipherSuiteNames(suites []uint16) []string {
+	var names []string
+	for _, suite := range suites {
+		names = append(names, tls.CipherSuiteName(suite))
+	}
+	return names
 }

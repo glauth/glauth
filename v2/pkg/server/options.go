@@ -16,12 +16,13 @@ type Option func(o *Options)
 
 // Options defines the available options for this package.
 type Options struct {
-	Logger    zerolog.Logger
-	Config    *config.Config
-	TLSConfig *tls.Config
-	Monitor   monitoring.MonitorInterface
-	Tracer    trace.Tracer
-	Context   context.Context
+	Logger         zerolog.Logger
+	Config         *config.Config
+	StartTLSConfig *tls.Config
+	LDAPSTLSConfig *tls.Config
+	Monitor        monitoring.MonitorInterface
+	Tracer         trace.Tracer
+	Context        context.Context
 }
 
 // newOptions initializes the available default options.
@@ -56,10 +57,17 @@ func Context(val context.Context) Option {
 	}
 }
 
-// TLSConfig provides a function to set the TLS config option.
-func TLSConfig(val *tls.Config) Option {
+// TLSConfig provides a function to set the StartTLS config option.
+func StartTLSConfig(val *tls.Config) Option {
 	return func(o *Options) {
-		o.TLSConfig = val
+		o.StartTLSConfig = val
+	}
+}
+
+// TLSConfig provides a function to set the LDAPSTls config option.
+func LDAPSTLSConfig(val *tls.Config) Option {
+	return func(o *Options) {
+		o.LDAPSTLSConfig = val
 	}
 }
 
