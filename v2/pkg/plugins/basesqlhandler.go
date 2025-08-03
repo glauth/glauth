@@ -99,7 +99,7 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 	sqlBackend.CreateSchema(db)
 	sqlBackend.MigrateSchema(db, ColumnExists)
 
-	options.Logger.Info().Msg("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
+	options.Logger.Debug().Msg("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
 }
