@@ -1,9 +1,12 @@
 package server
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"plugin"
+
+	_tls "github.com/glauth/glauth/v2/internal/tls"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
@@ -20,9 +23,10 @@ type LdapSvc struct {
 	yubiAuth *yubigo.YubiAuth
 	l        *ldap.Server
 
-	monitor monitoring.MonitorInterface
-	tracer  trace.Tracer
-	log     zerolog.Logger
+	ldapstls *tls.Config
+	monitor  monitoring.MonitorInterface
+	tracer   trace.Tracer
+	log      zerolog.Logger
 }
 
 func NewServer(opts ...Option) (*LdapSvc, error) {
@@ -96,9 +100,22 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	s.l = ldap.NewServer()
 	s.l.EnforceLDAP = true
 
-	if tlsConfig := options.TLSConfig; tlsConfig != nil {
+	if tlsConfig := options.StartTLSConfig; tlsConfig != nil {
 		s.l.TLSConfig = tlsConfig
-		s.log.Debug().Interface("tls.certificates", tlsConfig.Certificates).Msg("enabling LDAP over TLS")
+		s.log.Info().
+			Str("tls.min_version", tls.VersionName(tlsConfig.MinVersion)).
+			Str("tls.max_version", tls.VersionName(tlsConfig.MaxVersion)).
+			Interface("tls.cipher_suites", _tls.CipherSuiteNames(tlsConfig.CipherSuites)).
+			Msg("enabling LDAP over TLS")
+	}
+
+	if tlsConfig := options.LDAPSTLSConfig; tlsConfig != nil {
+		s.ldapstls = tlsConfig
+		s.log.Info().
+			Str("tls.min_version", tls.VersionName(tlsConfig.MinVersion)).
+			Str("tls.max_version", tls.VersionName(tlsConfig.MaxVersion)).
+			Interface("tls.cipher_suites", _tls.CipherSuiteNames(tlsConfig.CipherSuites)).
+			Msg("enabling LDAPS")
 	}
 
 	for i, backend := range s.c.Backends {
@@ -199,11 +216,11 @@ func (s *LdapSvc) ListenAndServe() error {
 // ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
 func (s *LdapSvc) ListenAndServeTLS() error {
 	s.log.Info().Str("address", s.c.LDAPS.Listen).Msg("LDAPS server listening")
-	return s.l.ListenAndServeTLS(
-		s.c.LDAPS.Listen,
-		s.c.LDAPS.Cert,
-		s.c.LDAPS.Key,
-	)
+	listener, err := tls.Listen("tcp", s.c.LDAPS.Listen, s.ldapstls)
+	if err != nil {
+		return err
+	}
+	return s.l.Serve(listener)
 }
 
 // Shutdown ends listeners by sending true to the ldap serves quit channel

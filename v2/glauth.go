@@ -143,20 +143,32 @@ func startService() {
 	startConfigWatcher()
 
 	var err error
-	var tlsConfig *tls.Config
+	var starttlsConfig *tls.Config
 	if c := activeConfig.LDAP; c.Enabled && c.TLS {
 		// TODO check if tls params are string or bytes and change config accordingly
-		tlsConfig, err = _tls.MakeTLS([]byte(c.TLSCert), []byte(c.TLSKey))
+		starttlsConfig, err = _tls.MakeTLS([]byte(c.TLSCert), []byte(c.TLSKey), c.LegacyTLS)
 
 		if err != nil {
-			log.Warn().Err(err).Msg("unable to configure TLS, proceeding without....StartTLS won't be supported")
+			log.Warn().Err(err).Msg("unable to configure TLS for StartTLS: StartTLS won't be supported")
+		}
+	}
+
+	var ldapstlsConfig *tls.Config
+	if c := activeConfig.LDAPS; c.Enabled {
+		// TODO check if tls params are string or bytes and change config accordingly
+		ldapstlsConfig, err = _tls.MakeTLS([]byte(c.Cert), []byte(c.Key), c.LegacyTLS)
+
+		if err != nil {
+			log.Warn().Err(err).Msg("unable to configure TLS for LDAPS")
+			os.Exit(1)
 		}
 	}
 
 	s, err := server.NewServer(
 		server.Logger(log),
 		server.Config(activeConfig),
-		server.TLSConfig(tlsConfig),
+		server.StartTLSConfig(starttlsConfig),
+		server.LDAPSTLSConfig(ldapstlsConfig),
 		server.Monitor(monitor),
 		server.Tracer(tracer),
 	)
