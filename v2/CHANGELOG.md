@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.5.0](https://github.com/glauth/glauth/compare/v2.4.0...v2.5.0) (2025-08-04)
+
+
+### Features
+
+* starttls and ldaps now matching features ([#458](https://github.com/glauth/glauth/issues/458)) ([d68c78a](https://github.com/glauth/glauth/commit/d68c78a18b150679038e5ce549b6b227c31518d7))
+
+
+### Bug Fixes
+
+* Credentials leaked on INFO log level ([#451](https://github.com/glauth/glauth/issues/451)) ([645dbb2](https://github.com/glauth/glauth/commit/645dbb226683ae57f3d5382e21ea42444e940752))
+
 ## [2.4.0](https://github.com/glauth/glauth/compare/v2.3.2...v2.4.0) (2024-08-04)
 
 
