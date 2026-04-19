@@ -1,0 +1,3 @@
+olcAccess: to dn.subtree="dc=glauth,dc=com"
+  by dn.exact="cn=admin,dc=glauth,dc=com" manage
+  by * break
