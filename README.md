@@ -1,14 +1,14 @@
-# GLAuth: LDAP authentication server for developers
-Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
-[![Gitter](https://badges.gitter.im/glauth/community.svg)](https://gitter.im/glauth/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Matrix](https://img.shields.io/badge/chat-%2fjoin%20%23glauth_community:gitter.im-green)](hey)
+# GLAuth: LDAP authentication server for developers
+[![Official GLAuth Website](https://img.shields.io/badge/Official%20GLAuth%20Website-glauth.github.io-brightgreen?style=plastic)](https://glauth.github.io/)
+[![kittens dns](https://img.shields.io/badge/kittens%20dns-github-blue?style=plastic)](https://github.com/fusion/kittendns)
+[![wing vpn](https://img.shields.io/badge/wing%20vpn-github-orange?style=plastic)](https://github.com/fusion/wing-vpn)
+
+Go-lang LDAP Authentication (GLAuth) is a secure, easy-to-use, LDAP server w/ configurable backends.
 
 ![GitHub all releases](https://img.shields.io/github/downloads/glauth/glauth/total)
 ![Docker pulls](https://badgen.net/docker/pulls/glauth/glauth)
-
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/glauth/glauth/master)
-![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/glauth/glauth)
 
 * Centrally manage accounts across your infrastructure
 * Centrally manage SSH keys, Linux accounts, and passwords for cloud servers.
@@ -110,4 +110,3 @@ For advanced users, GLAuth supports pluggable backends.  Currently, it can use a
 # Stargazers over time
 
 [![Stargazers over time](https://starchart.cc/glauth/glauth.svg)](https://starchart.cc/glauth/glauth)
-
