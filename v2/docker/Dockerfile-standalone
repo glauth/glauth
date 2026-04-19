@@ -10,7 +10,7 @@ RUN apk add --no-cache git make busybox-static dumb-init
 # Run Step
 #################
 
-FROM gcr.io/distroless/base-debian11 as run
+FROM gcr.io/distroless/base-debian13 as run
 
 LABEL maintainers="Ben Yanke <ben@benyanke.com>, Jörn Friedrich Dreyer <jfd@butonic.de>, Chris F Ravenscroft <chris@voilaweb.com>" \
       org.opencontainers.image.title="GLauth" \
