@@ -69,6 +69,9 @@ all: setup binaries verify
 #fast: @ run build process for only linuxamd64
 fast: setup linuxamd64
 
+#fastdebug: @ run build process for only linuxamd64 in debug mode
+fastdebug: setup linuxamd64debug
+
 #binaries: @ list of binary formats to build
 binaries: linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64
 
@@ -127,9 +130,17 @@ build: mkbindir
 	$(MAKE) sha256
 .PHONY: build
 
+builddebug: mkbindir
+	@go build ${TRIM_FLAGS} -tags ${BUILD_TAGS} -gcflags="all=-N -l" -o bin/$(GOOS)$(GOARCH)/glauth -buildvcs .
+	$(MAKE) sha256
+.PHONY: builddebug
+
 sha256:
 	@sha256sum bin/$(GOOS)$(GOARCH)/glauth > bin/$(GOOS)$(GOARCH)/glauth.sha256
 .PHONY: sha256
+
+linuxamd64debug:
+	GOOS=linux GOARCH=amd64 $(MAKE) builddebug
 
 linux386:
 	GOOS=linux GOARCH=386 $(MAKE) build
