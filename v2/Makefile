@@ -24,8 +24,8 @@ TRIM_FLAGS>?=-trimpath
 BUILD_TAGS?=noembed
 
 # Targets
-MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64,windows/amd64,windows/386
-PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,darwin/amd64,darwin/arm64
+MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,darwin/amd64,darwin/arm64,windows/amd64,windows/386
+PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,darwin/amd64,darwin/arm64
 EMBED_TARGETS?=windows/amd64
 
 # For release process
@@ -73,7 +73,7 @@ fast: setup linuxamd64
 fastdebug: setup linuxamd64debug
 
 #binaries: @ list of binary formats to build
-binaries: linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64
+binaries: linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64
 
 #setup: @ setup commands to always run
 setup: getdeps format
@@ -154,6 +154,9 @@ linuxarm:
 linuxarm64:
 	GOOS=linux GOARCH=arm64 $(MAKE) build
 
+linuxriscv64:
+	GOOS=linux GOARCH=riscv64 $(MAKE) build
+
 testing:
 	mkdir -p pkg/embed && \
 	cat pkg/plugins/glauth-sqlite/sqlite.go | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/sqlite.go  && \
@@ -174,7 +177,7 @@ winamd64:
 	GOOS=windows GOARCH=amd64 $(MAKE) build
 
 verify:
-	@for binary in linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
+	@for binary in linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
 pull-plugin-dependencies:
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
@@ -270,8 +273,9 @@ builddockermain:
 	cp -f bin/glauth-linux-amd64 docker/assets/linux/amd64/glauth && \
 	cp -f bin/glauth-linux-arm64 docker/assets/linux/arm64/glauth && \
 	cp -f bin/glauth-linux-arm-7 docker/assets/linux/arm/v7/glauth && \
-	docker buildx build --tag ghcr.io/$$REPO/glauth:$$TAG -t ghcr.io/$$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker && \
-	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
+    cp -f bin/glauth-linux-riscv64 docker/assets/linux/riscv64/glauth && \
+	docker buildx build --tag ghcr.io/$$REPO/glauth:$$TAG -t ghcr.io/$$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker && \
+	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker
 
 builddockerplugins:
 	$(if $(TAG),,$(error ❌ Must set TAG))
@@ -280,14 +284,17 @@ builddockerplugins:
 	cp -f bin/sqlite-linux-amd64.so docker/assets/linux/amd64/sqlite.so && \
 	cp -f bin/sqlite-linux-arm64.so docker/assets/linux/arm64/sqlite.so && \
 	cp -f bin/sqlite-linux-arm-7.so docker/assets/linux/arm/v7/sqlite.so && \
+	cp -f bin/sqlite-linux-riscv64.so docker/assets/linux/riscv64/sqlite.so && \
 	cp -f bin/mysql-linux-amd64.so docker/assets/linux/amd64/mysql.so && \
 	cp -f bin/mysql-linux-arm64.so docker/assets/linux/arm64/mysql.so && \
 	cp -f bin/mysql-linux-arm-7.so docker/assets/linux/arm/v7/mysql.so && \
+	cp -f bin/mysql-linux-riscv64.so docker/assets/linux/riscv64/mysql.so && \
 	cp -f bin/postgres-linux-amd64.so docker/assets/linux/amd64/postgres.so && \
 	cp -f bin/postgres-linux-arm64.so docker/assets/linux/arm64/postgres.so && \
 	cp -f bin/postgres-linux-arm-7.so docker/assets/linux/arm/v7/postgres.so && \
-	docker buildx build --tag ghcr.io/$$REPO/glauth-plugins:$$TAG -t ghcr.io/$$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker && \
-	docker buildx build --tag $$REPO/glauth-plugins:$$TAG -t $$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7 --push docker
+	cp -f bin/postgres-linux-riscv64.so docker/assets/linux/riscv64/postgres.so && \
+	docker buildx build --tag ghcr.io/$$REPO/glauth-plugins:$$TAG -t ghcr.io/$$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker && \
+	docker buildx build --tag $$REPO/glauth-plugins:$$TAG -t $$REPO/glauth-plugins:latest -f docker/Dockerfile-plugins --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker
 
 builddocker: _checkdockerauth builddockermain builddockerplugins
 
@@ -335,6 +342,6 @@ testdocker:
 
 .PHONY: all \
 	prepbuild run test fast binaries setup getdeps runtest updatetest format devrun \
-	linux386 linuxamd64 linuxarm linuxarm64 darwinamd64 darwinarm64 win386 winamd64 verify \
+	linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64 verify \
 	pull-plugin pull-base-plugins forget-plugin forget-plugins buildmain buildplugin build \
 	buildplugins builddockermain builddockerplugins builddocker testdocker buildeverything
