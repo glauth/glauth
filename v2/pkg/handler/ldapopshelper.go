@@ -91,6 +91,12 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		return ldapcode, nil
 	}
 
+	// a disabled account must never authenticate, on any backend
+	if user.Disabled {
+		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind attempt on disabled account")
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
+
 	validotp := false
 
 	if len(user.Yubikey) == 0 && len(user.OTPSecret) == 0 {
