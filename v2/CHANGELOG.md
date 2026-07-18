@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.1](https://github.com/glauth/glauth/compare/GLAuth-v2.5.0...GLAuth-v2.5.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* reject disabled users on all backends in Bind ([#470](https://github.com/glauth/glauth/issues/470)) ([fb65713](https://github.com/glauth/glauth/commit/fb65713fbdfd626cb033675fb42724a5fb3d06ff))
+* team atlanta arbitrary password ([#471](https://github.com/glauth/glauth/issues/471)) ([cb121cd](https://github.com/glauth/glauth/commit/cb121cdc2c9b831abdf7831835ec30ead2536a7a))
+
 ## [2.5.0](https://github.com/glauth/glauth/compare/GLAuth-v2.5.0...GLAuth-v2.5.0) (2026-04-19)
 
 
