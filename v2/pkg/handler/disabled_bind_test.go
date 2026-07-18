@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/hex"
 	"net"
 	"testing"
@@ -14,9 +13,22 @@ import (
 	"github.com/glauth/ldap"
 )
 
+type disabledBindTestMonitor struct{}
+
+func (disabledBindTestMonitor) SetResponseTimeMetric(map[string]string, float64) error {
+	return nil
+}
+
+func (disabledBindTestMonitor) SetLDAPMetric(map[string]string, float64) error {
+	return nil
+}
+
 func TestConfigBackendDisabledUserCannotBind(t *testing.T) {
 	pw := "correct horse"
-	raw, _ := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.MinCost)
+	raw, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hexHash := hex.EncodeToString(raw)
 
 	cfg := &config.Config{}
@@ -37,13 +49,14 @@ func TestConfigBackendDisabledUserCannotBind(t *testing.T) {
 		log:       &logger,
 		cfg:       cfg,
 		ldohelper: helper,
+		monitor:   disabledBindTestMonitor{},
 		tracer:    tracer,
 	}
 	_, server := net.Pipe()
 	defer server.Close()
 
 	bind := func(dn, pass string) ldap.LDAPResultCode {
-		code, _ := helper.Bind(context.Background(), h, dn, pass, server)
+		code, _ := h.Bind(dn, pass, server)
 		return code
 	}
 
