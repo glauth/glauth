@@ -21,7 +21,7 @@ Use it to centralize account management across your Linux servers, your OSX mach
 
 ### Contributing
 - Please base all Pull Requests on [dev](https://github.com/glauth/glauth/tree/dev), not master.
-- Format your code autonmatically using `gofmt -d ./` before committing
+- Format your code automatically using `gofmt -d ./` before committing
 
 ### Quickstart
 This quickstart is a great way to try out GLAuth in a non-production environment.  *Be warned that you should take the extra steps to setup SSL (TLS) for production use!*

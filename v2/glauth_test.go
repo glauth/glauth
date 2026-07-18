@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,15 +27,123 @@ type testEnv struct {
 	checkemployeetype     string
 }
 
+func glauthBinary() string {
+	if binary := os.Getenv("GLAUTH_TEST_BINARY"); binary != "" {
+		return binary
+	}
+
+	qualified := filepath.Join("bin", runtime.GOOS+runtime.GOARCH, "glauth")
+	if _, err := os.Stat(qualified); err == nil {
+		return qualified
+	}
+	return "bin/glauth"
+}
+
 func TestProperBuild(t *testing.T) {
-	info, err := os.Stat("bin/glauth")
+	info, err := os.Stat(glauthBinary())
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	mode := uint32(info.Mode())
 	if mode&0b001001001 == 0 {
 		t.Fatalf("bad file mode: %b", mode)
 	}
+}
+
+func TestConfigBackendRejectsPasswordlessUserBinds(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	configPath := filepath.Join(t.TempDir(), "passwordless.cfg")
+	config := fmt.Sprintf(`debug = false
+
+[ldap]
+  enabled = true
+  listen = "127.0.0.1:%d"
+  tls = false
+
+[ldaps]
+  enabled = false
+
+[backend]
+  datastore = "config"
+  baseDN = "dc=glauth,dc=com"
+
+[behaviors]
+  LimitFailedBinds = false
+
+[[groups]]
+  name = "svc"
+  gidnumber = 5501
+
+[[users]]
+  name = "nopass"
+  uidnumber = 5001
+  primarygroup = 5501
+    [[users.capabilities]]
+    action = "search"
+    object = "*"
+`, port)
+	if err := os.WriteFile(configPath, []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	svc := startSvc(SD, glauthBinary(), "-c", configPath)
+	defer stopSvc(svc)
+
+	bindDN := "cn=nopass,dc=glauth,dc=com"
+	for _, tc := range []struct {
+		name     string
+		password string
+		want     string
+	}{
+		{name: "arbitrary password", password: "definitely-wrong", want: "exit status 49"},
+		{name: "empty password", password: "", want: "exit status 53"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := doRunGetFirst(0, "ldapsearch", "-LLL", "-H", fmt.Sprintf("ldap://127.0.0.1:%d", port), "-D", bindDN, "-w", tc.password, "-x", "-b", "dc=glauth,dc=com", "(cn=nopass)")
+			if got != tc.want {
+				t.Fatalf("bind result = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func ldapOnlyConfig(t *testing.T, source string) string {
+	t.Helper()
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contents := string(data)
+	sectionMarker := "\n[ldaps]\n"
+	markerStart := strings.Index(contents, sectionMarker)
+	if markerStart < 0 {
+		t.Fatalf("%s has no [ldaps] section", source)
+	}
+	start := markerStart + 1
+	relEnd := strings.Index(contents[start+len("[ldaps]"):], "\n[")
+	if relEnd < 0 {
+		t.Fatalf("%s has no section after [ldaps]", source)
+	}
+	end := start + len("[ldaps]") + relEnd
+	section := contents[start:end]
+	sectionWithoutLDAPS := strings.Replace(section, "enabled = true", "enabled = false", 1)
+	if section == sectionWithoutLDAPS {
+		t.Fatalf("%s [ldaps] section does not enable LDAPS", source)
+	}
+
+	contents = contents[:start] + sectionWithoutLDAPS + contents[end:]
+	path := filepath.Join(t.TempDir(), filepath.Base(source))
+	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func batteryOfTests(t *testing.T, env *testEnv) {
@@ -195,7 +307,7 @@ func TestSampleSimple(t *testing.T) {
 		checkemployeetype:     "cn=hackers",
 	}
 
-	svc := startSvc(SD, "bin/glauth", "-c", "sample-simple.cfg")
+	svc := startSvc(SD, glauthBinary(), "-c", ldapOnlyConfig(t, "sample-simple.cfg"))
 	batteryOfTests(t, &env)
 	stopSvc(svc)
 }
@@ -221,7 +333,7 @@ func TestSQLitePlugin(t *testing.T) {
 		checkemployeetype:     "",
 	}
 
-	svc := startSvc(SD, "bin/glauth", "-c", "pkg/plugins/glauth-sqlite/sample-database.cfg")
+	svc := startSvc(SD, glauthBinary(), "-c", "pkg/plugins/glauth-sqlite/sample-database.cfg")
 	batteryOfTests(t, &env)
 	stopSvc(svc)
 }
@@ -247,7 +359,7 @@ func TestLdapInjection(t *testing.T) {
 		checkemployeetype:     "",
 	}
 
-	svc := startSvc(SD, "bin/glauth", "-c", "sample-ldap-injection.cfg")
+	svc := startSvc(SD, glauthBinary(), "-c", "sample-ldap-injection.cfg")
 	batteryOfTests(t, &env)
 	stopSvc(svc)
 }

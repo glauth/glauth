@@ -58,10 +58,9 @@ mocks:
 vet:
 	-go vet ./...
 .PHONY: vet
-#test: @ runs the integration test on linuxamd64 (eventually allow the binary to be set)
+#test: @ runs package, root integration, and shell integration tests
 test: mocks vet
-	# also run unit tests for packages, skip glauth_test.go for now
-	go test -v -cover -coverprofile coverage.out ./pkg/... ./internal/...
+	go test -v -cover -coverprofile coverage.out ./pkg/... ./internal/... .
 	$(MAKE) runtest
 #all: @ run build process for all binaries
 all: setup binaries verify
