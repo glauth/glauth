@@ -121,6 +121,8 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 
 		validotp := false
 
+		// Local records augment proxy authentication with OTP/YubiKey checks;
+		// password authentication remains delegated to the upstream LDAP server.
 		// Find the user
 		// We are going to go through all backends and ask
 		// until we find our user or die of boredom.

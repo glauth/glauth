@@ -65,6 +65,10 @@ func NewLDAPOpsHelper(tracer trace.Tracer) LDAPOpsHelper {
 	return helper
 }
 
+func isUnauthenticatedSimpleBind(bindDN, bindSimplePw string) bool {
+	return bindDN != "" && bindSimplePw == ""
+}
+
 func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.Bind")
 	defer span.End()
@@ -84,6 +88,13 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		stats.Frontend.Add("bind_successes", 1)
 		h.GetLog().Info().Str("src", conn.RemoteAddr().String()).Msg("Anonymous Bind success")
 		return ldap.LDAPResultSuccess, nil
+	}
+
+	// A non-empty DN with an empty password is LDAP's unauthenticated bind
+	// mechanism. It must not establish the named user's authorization state.
+	if isUnauthenticatedSimpleBind(bindDN, bindSimplePw) {
+		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("unauthenticated bind rejected")
+		return ldap.LDAPResultUnwillingToPerform, nil
 	}
 
 	user, ldapcode := l.findUser(ctx, h, bindDN, true /* checkGroup */)
@@ -172,6 +183,15 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 	// Then ensure the OTP is valid before checking
 	if !validotp {
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid OTP token")
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
+
+	// Reaching this point without a configured primary password verifier must
+	// not be treated as successful authentication. App-password matches and
+	// custom authentication return above when they succeed.
+	if user.PassBcrypt == "" && user.PassSHA256 == "" {
+		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials")
+		l.maybePutInTimeout(ctx, h, conn, true)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
