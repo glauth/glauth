@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.2](https://github.com/glauth/glauth/compare/GLAuth-v2.5.1...GLAuth-v2.5.2) (2026-07-25)
+
+
+### Features
+
+* check plugin compatibility at release time ([700745e](https://github.com/glauth/glauth/commit/700745e640c5371361a58ef3c90245a4637c5224))
+
 ## [2.5.1](https://github.com/glauth/glauth/compare/GLAuth-v2.5.0...GLAuth-v2.5.1) (2026-07-18)
 
 
