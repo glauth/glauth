@@ -1,4 +1,4 @@
-//go:build embedsqlite
+//go:build embed
 
 package server
 
