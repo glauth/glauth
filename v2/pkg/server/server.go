@@ -4,7 +4,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"plugin"
+	"time"
 
 	_tls "github.com/glauth/glauth/v2/internal/tls"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/glauth/ldap"
+	proxyproto "github.com/pires/go-proxyproto"
 )
 
 type LdapSvc struct {
@@ -210,7 +213,22 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 // ListenAndServe listens on the TCP network address s.c.LDAP.Listen
 func (s *LdapSvc) ListenAndServe() error {
 	s.log.Info().Str("address", s.c.LDAP.Listen).Msg("LDAP server listening")
-	return s.l.ListenAndServe(s.c.LDAP.Listen)
+
+	ln, err := net.Listen("tcp", s.c.LDAP.Listen)
+	if err != nil {
+		return err
+	}
+	connPolicy, err := proxyproto.PolicyFromRanges(s.c.LDAP.ProxyProtocolAllowedAddresses, proxyproto.USE, proxyproto.IGNORE)
+	if err != nil {
+		return fmt.Errorf("failed to parse LDAPS.ProxyProtocolAllowedAddresses: %w", err)
+	}
+	ln = &proxyproto.Listener{
+		Listener:          ln,
+		ReadHeaderTimeout: 2 * time.Second,
+		ConnPolicy: connPolicy,
+	}
+	defer ln.Close()
+	return s.l.Serve(ln)
 }
 
 // ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
@@ -220,6 +238,17 @@ func (s *LdapSvc) ListenAndServeTLS() error {
 	if err != nil {
 		return err
 	}
+	connPolicy, err := proxyproto.PolicyFromRanges(s.c.LDAPS.ProxyProtocolAllowedAddresses, proxyproto.USE, proxyproto.IGNORE)
+	if err != nil {
+		return fmt.Errorf("failed to parse LDAPS.ProxyProtocolAllowedAddresses: %w", err)
+	}
+	listener = &proxyproto.Listener{
+		Listener:          listener,
+		ReadHeaderTimeout: 2 * time.Second,
+		ConnPolicy: connPolicy,
+	}
+	defer listener.Close()
+
 	return s.l.Serve(listener)
 }
 
