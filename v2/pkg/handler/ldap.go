@@ -464,16 +464,11 @@ func (h ldapHandler) getSession(conn net.Conn) (ldapSession, error) {
 		if err != nil {
 			return ldapSession{}, err
 		}
-		dest := fmt.Sprintf("%s:%d", server.Hostname, server.Port)
-		if server.Scheme == "ldaps" {
-			tlsCfg := &tls.Config{}
-			if h.backend.Insecure {
-				tlsCfg.InsecureSkipVerify = true
-			}
-			l, err = ldap.DialTLS("tcp", dest, tlsCfg)
-		} else if server.Scheme == "ldap" {
-			l, err = ldap.Dial("tcp", dest)
+		dest := fmt.Sprintf("%s://%s:%d", server.Scheme, server.Hostname, server.Port)
+		tlsCfg := &tls.Config{
+			InsecureSkipVerify: h.backend.Insecure,
 		}
+		l, err = ldap.DialURL(dest, ldap.DialWithTLSConfig(tlsCfg))
 		if err != nil {
 			select {
 			case h.doPing <- true: // non-blocking send
@@ -494,17 +489,13 @@ func (h ldapHandler) ping() error {
 	for k, s := range h.servers {
 		var l *ldap.Conn
 		var err error
-		dest := fmt.Sprintf("%s:%d", s.Hostname, s.Port)
+		dest := fmt.Sprintf("%s://%s:%d", s.Scheme, s.Hostname, s.Port)
 		start := time.Now()
-		if h.servers[0].Scheme == "ldaps" {
-			tlsCfg := &tls.Config{}
-			if h.backend.Insecure {
-				tlsCfg.InsecureSkipVerify = true
-			}
-			l, err = ldap.DialTLS("tcp", dest, tlsCfg)
-		} else if h.servers[0].Scheme == "ldap" {
-			l, err = ldap.Dial("tcp", dest)
+		tlsCfg := &tls.Config{}
+		if h.backend.Insecure {
+			tlsCfg.InsecureSkipVerify = true
 		}
+		l, err = ldap.DialURL(dest, ldap.DialWithTLSConfig(tlsCfg))
 		elapsed := time.Since(start)
 		h.lock.Lock()
 		if err != nil || l == nil {
