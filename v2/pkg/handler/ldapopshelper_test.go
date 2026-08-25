@@ -12,7 +12,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/glauth/glauth/v2/pkg/config"
-	"github.com/glauth/ldap"
+	"github.com/glauth/ldaps"
+	"github.com/go-ldap/ldap/v3"
 )
 
 type bindTestHandler struct {
@@ -58,7 +59,7 @@ func TestLDAPOpsHelperBindRejectsUnauthenticatedAndPasswordlessBinds(t *testing.
 		name       string
 		password   string
 		user       config.User
-		wantResult ldap.LDAPResultCode
+		wantResult uint16
 	}{
 		{
 			name:       "named empty password is unauthenticated bind",
@@ -110,12 +111,9 @@ func TestLDAPOpsHelperBindRejectsUnauthenticatedAndPasswordlessBinds(t *testing.
 			defer peer.Close()
 
 			helper := NewLDAPOpsHelper(trace.NewNoopTracerProvider().Tracer("bind-test"))
-			got, err := helper.Bind(context.Background(), h, "cn=nopass,dc=glauth,dc=com", tt.password, conn)
-			if err != nil {
-				t.Fatalf("Bind returned error: %v", err)
-			}
-			if got != tt.wantResult {
-				t.Fatalf("Bind result = %v, want %v", got, tt.wantResult)
+			_, err := helper.Bind(context.Background(), h, "cn=nopass,dc=glauth,dc=com", tt.password, conn)
+			if ldaps.StatusCode(err) != tt.wantResult {
+				t.Fatalf("Bind result = %v, want %v", err, tt.wantResult)
 			}
 		})
 	}
@@ -131,11 +129,8 @@ func TestLDAPOpsHelperBindAllowsAnonymousBind(t *testing.T) {
 	defer peer.Close()
 
 	helper := NewLDAPOpsHelper(trace.NewNoopTracerProvider().Tracer("bind-test"))
-	got, err := helper.Bind(context.Background(), h, "", "", conn)
-	if err != nil {
-		t.Fatalf("Bind returned error: %v", err)
-	}
-	if got != ldap.LDAPResultSuccess {
-		t.Fatalf("Bind result = %v, want %v", got, ldap.LDAPResultSuccess)
+	_, err := helper.Bind(context.Background(), h, "", "", conn)
+	if ldaps.StatusCode(err) != ldap.LDAPResultSuccess {
+		t.Fatalf("Bind result = %v, want %v", err, ldap.LDAPResultSuccess)
 	}
 }

@@ -272,7 +272,7 @@ buildsingleembed:
 	# Delete any go modules. `make pull-plugin-dependencies` should be ran separately before this
 	rm -f pkg/embed/go.mod pkg/embed/go.sum
 	# Do a naive package name replacement
-	find pkg/embed -name '*.go' -exec sed -E -i -e 's/func main\(\)\s*\{\s*\}\s*//' -e 's/func New\w+Handler\(opts \.\.\.handler\.Option\) handler\.Handler \{/func NewHandler(opts ...handler.Option) handler.Handler {/g' -e 's/^package main/package embed/' '{}' '+'
+	find pkg/embed -name '*.go' -exec sed -E -i -e 's/func main\(\)\s*\{\s*\}\s*//' -e 's/func New\w+Handler\((ctx context.Context, )?opts \.\.\.handler\.Option\) handler\.Handler \{/func NewHandler(\1opts ...handler.Option) handler.Handler {/g' -e 's/^package main/package embed/' '{}' '+'
 	# Tidy because go sucks
 	go mod tidy
 	# Actually build the thing

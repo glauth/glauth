@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -15,13 +16,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/glauth/ldaps"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/glauth/ldap"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -97,14 +99,14 @@ func NewLdapHandler(opts ...Option) Handler {
 	return handler
 }
 
-func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	ctx, span := h.tracer.Start(context.Background(), "handler.ldapHandler.Bind")
+func (h ldapHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (result *ldap.SimpleBindResult, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.ldapHandler.Bind")
 	defer span.End()
 
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
-			map[string]string{"operation": "bind", "status": fmt.Sprintf("%v", result)},
+			map[string]string{"operation": "bind", "status": fmt.Sprintf("%v", ldaps.StatusCode(err))},
 			time.Since(start).Seconds(),
 		)
 	}()
@@ -154,7 +156,7 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 
 		if !validotp {
 			h.log.Debug().Msg(fmt.Sprintf("Bind Error: invalid OTP token as %s from %s", bindDN, conn.RemoteAddr().String()))
-			return ldap.LDAPResultInvalidCredentials, nil
+			return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("Invalid OTP code"))
 		}
 	}
 
@@ -163,26 +165,26 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 	if err != nil {
 		stats.Frontend.Add("bind_ldapSession_errors", 1)
 		h.log.Debug().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Err(err).Msg("could not get session")
-		return ldap.LDAPResultOperationsError, err
+		return nil, err
 	}
 	if err := s.ldap.Bind(bindDN, bindSimplePw); err != nil {
 		stats.Frontend.Add("bind_errors", 1)
 		h.log.Debug().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid creds")
-		return ldap.LDAPResultInvalidCredentials, nil
+		return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 	}
 	stats.Frontend.Add("bind_successes", 1)
 	h.log.Debug().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("bind success")
-	return ldap.LDAPResultSuccess, nil
+	return nil, nil
 }
 
-func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	ctx, span := h.tracer.Start(context.Background(), "handler.ldapHandler.Search")
+func (h ldapHandler) Search(ctx context.Context, boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (result *ldap.SearchResult, err error) {
+	ctx, span := h.tracer.Start(ctx, "handler.ldapHandler.Search")
 	defer span.End()
 
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
-			map[string]string{"operation": "search", "status": fmt.Sprintf("%v", result.ResultCode)},
+			map[string]string{"operation": "search", "status": fmt.Sprintf("%v", ldaps.StatusCode(err))},
 			time.Since(start).Seconds(),
 		)
 	}()
@@ -210,7 +212,7 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	s, err := h.getSession(conn)
 	if err != nil {
 		stats.Frontend.Add("search_ldapSession_errors", 1)
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, nil
+		return nil, err
 	}
 	/*
 	   delete_idx := -1
@@ -310,23 +312,20 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 		}
 	}
 
-	ssr := ldap.ServerSearchResult{
-		Entries:    sr.Entries,
-		Referrals:  sr.Referrals,
-		Controls:   sr.Controls,
-		ResultCode: ldap.LDAPResultSuccess,
+	ssr := ldap.SearchResult{
+		Entries:   sr.Entries,
+		Referrals: sr.Referrals,
+		Controls:  sr.Controls,
 	}
 	h.log.Debug().Interface("result", ssr).Msg("Frontend Search result")
-	if err != nil {
-		e := err.(*ldap.Error)
+	if ldaps.StatusCode(err) != ldap.LDAPResultSuccess {
 		h.log.Debug().Err(err).Msg("search Err")
 		stats.Frontend.Add("search_errors", 1)
-		ssr.ResultCode = ldap.LDAPResultCode(e.ResultCode)
-		return ssr, err
+		return &ssr, err
 	}
 	stats.Frontend.Add("search_successes", 1)
 	h.log.Debug().Str("filter", search.Filter).Int("numentries", len(ssr.Entries)).Msg("AP: Search OK")
-	return ssr, nil
+	return &ssr, err
 }
 
 func (h ldapHandler) buildReqAttributesList(ctx context.Context, filter string, filters []string) []string {
@@ -356,48 +355,48 @@ func (h ldapHandler) buildReqAttributesList(ctx context.Context, filter string, 
 }
 
 // Add is not yet supported for the ldap backend
-func (h ldapHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "handler.ldapHandler.Add")
+func (h ldapHandler) Add(ctx context.Context, boundDN string, req ldap.AddRequest, conn net.Conn) (err error) {
+	_, span := h.tracer.Start(ctx, "handler.ldapHandler.Add")
 	defer span.End()
 
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
-			map[string]string{"operation": "add", "status": fmt.Sprintf("%v", result)},
+			map[string]string{"operation": "add", "status": fmt.Sprintf("%v", ldaps.StatusCode(err))},
 			time.Since(start).Seconds(),
 		)
 	}()
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 // Modify is not yet supported for the ldap backend
-func (h ldapHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "handler.ldapHandler.Modify")
+func (h ldapHandler) Modify(ctx context.Context, boundDN string, req ldap.ModifyRequest, conn net.Conn) (r *ldap.ModifyResult, err error) {
+	_, span := h.tracer.Start(ctx, "handler.ldapHandler.Modify")
 	defer span.End()
 
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
-			map[string]string{"operation": "modify", "status": fmt.Sprintf("%v", result)},
+			map[string]string{"operation": "modify", "status": fmt.Sprintf("%v", ldaps.StatusCode(err))},
 			time.Since(start).Seconds(),
 		)
 	}()
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 // Delete is not yet supported for the ldap backend
-func (h ldapHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "handler.ldapHandler.Delete")
+func (h ldapHandler) Delete(ctx context.Context, boundDN string, deleteDN string, conn net.Conn) (err error) {
+	_, span := h.tracer.Start(ctx, "handler.ldapHandler.Delete")
 	defer span.End()
 
 	start := time.Now()
 	defer func() {
 		h.monitor.SetResponseTimeMetric(
-			map[string]string{"operation": "delete", "status": fmt.Sprintf("%v", result)},
+			map[string]string{"operation": "delete", "status": fmt.Sprintf("%v", ldaps.StatusCode(err))},
 			time.Since(start).Seconds(),
 		)
 	}()
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 func (h ldapHandler) FindUser(ctx context.Context, userName string, searchByUPN bool) (found bool, user config.User, err error) {
@@ -413,14 +412,13 @@ func (h ldapHandler) FindGroup(ctx context.Context, groupName string) (found boo
 	return false, config.Group{}, nil
 }
 
-func (h ldapHandler) Close(boundDn string, conn net.Conn) error {
+func (h ldapHandler) Close(ctx context.Context, boundDn string, conn net.Conn) {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	delete(h.sessions, connID(conn))
 	stats.Frontend.Add("closes", 1)
 	stats.Backend.Add("closes", 1)
-	return nil
 }
 
 // monitorServers tests server connectivity before listening, then keeps it updated

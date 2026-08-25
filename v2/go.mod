@@ -8,7 +8,8 @@ require (
 	github.com/arl/statsviz v0.6.0
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
+	github.com/glauth/ldaps v0.0.0-20260629221740-fae8dfa087f9
+	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/jinzhu/copier v0.4.0
 	github.com/pires/go-proxyproto v0.15.0
 	github.com/pquerna/otp v1.4.0
@@ -26,19 +27,22 @@ require (
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.54.0
+	golang.org/x/net v0.57.0
 	gopkg.in/amz.v3 v3.0.0-20201001071545-24fc1eceb27b
 )
 
 require (
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -48,11 +52,11 @@ require (
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/rickb777/date v1.12.4 // indirect
 	github.com/rickb777/plural v1.2.0 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/grpc v1.59.0 // indirect
