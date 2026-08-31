@@ -1,6 +1,6 @@
 module github.com/glauth/glauth/v2
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.3.2
@@ -10,6 +10,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
 	github.com/jinzhu/copier v0.4.0
+	github.com/pires/go-proxyproto v0.15.0
 	github.com/pquerna/otp v1.4.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -25,7 +26,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/crypto v0.18.0
+	golang.org/x/crypto v0.51.0
 	gopkg.in/amz.v3 v3.0.0-20201001071545-24fc1eceb27b
 )
 
@@ -49,11 +50,13 @@ require (
 	github.com/rickb777/plural v1.2.0 // indirect
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 )
+
+replace github.com/gwelch-contegix/ldaps => ../../ldaps/
