@@ -1,6 +1,6 @@
 package monitoring
 
-import "github.com/glauth/ldap"
+import "github.com/glauth/ldaps"
 
 type MonitorInterface interface {
 	SetResponseTimeMetric(map[string]string, float64) error
@@ -9,5 +9,5 @@ type MonitorInterface interface {
 
 type LDAPServerInterface interface {
 	SetStats(bool)
-	GetStats() ldap.Stats
+	GetStats() ldaps.Stats
 }

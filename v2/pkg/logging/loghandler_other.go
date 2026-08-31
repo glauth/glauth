@@ -44,12 +44,11 @@ func InitLogging(reqdebug bool, reqsyslog bool, reqstructlog bool) zerolog.Logge
 	var logr zerolog.Logger
 	if reqsyslog {
 		s, err := syslog.New(syslog.LOG_INFO, "glauth")
-		if err != nil {
+		if err == nil {
+			logr = zerolog.New(zerolog.SyslogLevelWriter(s)).Level(level).With().Timestamp().Logger()
+		} else {
 			fmt.Println("Unable to write to syslog: ignoring...")
 			reqsyslog = false
-		} else {
-			writers := zerolog.MultiLevelWriter(mainWriter, zerolog.SyslogLevelWriter(s))
-			logr = zerolog.New(writers).Level(level).With().Timestamp().Logger()
 		}
 	}
 

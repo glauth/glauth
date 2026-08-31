@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -19,7 +20,8 @@ import (
 	"github.com/GeertJohan/yubigo"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/glauth/ldap"
+	"github.com/glauth/ldaps"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -69,12 +71,12 @@ func isUnauthenticatedSimpleBind(bindDN, bindSimplePw string) bool {
 	return bindDN != "" && bindSimplePw == ""
 }
 
-func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
+func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindSimplePw string, conn net.Conn) (result *ldap.SimpleBindResult, err error) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.Bind")
 	defer span.End()
 
 	if l.isInTimeout(ctx, h, conn) {
-		return ldap.LDAPResultUnwillingToPerform, nil
+		return nil, ldap.NewError(ldap.LDAPResultUnwillingToPerform, ldaps.ErrEmpty)
 	}
 
 	bindDN = strings.ToLower(bindDN)
@@ -87,25 +89,25 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 	if bindDN == "" && bindSimplePw == "" {
 		stats.Frontend.Add("bind_successes", 1)
 		h.GetLog().Info().Str("src", conn.RemoteAddr().String()).Msg("Anonymous Bind success")
-		return ldap.LDAPResultSuccess, nil
+		return nil, nil
 	}
 
 	// A non-empty DN with an empty password is LDAP's unauthenticated bind
 	// mechanism. It must not establish the named user's authorization state.
 	if isUnauthenticatedSimpleBind(bindDN, bindSimplePw) {
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("unauthenticated bind rejected")
-		return ldap.LDAPResultUnwillingToPerform, nil
+		return nil, ldap.NewError(ldap.LDAPResultUnwillingToPerform, ldaps.ErrEmpty)
 	}
 
 	user, ldapcode := l.findUser(ctx, h, bindDN, true /* checkGroup */)
 	if ldapcode != ldap.LDAPResultSuccess {
-		return ldapcode, nil
+		return nil, ldap.NewError(ldapcode, ldaps.ErrEmpty)
 	}
 
 	// a disabled account must never authenticate, on any backend
 	if user.Disabled {
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind attempt on disabled account")
-		return ldap.LDAPResultInvalidCredentials, nil
+		return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 	}
 
 	validotp := false
@@ -156,7 +158,7 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 				if bcrypt.CompareHashAndPassword(decoded, []byte(untouchedBindSimplePw)) == nil {
 					stats.Frontend.Add("bind_successes", 1)
 					h.GetLog().Info().Int("index", index).Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind success using app pw")
-					return ldap.LDAPResultSuccess, nil
+					return nil, nil
 				}
 			}
 		}
@@ -170,7 +172,7 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 			} else {
 				stats.Frontend.Add("bind_successes", 1)
 				h.GetLog().Info().Int("index", index).Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind success using app pw")
-				return ldap.LDAPResultSuccess, nil
+				return nil, nil
 			}
 		}
 	}
@@ -178,18 +180,18 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		err := user.PassAppCustom(user, untouchedBindSimplePw)
 		if err != nil {
 			h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Str("error", err.Error()).Msg("Attempt to bind app custom auth failed")
-			return ldap.LDAPResultInvalidCredentials, nil
+			return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 		}
 
 		stats.Frontend.Add("bind_successes", 1)
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind success using app custom auth")
-		return ldap.LDAPResultSuccess, nil
+		return nil, nil
 	}
 
 	// Then ensure the OTP is valid before checking
 	if !validotp {
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid OTP token")
-		return ldap.LDAPResultInvalidCredentials, nil
+		return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 	}
 
 	// Reaching this point without a configured primary password verifier must
@@ -198,7 +200,7 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 	if user.PassBcrypt == "" && user.PassSHA256 == "" {
 		h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials")
 		l.maybePutInTimeout(ctx, h, conn, true)
-		return ldap.LDAPResultInvalidCredentials, nil
+		return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 	}
 
 	// Now, check the pasword hash
@@ -206,12 +208,12 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		decoded, err := hex.DecodeString(user.PassBcrypt)
 		if err != nil {
 			h.GetLog().Info().Str("incorrect stored hash", "(omitted)").Msg("invalid credentials")
-			return ldap.LDAPResultInvalidCredentials, nil
+			return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 		}
 		if bcrypt.CompareHashAndPassword(decoded, []byte(bindSimplePw)) != nil {
 			h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials")
 			l.maybePutInTimeout(ctx, h, conn, true)
-			return ldap.LDAPResultInvalidCredentials, nil
+			return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 		}
 	}
 	if user.PassSHA256 != "" {
@@ -220,13 +222,13 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
 		if user.PassSHA256 != hex.EncodeToString(hash.Sum(nil)) {
 			h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("invalid credentials")
 			l.maybePutInTimeout(ctx, h, conn, true)
-			return ldap.LDAPResultInvalidCredentials, nil
+			return nil, ldap.NewError(ldap.LDAPResultInvalidCredentials, ldaps.ErrEmpty)
 		}
 	}
 
 	stats.Frontend.Add("bind_successes", 1)
 	h.GetLog().Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind success")
-	return ldap.LDAPResultSuccess, nil
+	return nil, nil
 }
 
 /*
@@ -244,12 +246,12 @@ func (l LDAPOpsHelper) Bind(ctx context.Context, h LDAPOpsHandler, bindDN, bindS
  * TODO #5:
  * Document roll out of schemas
  */
-func (l LDAPOpsHelper) Search(ctx context.Context, h LDAPOpsHandler, bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
+func (l LDAPOpsHelper) Search(ctx context.Context, h LDAPOpsHandler, bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result *ldap.SearchResult, err error) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.Search")
 	defer span.End()
 
 	if l.isInTimeout(ctx, h, conn) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultUnwillingToPerform}, fmt.Errorf("Source is in a timeout")
+		return nil, ldap.NewError(ldap.LDAPResultUnwillingToPerform, errors.New("Source is in a timeout"))
 	}
 
 	bindDN = strings.ToLower(bindDN)
@@ -259,11 +261,11 @@ func (l LDAPOpsHelper) Search(ctx context.Context, h LDAPOpsHandler, bindDN stri
 	anonymous := len(bindDN) < 1
 
 	var boundUser *config.User
-	var ldapcode ldap.LDAPResultCode
+	var ldapcode uint16
 
 	if !anonymous {
 		if bindDN, boundUser, ldapcode = l.searchCheckBindDN(ctx, h, baseDN, bindDN, anonymous); ldapcode != ldap.LDAPResultSuccess {
-			return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Search Error: Potential bypass of BindDN %s", bindDN)
+			return nil, ldap.NewError(ldapcode, fmt.Errorf("Search Error: Potential bypass of BindDN %s", bindDN))
 		}
 	}
 
@@ -272,78 +274,78 @@ func (l LDAPOpsHelper) Search(ctx context.Context, h LDAPOpsHandler, bindDN stri
 
 	switch entries, ldapcode := l.searchMaybeRootDSEQuery(ctx, h, baseDN, searchBaseDN, searchReq, anonymous); ldapcode {
 	case ldap.LDAPResultUnwillingToPerform:
-		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Search Error: No BaseDN provided")
+		return nil, ldap.NewError(ldapcode, fmt.Errorf("Search Error: No BaseDN provided"))
 	case ldap.LDAPResultInsufficientAccessRights:
-		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Root DSE Search Error: Anonymous BindDN not allowed %s", bindDN)
+		return nil, ldap.NewError(ldapcode, fmt.Errorf("Root DSE Search Error: Anonymous BindDN not allowed %s", bindDN))
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	// Past this point, there is no reason to allow anonymous searches
 	if anonymous {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN)
+		return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, fmt.Errorf("Search Error: Anonymous BindDN not allowed %s", bindDN))
 	}
 
 	switch entries, ldapcode, attributename := l.searchMaybeSchemaQuery(ctx, h, baseDN, searchBaseDN, searchReq, anonymous); ldapcode {
 	case ldap.LDAPResultOperationsError:
-		return ldap.ServerSearchResult{ResultCode: ldapcode}, fmt.Errorf("Schema Error: attribute %s cannot be read", *attributename)
+		return nil, ldap.NewError(ldapcode, fmt.Errorf("Schema Error: attribute %s cannot be read", *attributename))
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	// Past this further point, we are looking at tree searches... not all standard searches yet, though
 
 	// But first, let's only allow legal searches
 	if !strings.HasSuffix(bindDN, fmt.Sprintf(",%s", baseDN)) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.GetBackend().BaseDN)
+		return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, fmt.Errorf("Search Error: BindDN %s not in our BaseDN %s", bindDN, h.GetBackend().BaseDN))
 	}
 	if !strings.HasSuffix(searchBaseDN, h.GetBackend().BaseDN) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.GetBackend().BaseDN)
+		return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, fmt.Errorf("Search Error: search BaseDN %s is not in our BaseDN %s", searchBaseDN, h.GetBackend().BaseDN))
 	}
 	// Unless globally ignored, we will check that a user has capabilities allowing them to perform a search in the requested BaseDN
 	if !h.GetCfg().Behaviors.IgnoreCapabilities && !l.checkCapability(ctx, *boundUser, "search", []string{"*", searchBaseDN}) {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("Search Error: no capability allowing BindDN %s to perform search in %s", bindDN, searchBaseDN)
+		return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, fmt.Errorf("Search Error: no capability allowing BindDN %s to perform search in %s", bindDN, searchBaseDN))
 	}
 
 	switch entries, ldapcode := l.searchMaybeTopLevelNodes(ctx, h, baseDN, searchBaseDN, searchReq); ldapcode {
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	switch entries, ldapcode := l.searchMaybeTopLevelGroupsNode(ctx, h, baseDN, searchBaseDN, searchReq); ldapcode {
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	switch entries, ldapcode := l.searchMaybeTopLevelUsersNode(ctx, h, baseDN, searchBaseDN, searchReq); ldapcode {
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
-	filterEntity, err := ldap.GetFilterObjectClass(searchReq.Filter)
+	filterEntity, err := ldaps.GetFilterAttribute(searchReq.Filter, "objectclass")
 	if err != nil {
-		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultOperationsError}, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter)
+		return nil, ldap.NewError(ldap.LDAPResultOperationsError, fmt.Errorf("Search Error: error parsing filter: %s", searchReq.Filter))
 	}
 
 	switch entries, ldapcode := l.searchMaybePosixGroups(ctx, h, baseDN, searchBaseDN, searchReq, filterEntity); ldapcode {
 	case ldap.LDAPResultSuccess:
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	switch entries, ldapcode := l.searchMaybePosixAccounts(ctx, h, baseDN, searchBaseDN, searchReq, filterEntity); ldapcode {
 	case ldap.LDAPResultSuccess:
 		stats.Frontend.Add("search_successes", 1)
 		h.GetLog().Info().Str("filter", searchReq.Filter).Msg("AP: Search OK")
-		return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldapcode}, nil
+		return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 	}
 
 	// So, this should be an ERROR condition! Right..?
 	entries := []*ldap.Entry{}
-	return ldap.ServerSearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}, ResultCode: ldap.LDAPResultSuccess}, nil
+	return &ldap.SearchResult{Entries: entries, Referrals: []string{}, Controls: []ldap.Control{}}, nil
 }
 
 // Returns: LDAPResultSuccess or any ldap code returned by findUser
-func (l LDAPOpsHelper) searchCheckBindDN(ctx context.Context, h LDAPOpsHandler, baseDN string, bindDN string, anonymous bool) (newBindDN string, boundUser *config.User, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchCheckBindDN(ctx context.Context, h LDAPOpsHandler, baseDN string, bindDN string, anonymous bool) (newBindDN string, boundUser *config.User, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchCheckBindDN")
 	defer span.End()
 
@@ -363,7 +365,7 @@ func (l LDAPOpsHelper) searchCheckBindDN(ctx context.Context, h LDAPOpsHandler, 
 
 // Search RootDSE and return information on the server
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultUnwillingToPerform, LDAPResultInsufficientAccessRights
-func (l LDAPOpsHelper) searchMaybeRootDSEQuery(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybeRootDSEQuery(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybeRootDSEQuery")
 	defer span.End()
 
@@ -402,7 +404,7 @@ func (l LDAPOpsHelper) searchMaybeRootDSEQuery(ctx context.Context, h LDAPOpsHan
 
 // Search and return the information, after indirection from the RootDSE
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
-func (l LDAPOpsHelper) searchMaybeSchemaQuery(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode, attributename *string) {
+func (l LDAPOpsHelper) searchMaybeSchemaQuery(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, anonymous bool) (resultentries []*ldap.Entry, ldapresultcode uint16, attributename *string) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybeSchemaQuery")
 	defer span.End()
 
@@ -444,7 +446,7 @@ func (l LDAPOpsHelper) searchMaybeSchemaQuery(ctx context.Context, h LDAPOpsHand
 
 // Retrieve the top-levell nodes, i.e. the baseDN, groups, members...
 // Returns: LDAPResultSuccess, LDAPResultOther
-func (l LDAPOpsHelper) searchMaybeTopLevelNodes(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybeTopLevelNodes(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybeTopLevelNodes")
 	defer span.End()
 
@@ -478,7 +480,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelNodes(ctx context.Context, h LDAPOpsHa
 
 // Search starting from and including the ou=groups node
 // Returns: LDAPResultSuccess, LDAPResultOther
-func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybeTopLevelGroupsNode")
 	defer span.End()
 
@@ -504,7 +506,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelGroupsNode(ctx context.Context, h LDAP
 
 // Search starting from and including the ou=users node
 // Returns: LDAPResultSuccess, LDAPResultOther
-func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybeTopLevelUsersNode")
 	defer span.End()
 
@@ -537,7 +539,7 @@ func (l LDAPOpsHelper) searchMaybeTopLevelUsersNode(ctx context.Context, h LDAPO
 
 // Look up posixgroup entries, either through objectlass or parent is ou=groups or ou=users
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
-func (l LDAPOpsHelper) searchMaybePosixGroups(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybePosixGroups(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybePosixGroups")
 	defer span.End()
 
@@ -575,7 +577,7 @@ func (l LDAPOpsHelper) searchMaybePosixGroups(ctx context.Context, h LDAPOpsHand
 // Lookup posixaccount entries
 // Returns: LDAPResultSuccess, LDAPResultOther, LDAPResultOperationsError
 // This function ignores scopes... for now
-func (l LDAPOpsHelper) searchMaybePosixAccounts(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) searchMaybePosixAccounts(ctx context.Context, h LDAPOpsHandler, baseDN string, searchBaseDN string, searchReq ldap.SearchRequest, filterEntity string) (resultentries []*ldap.Entry, ldapresultcode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.searchMaybePosixAccounts")
 	defer span.End()
 
@@ -658,7 +660,7 @@ func (l LDAPOpsHelper) preFilterEntries(ctx context.Context, searchBaseDN string
 	return filteredEntries
 }
 
-func (l LDAPOpsHelper) findUser(ctx context.Context, h LDAPOpsHandler, bindDN string, checkGroup bool) (userWhenFound *config.User, resultCode ldap.LDAPResultCode) {
+func (l LDAPOpsHelper) findUser(ctx context.Context, h LDAPOpsHandler, bindDN string, checkGroup bool) (userWhenFound *config.User, resultCode uint16) {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.findUser")
 	defer span.End()
 
@@ -796,7 +798,7 @@ func (l LDAPOpsHelper) isInTimeout(ctx context.Context, handler LDAPOpsHandler, 
 	return false
 }
 
-func (l LDAPOpsHelper) maybePutInTimeout(ctx context.Context, handler LDAPOpsHandler, conn net.Conn, noteFailure bool) bool {
+func (l *LDAPOpsHelper) maybePutInTimeout(ctx context.Context, handler LDAPOpsHandler, conn net.Conn, noteFailure bool) bool {
 	ctx, span := l.tracer.Start(ctx, "handler.LDAPOpsHelper.maybePutInTimeout")
 	defer span.End()
 
