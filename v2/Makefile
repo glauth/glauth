@@ -212,7 +212,7 @@ verify:
 	@for binary in linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
 pull-plugin-dependencies:
-	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1}} /^require \(/{rblock=1}'); do if [ "$$(grep $$pkg go.mod &>/dev/null)" = "" ]; then go get $$pkg; fi; done)
+	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2"@"$$3} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1"@"$$2}} /^require \(/{rblock=1}'); do if [ "$$(grep $${pkg%@*} go.mod 2>/dev/null)" = "" ]; then go get $$pkg; fi; done)
 
 #prepare-plugins-buid: @ pull plugins dependencies for local building
 prepare-plugins-build:
