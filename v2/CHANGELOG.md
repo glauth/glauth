@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.4](https://github.com/glauth/glauth/compare/GLAuth-v2.5.3...GLAuth-v2.5.4) (2026-09-13)
+
+
+### Bug Fixes
+
+* revert pam plugin to msteinert/pam v1 ([#487](https://github.com/glauth/glauth/issues/487)) ([8d1ea39](https://github.com/glauth/glauth/commit/8d1ea390bacc74a54d9b2046e514b7e0336cb08b))
+
 ## [2.5.3](https://github.com/glauth/glauth/compare/GLAuth-v2.5.2...GLAuth-v2.5.3) (2026-09-13)
 
 
