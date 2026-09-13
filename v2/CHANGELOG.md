@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.3](https://github.com/glauth/glauth/compare/GLAuth-v2.5.2...GLAuth-v2.5.3) (2026-09-13)
+
+
+### Bug Fixes
+
+* remove repetitions, reduce waitForPort scope, restore arbitrary port ([5bdeb51](https://github.com/glauth/glauth/commit/5bdeb5118b0689d92c4a0d12aea63d8b8d153b71))
+
 ## [2.5.2](https://github.com/glauth/glauth/compare/GLAuth-v2.5.1...GLAuth-v2.5.2) (2026-07-25)
 
 
