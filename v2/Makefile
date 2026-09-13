@@ -58,8 +58,21 @@ mocks:
 vet:
 	-go vet ./...
 .PHONY: vet
+#seedplugindb: @ stage the sqlite plugin and seed its test database
+seedplugindb:
+	@if [ -f bin/sqlite-linux-amd64.so ]; then \
+		echo "- staging sqlite plugin and seeding gl.db"; \
+		cp -f bin/sqlite-linux-amd64.so bin/sqlite.so; \
+		rm -f gl.db; \
+		glauth=$$(ls bin/$(GOOS)$(GOARCH)/glauth bin/glauth-$(GOOS)-$(GOARCH) 2>/dev/null | head -1); \
+		"$$glauth" -c pkg/plugins/glauth-sqlite/sample-database.cfg >/dev/null 2>&1 & \
+		pid=$$!; sleep 2; kill -TERM $$pid 2>/dev/null; wait $$pid 2>/dev/null || true; \
+		sqlite3 gl.db < scripts/ci/seed-sqlite-plugin.sql; \
+	fi
+.PHONY: seedplugindb
+
 #test: @ runs package, root integration, and shell integration tests
-test: mocks vet
+test: mocks vet seedplugindb
 	go test -v -cover -coverprofile coverage.out ./pkg/... ./internal/... .
 	$(MAKE) runtest
 #all: @ run build process for all binaries
