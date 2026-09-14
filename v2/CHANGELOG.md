@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.5](https://github.com/glauth/glauth/compare/GLAuth-v2.5.4...GLAuth-v2.5.5) (2026-09-14)
+
+
+### Bug Fixes
+
+* route library log output through the logger ([#491](https://github.com/glauth/glauth/issues/491)) ([156e917](https://github.com/glauth/glauth/commit/156e9176977810140fbf60c4fea30a3480abf828))
+
 ## [2.5.4](https://github.com/glauth/glauth/compare/GLAuth-v2.5.3...GLAuth-v2.5.4) (2026-09-13)
 
 
