@@ -4,7 +4,6 @@
 package logging
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -42,14 +41,13 @@ func InitLogging(reqdebug bool, reqsyslog bool, reqstructlog bool) zerolog.Logge
 
 	logr := zerolog.New(mainWriter).Level(level).With().Timestamp().Logger()
 
-	log.SetOutput(customWriter{logr: logr, structlog: reqstructlog})
+	log.SetOutput(customWriter{logr: logr})
 
 	return logr
 }
 
 type customWriter struct {
-	logr      zerolog.Logger
-	structlog bool
+	logr zerolog.Logger
 }
 
 func (e customWriter) Write(p []byte) (int, error) {
@@ -61,10 +59,6 @@ func (e customWriter) Write(p []byte) (int, error) {
 	if msg == "" {
 		msg = strings.TrimSpace(string(p))
 	}
-	if e.structlog {
-		fmt.Fprintf(os.Stderr, "{\"level\":\"info\",\"time\":\"%s\",\"message\":\"%s\"}\n", time.Now().Format(time.RFC1123Z), strings.Replace(strings.TrimSpace(msg), `"`, `\"`, -1))
-	} else {
-		e.logr.Info().Msg(msg)
-	}
+	e.logr.Info().Msg(msg)
 	return len(p), nil
 }
