@@ -10,6 +10,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
 	github.com/jinzhu/copier v0.4.0
+	github.com/pires/go-proxyproto v0.15.0
 	github.com/pquerna/otp v1.4.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
