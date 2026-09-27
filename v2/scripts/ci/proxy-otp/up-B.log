@@ -1,0 +1,15 @@
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Debugging enabled
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP start
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Loading backend [36mdatastore=[0mconfig [36mposition=[0m0
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m LDAP server listening [36maddress=[0m127.0.0.1:13903
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Bind request [36mbasedn=[0mdc=glauth,dc=com [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:52574
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Bind success [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:52574
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Search request [36mbasedn=[0mdc=glauth,dc=com [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36mfilter=[0m(cn=otpuser) [36mscope=[0m2 [36msearchbasedn=[0mdc=glauth,dc=com [36msrc=[0m127.0.0.1:52574
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Search request [36mspecial case=[0m"top-level browse"
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP: Top-Level Browse OK [36mfilter=[0m(cn=otpuser)
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Bind request [36mbasedn=[0mdc=glauth,dc=com [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:52576
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Bind success [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:52576
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Search request [36mbasedn=[0mdc=glauth,dc=com [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36mfilter=[0m(cn=otpuser) [36mscope=[0m2 [36msearchbasedn=[0mdc=glauth,dc=com [36msrc=[0m127.0.0.1:52576
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Search request [36mspecial case=[0m"top-level browse"
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP: Top-Level Browse OK [36mfilter=[0m(cn=otpuser)
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP exit

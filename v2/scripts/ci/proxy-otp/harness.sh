@@ -13,7 +13,12 @@
 #
 # Usage: harness.sh <glauth-binary>
 set -uo pipefail
-BIN="$1"; D="$(cd "$(dirname "$0")" && pwd)"
+BIN="${1:-bin/glauth}"; D="$(cd "$(dirname "$0")" && pwd)"
+
+for tool in ldapsearch oathtool; do
+  command -v "$tool" >/dev/null || { echo "- skipping proxy OTP tests: $tool not installed"; exit 0; }
+done
+[ -x "$BIN" ] || { echo "- skipping proxy OTP tests: no binary at $BIN"; exit 0; }
 SECRET=3hnvnk4ycv44glzigd6s25j4dougs3rk
 PASS=mysecret
 pass=0; fail=0; invalid=0
@@ -67,46 +72,46 @@ OTP=$(oathtool --totp -b "$SECRET")
 CN="cn=otpuser,ou=superheros,dc=glauth,dc=com"
 UID_DN="uid=otpuser,ou=superheros,dc=glauth,dc=com"
 
-echo "=== topology A: upstream and proxy both name by cn (port 3894) ==="
-start "$D/upstream.cfg" 3893 "$D/proxy.cfg" 3894 A
+echo "=== topology A: upstream and proxy both name by cn (port 13902) ==="
+start "$D/upstream.cfg" 13901 "$D/proxy.cfg" 13902 A
 # Self-check: if the canonical password+OTP bind is refused, every "deny" below
 # is meaningless - the harness would report success while proving nothing.
-if [ "$(bind 3894 "$CN" "${PASS}${OTP}")" != "ok" ]; then
+if [ "$(bind 13902 "$CN" "${PASS}${OTP}")" != "ok" ]; then
   echo "  FATAL: harness invalid - canonical password+valid OTP was denied"
   tail -12 "$D/px-A.log"; invalid=1
 else
-  try 3894 "control: cn= + password + valid OTP"   ok   "$CN" "${PASS}${OTP}"
-  try 3894 "control: cn= + password only"          deny "$CN" "$PASS"
-  try 3894 "control: cn= + password + wrong OTP"   deny "$CN" "${PASS}000000"
-  try 3894 "BYPASS: UPN + password only"           deny "otpuser@glauth.com" "$PASS"
-  try 3894 "BYPASS: UPN uppercased + password"     deny "OTPUSER@GLAUTH.COM" "$PASS"
-  try 3894 "negative: cn= + wrong password + OTP"  deny "$CN" "wrongpw${OTP}"
-  try 3894 "negative: UPN + wrong password"        deny "otpuser@glauth.com" "wrongpw"
-  try 3894 "negative: unknown user + password"     deny "nobody@glauth.com" "$PASS"
+  try 13902 "control: cn= + password + valid OTP"   ok   "$CN" "${PASS}${OTP}"
+  try 13902 "control: cn= + password only"          deny "$CN" "$PASS"
+  try 13902 "control: cn= + password + wrong OTP"   deny "$CN" "${PASS}000000"
+  try 13902 "BYPASS: UPN + password only"           deny "otpuser@glauth.com" "$PASS"
+  try 13902 "BYPASS: UPN uppercased + password"     deny "OTPUSER@GLAUTH.COM" "$PASS"
+  try 13902 "negative: cn= + wrong password + OTP"  deny "$CN" "wrongpw${OTP}"
+  try 13902 "negative: UPN + wrong password"        deny "otpuser@glauth.com" "wrongpw"
+  try 13902 "negative: unknown user + password"     deny "nobody@glauth.com" "$PASS"
 fi
 
 echo
-echo "=== topology B: upstream names by uid, proxy default cn,uid (port 3896) ==="
-start "$D/upstreamB.cfg" 3895 "$D/proxyB.cfg" 3896 B
-if [ "$(bind 3896 "$UID_DN" "${PASS}${OTP}")" != "ok" ]; then
+echo "=== topology B: upstream names by uid, proxy default cn,uid (port 13904) ==="
+start "$D/upstreamB.cfg" 13903 "$D/proxyB.cfg" 13904 B
+if [ "$(bind 13904 "$UID_DN" "${PASS}${OTP}")" != "ok" ]; then
   echo "  NOTE: uid= + password + valid OTP denied here."
   echo "        Expected on a pre-fix binary: the proxy cannot resolve uid= so it"
   echo "        waives OTP, then forwards password+OTP as the password upstream."
-  try 3896 "BYPASS: uid= + password only"          deny "$UID_DN" "$PASS"
-  try 3896 "negative: uid= + wrong password"       deny "$UID_DN" "wrongpw"
+  try 13904 "BYPASS: uid= + password only"          deny "$UID_DN" "$PASS"
+  try 13904 "negative: uid= + wrong password"       deny "$UID_DN" "wrongpw"
 else
-  try 3896 "control: uid= + password + valid OTP"  ok   "$UID_DN" "${PASS}${OTP}"
-  try 3896 "BYPASS: uid= + password only"          deny "$UID_DN" "$PASS"
-  try 3896 "negative: uid= + wrong password"       deny "$UID_DN" "wrongpw"
+  try 13904 "control: uid= + password + valid OTP"  ok   "$UID_DN" "${PASS}${OTP}"
+  try 13904 "BYPASS: uid= + password only"          deny "$UID_DN" "$PASS"
+  try 13904 "negative: uid= + wrong password"       deny "$UID_DN" "wrongpw"
 fi
 
 echo
-echo "=== topology C: pure proxy, no local records (port 3898) ==="
-start "$D/upstreamC.cfg" 3897 "$D/proxyC.cfg" 3898 C
+echo "=== topology C: pure proxy, no local records (port 13906) ==="
+start "$D/upstreamC.cfg" 13905 "$D/proxyC.cfg" 13906 C
 # The waiver this deployment depends on: no local record means no second factor
 # of ours to enforce, so the password alone must still bind.
-try 3898 "fail-open kept: no local record + password"  ok   "$CN" "$PASS"
-try 3898 "still authenticated upstream: wrong password" deny "$CN" "wrongpw"
+try 13906 "fail-open kept: no local record + password"  ok   "$CN" "$PASS"
+try 13906 "still authenticated upstream: wrong password" deny "$CN" "wrongpw"
 
 echo
 echo "  $pass passed, $fail failed"

@@ -1,0 +1,27 @@
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Debugging enabled
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP start
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Server health [36mservers=[0m[{"Hostname":"127.0.0.1","Ping":121810,"Port":13903,"Scheme":"ldap","Status":1}]
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Loading backend [36mdatastore=[0mldap [36mposition=[0m0
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m Loading backend [36mdatastore=[0mconfig [36mposition=[0m1
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m LDAP server listening [36maddress=[0m127.0.0.1:13904
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34924
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Best server [36mfavorite=[0m{"Hostname":"127.0.0.1","Ping":121810,"Port":13903,"Scheme":"ldap","Status":1}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m bind success [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34924
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Search request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36mfilter=[0m(cn=otpuser) [36msrc=[0m127.0.0.1:34924
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Search request to backend [36mrequest=[0m{"Attributes":[],"BaseDN":"dc=glauth,dc=com","Controls":[],"DerefAliases":0,"Filter":"(cn=otpuser)","Scope":2,"SizeLimit":0,"TimeLimit":0,"TypesOnly":false}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Backend Search result [36mresult=[0m{"Controls":[],"Entries":[],"Referrals":[]}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Frontend Search result [36mresult=[0m{"Controls":[],"Entries":[],"Referrals":[],"ResultCode":0}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m AP: Search OK [36mfilter=[0m(cn=otpuser) [36mnumentries=[0m0
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34926
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Best server [36mfavorite=[0m{"Hostname":"127.0.0.1","Ping":121810,"Port":13903,"Scheme":"ldap","Status":1}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m bind success [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34926
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Search request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36mfilter=[0m(cn=otpuser) [36msrc=[0m127.0.0.1:34926
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Search request to backend [36mrequest=[0m{"Attributes":[],"BaseDN":"dc=glauth,dc=com","Controls":[],"DerefAliases":0,"Filter":"(cn=otpuser)","Scope":2,"SizeLimit":0,"TimeLimit":0,"TypesOnly":false}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Backend Search result [36mresult=[0m{"Controls":[],"Entries":[],"Referrals":[]}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Frontend Search result [36mresult=[0m{"Controls":[],"Entries":[],"Referrals":[],"ResultCode":0}
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m AP: Search OK [36mfilter=[0m(cn=otpuser) [36mnumentries=[0m0
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34928
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind Error: invalid OTP token as uid=otpuser,ou=superheros,dc=glauth,dc=com from 127.0.0.1:34928
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind request [36mbinddn=[0muid=otpuser,ou=superheros,dc=glauth,dc=com [36msrc=[0m127.0.0.1:34932
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [33mDBG[0m Bind Error: invalid OTP token as uid=otpuser,ou=superheros,dc=glauth,dc=com from 127.0.0.1:34932
+[90mSun, 27 Sep 2026 15:17:36 -0700[0m [32mINF[0m AP exit
