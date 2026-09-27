@@ -27,6 +27,62 @@ import (
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
 var emailmatcher = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
+// bindDNCandidate is one way a bind DN may name a user: the value to look up,
+// and whether it should be matched against the user's mail rather than name.
+type bindDNCandidate struct {
+	name  string
+	byUPN bool
+}
+
+// bindDNCandidates lists every identity a bind DN could refer to under this
+// backend's naming rules: a UPN/e-mail address, or the first RDN with any of
+// the configured nameformat prefixes stripped.
+//
+// Anything deciding "do we hold a local record for this user" must try all of
+// them. Resolving fewer spellings than the authenticating party accepts is what
+// GHSA-hx8m-chmx-x2j3 turned into an OTP bypass: the proxy waived the second
+// factor because it could not resolve a DN the upstream server resolved fine.
+func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate {
+	lowerBindDN := strings.ToLower(bindDN)
+
+	var candidates []bindDNCandidate
+	seen := make(map[bindDNCandidate]bool)
+	add := func(name string, byUPN bool) {
+		if name == "" {
+			return
+		}
+		c := bindDNCandidate{name: name, byUPN: byUPN}
+		if !seen[c] {
+			seen[c] = true
+			candidates = append(candidates, c)
+		}
+	}
+
+	if emailmatcher.MatchString(lowerBindDN) {
+		add(lowerBindDN, true)
+		return candidates
+	}
+
+	baseDN := strings.ToLower("," + backend.BaseDN)
+	rdn := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")[0]
+
+	// Every configured name attribute, not just the first: a DN spelled with
+	// the second nameformat element must resolve to the same user as the first.
+	for _, nameFormat := range backend.NameFormatAsArray {
+		add(strings.TrimPrefix(rdn, nameFormat+"="), false)
+	}
+	add(rdn, false)
+
+	// An RDN value may itself be a UPN, e.g. cn=user@example.com
+	for _, c := range append([]bindDNCandidate(nil), candidates...) {
+		if emailmatcher.MatchString(c.name) {
+			add(c.name, true)
+		}
+	}
+
+	return candidates
+}
+
 type LDAPOpsHandler interface {
 	GetBackend() config.Backend
 	GetLog() *zerolog.Logger

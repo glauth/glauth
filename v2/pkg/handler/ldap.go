@@ -114,11 +114,6 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 	//	if h.helper != nil {
 	if true {
 
-		lowerBindDN := strings.ToLower(bindDN)
-		baseDN := strings.ToLower("," + h.backend.BaseDN)
-		parts := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")
-		userName := strings.TrimPrefix(parts[0], h.backend.NameFormatAsArray[0]+"=")
-
 		validotp := false
 
 		// Local records augment proxy authentication with OTP/YubiKey checks;
@@ -126,19 +121,32 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 		// Find the user
 		// We are going to go through all backends and ask
 		// until we find our user or die of boredom.
+		//
+		// Every spelling of the bind DN has to resolve to the same local record,
+		// otherwise a client can pick a spelling we cannot resolve but the
+		// upstream server can, and the OTP check below is skipped for a user who
+		// does have a second factor configured (GHSA-hx8m-chmx-x2j3).
 		user := config.User{}
 		found := false
-		for i, handler := range h.handlers.Handlers {
-			found, user, _ = handler.FindUser(ctx, userName, false)
-			if found {
-				break
+		for _, candidate := range bindDNCandidates(&h.backend, bindDN) {
+			for i, handler := range h.handlers.Handlers {
+				found, user, _ = handler.FindUser(ctx, candidate.name, candidate.byUPN)
+				if found {
+					break
+				}
+				if i >= *h.handlers.Count {
+					break
+				}
 			}
-			if i >= *h.handlers.Count {
+			if found {
 				break
 			}
 		}
 
 		if !found {
+			// No local record: this user's second factor, if any, is the
+			// upstream server's business. Logged because it waives our checks.
+			h.log.Info().Str("binddn", bindDN).Msg("No local record for bind DN: OTP/YubiKey checks not enforced")
 			validotp = true
 		} else {
 			if len(user.OTPSecret) == 0 {
