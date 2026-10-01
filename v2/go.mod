@@ -8,8 +8,10 @@ require (
 	github.com/arl/statsviz v0.6.0
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
+	github.com/glauth/ldaps v0.0.0-20260629221740-fae8dfa087f9
+	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/jinzhu/copier v0.4.0
+	github.com/pires/go-proxyproto v0.15.0
 	github.com/pquerna/otp v1.4.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -30,6 +32,7 @@ require (
 )
 
 require (
+	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect

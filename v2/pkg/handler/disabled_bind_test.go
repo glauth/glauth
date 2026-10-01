@@ -5,12 +5,13 @@ import (
 	"net"
 	"testing"
 
+	"github.com/glauth/ldaps"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/glauth/glauth/v2/pkg/config"
-	"github.com/glauth/ldap"
+	"github.com/go-ldap/ldap/v3"
 )
 
 type disabledBindTestMonitor struct{}
@@ -55,9 +56,9 @@ func TestConfigBackendDisabledUserCannotBind(t *testing.T) {
 	_, server := net.Pipe()
 	defer server.Close()
 
-	bind := func(dn, pass string) ldap.LDAPResultCode {
-		code, _ := h.Bind(dn, pass, server)
-		return code
+	bind := func(dn, pass string) uint16 {
+		_, err := h.Bind(t.Context(), dn, pass, server)
+		return ldaps.StatusCode(err)
 	}
 
 	if code := bind("cn=activeuser,dc=example,dc=com", pw); code != ldap.LDAPResultSuccess {

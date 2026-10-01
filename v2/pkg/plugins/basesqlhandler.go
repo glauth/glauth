@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/glauth/ldaps"
 	"github.com/rs/zerolog"
 	"github.com/uptrace/opentelemetry-go-extra/otelsql"
 	"go.opentelemetry.io/otel/attribute"
@@ -23,12 +24,22 @@ import (
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
 	"github.com/glauth/glauth/v2/pkg/stats"
-	"github.com/glauth/ldap"
+	"github.com/go-ldap/ldap/v3"
 )
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
 
 type SqlBackend interface {
+	// Name used by database/sql when loading the driver
+	GetDriverName() string
+	// Create db/schema if necessary
+	CreateSchema(db *sql.DB, ctx context.Context)
+	// Migrate schema if necessary
+	MigrateSchema(db *sql.DB, ctx context.Context, checker func(*sql.DB, context.Context, string, string) bool)
+	//
+	GetPrepareSymbol() string
+}
+type DeprecatedSQLBackend interface {
 	// Name used by database/sql when loading the driver
 	GetDriverName() string
 	// Create db/schema if necessary
@@ -58,7 +69,28 @@ type databaseHandler struct {
 	tracer trace.Tracer
 }
 
-func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.Handler {
+type wrappedSqlBackend struct {DeprecatedSQLBackend}
+
+func (w *wrappedSqlBackend) CreateSchema(db *sql.DB, ctx context.Context) {
+	w.DeprecatedSQLBackend.CreateSchema(db)
+}
+func (w *wrappedSqlBackend)MigrateSchema(db *sql.DB, ctx context.Context, checker func(*sql.DB, context.Context, string, string) bool) {
+	newChecker := func(db *sql.DB, tableName string, columnName string) bool {
+		return checker(db, ctx, tableName, columnName)
+	}
+	w.DeprecatedSQLBackend.MigrateSchema(db, newChecker)
+}
+
+func wrapDeprecatedSQL(sqlBackend DeprecatedSQLBackend) SqlBackend {
+	return &wrappedSqlBackend{sqlBackend}
+}
+
+// Deprecated: Use NewDatabaseHandlerContext instead
+func NewDatabaseHandler(sqlBackend DeprecatedSQLBackend, opts ...handler.Option) handler.Handler {
+	return NewDatabaseHandlerContext(context.Background(), wrapDeprecatedSQL(sqlBackend), opts...)
+}
+
+func NewDatabaseHandlerContext(ctx context.Context, sqlBackend SqlBackend, opts ...handler.Option) handler.Handler {
 	options := handler.NewOptions(opts...)
 
 	// Note: we will never terminate this connection pool.
@@ -73,7 +105,7 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to open SQL database named '%s'", options.Backend.Database))
 		os.Exit(1)
 	}
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	if err != nil {
 		options.Logger.Error().Err(err).Msg(fmt.Sprintf("unable to communicate with SQL database error: %s", options.Backend.Database))
 		os.Exit(1)
@@ -96,17 +128,17 @@ func NewDatabaseHandler(sqlBackend SqlBackend, opts ...handler.Option) handler.H
 		tracer:      options.Tracer,
 	}
 
-	sqlBackend.CreateSchema(db)
-	sqlBackend.MigrateSchema(db, ColumnExists)
+	sqlBackend.CreateSchema(db, ctx)
+	sqlBackend.MigrateSchema(db, ctx, ColumnExists)
 
 	options.Logger.Debug().Msg("Database (" + sqlBackend.GetDriverName() + "::" + options.Backend.Database + ") Plugin: Ready")
 
 	return handler
 }
 
-func ColumnExists(db *sql.DB, tableName string, columnName string) bool {
+func ColumnExists(db *sql.DB, ctx context.Context, tableName string, columnName string) bool {
 	var found string
-	err := db.QueryRowContext(context.Background(), fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
+	err := db.QueryRowContext(ctx, fmt.Sprintf(`SELECT COUNT(%s) FROM %s`, columnName, tableName)).Scan(
 		&found)
 	return err == nil
 }
@@ -137,42 +169,42 @@ func (h databaseHandler) GetYubikeyAuth() *yubigo.YubiAuth {
 	return h.yubikeyAuth
 }
 
-func (h databaseHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resultCode ldap.LDAPResultCode, err error) {
-	ctx, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Bind")
+func (h databaseHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (result *ldap.SimpleBindResult, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.Bind")
 	defer span.End()
 
 	return h.ldohelper.Bind(ctx, h, bindDN, bindSimplePw, conn)
 }
 
-func (h databaseHandler) Search(bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result ldap.ServerSearchResult, err error) {
-	ctx, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Search")
+func (h databaseHandler) Search(ctx context.Context, bindDN string, searchReq ldap.SearchRequest, conn net.Conn) (result *ldap.SearchResult, err error) {
+	ctx, span := h.tracer.Start(ctx, "plugins.databaseHandler.Search")
 	defer span.End()
 
 	return h.ldohelper.Search(ctx, h, bindDN, searchReq, conn)
 }
 
 // Add is not yet supported for the sql backend
-func (h databaseHandler) Add(boundDN string, req ldap.AddRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Add")
+func (h databaseHandler) Add(ctx context.Context, boundDN string, req ldap.AddRequest, conn net.Conn) (err error) {
+	_, span := h.tracer.Start(ctx, "plugins.databaseHandler.Add")
 	defer span.End()
 
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 // Modify is not yet supported for the sql backend
-func (h databaseHandler) Modify(boundDN string, req ldap.ModifyRequest, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Modify")
+func (h databaseHandler) Modify(ctx context.Context, boundDN string, req ldap.ModifyRequest, conn net.Conn) (result *ldap.ModifyResult, err error) {
+	_, span := h.tracer.Start(ctx, "plugins.databaseHandler.Modify")
 	defer span.End()
 
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return nil, ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 // Delete is not yet supported for the sql backend
-func (h databaseHandler) Delete(boundDN string, deleteDN string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
-	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Delete")
+func (h databaseHandler) Delete(ctx context.Context, boundDN string, deleteDN string, conn net.Conn) (err error) {
+	_, span := h.tracer.Start(ctx, "plugins.databaseHandler.Delete")
 	defer span.End()
 
-	return ldap.LDAPResultInsufficientAccessRights, nil
+	return ldap.NewError(ldap.LDAPResultInsufficientAccessRights, ldaps.ErrEmpty)
 }
 
 func (h databaseHandler) FindUser(ctx context.Context, userName string, searchByUPN bool) (f bool, u config.User, err error) {
@@ -259,7 +291,7 @@ func (h databaseHandler) FindPosixAccounts(ctx context.Context, hierarchy string
 	rows, err := h.database.cnx.QueryContext(
 		ctx,
 		`
-		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.sshkeys,u.custattr  
+		SELECT u.name,u.uidnumber,u.primarygroup,u.passbcrypt,u.passsha256,u.otpsecret,u.yubikey,u.othergroups,u.givenname,u.sn,u.mail,u.loginshell,u.homedirectory,u.disabled,u.sshkeys,u.custattr
 		FROM users u`)
 	if err != nil {
 		return entries, err
@@ -335,12 +367,11 @@ func (h databaseHandler) FindPosixGroups(ctx context.Context, hierarchy string) 
 	return entries, nil
 }
 
-func (h databaseHandler) Close(boundDn string, conn net.Conn) error {
-	_, span := h.tracer.Start(context.Background(), "plugins.databaseHandler.Close")
+func (h databaseHandler) Close(ctx context.Context, boundDn string, conn net.Conn) {
+	_, span := h.tracer.Start(ctx, "plugins.databaseHandler.Close")
 	defer span.End()
 
 	stats.Frontend.Add("closes", 1)
-	return nil
 }
 
 func (h databaseHandler) intToBool(value int) bool {
@@ -387,9 +418,9 @@ func (h databaseHandler) memoizeGroups(ctx context.Context) ([]config.Group, err
 	rows, err := h.database.cnx.QueryContext(
 		ctx,
 		`
-		SELECT g1.name,g1.gidnumber,ig.includegroupid 
-		FROM ldapgroups g1 
-		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid 
+		SELECT g1.name,g1.gidnumber,ig.includegroupid
+		FROM ldapgroups g1
+		LEFT JOIN includegroups ig ON g1.gidnumber=ig.parentgroupid
 		LEFT JOIN ldapgroups g2 ON ig.includegroupid=g2.gidnumber`)
 	if err != nil {
 		return nil, errors.New("Unable to memoize groups list")

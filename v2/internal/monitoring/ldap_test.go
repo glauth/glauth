@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glauth/ldap"
+	"github.com/glauth/ldaps"
 	"github.com/rs/zerolog"
 	"go.uber.org/mock/gomock"
 )
@@ -17,7 +17,7 @@ func TestNewLDAPMonitorWatcherRunsOnASchedule(t *testing.T) {
 	mockMonitor := NewMockMonitorInterface(ctrl)
 	mockLDAPServer := NewMockLDAPServerInterface(ctrl)
 
-	stats := ldap.Stats{}
+	stats := ldaps.Stats{}
 
 	mockLDAPServer.EXPECT().SetStats(true).Times(1)
 	mockLDAPServer.EXPECT().GetStats().MinTimes(1).Return(stats)

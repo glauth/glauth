@@ -1,10 +1,13 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"plugin"
+	"time"
 
 	_tls "github.com/glauth/glauth/v2/internal/tls"
 
@@ -15,13 +18,14 @@ import (
 	"github.com/glauth/glauth/v2/internal/monitoring"
 	"github.com/glauth/glauth/v2/pkg/config"
 	"github.com/glauth/glauth/v2/pkg/handler"
-	"github.com/glauth/ldap"
+	"github.com/glauth/ldaps"
+	proxyproto "github.com/pires/go-proxyproto"
 )
 
 type LdapSvc struct {
 	c        *config.Config
 	yubiAuth *yubigo.YubiAuth
-	l        *ldap.Server
+	l        *ldaps.Server
 
 	ldapstls *tls.Config
 	monitor  monitoring.MonitorInterface
@@ -29,7 +33,7 @@ type LdapSvc struct {
 	log      zerolog.Logger
 }
 
-func NewServer(opts ...Option) (*LdapSvc, error) {
+func NewServer(ctx context.Context, opts ...Option) (*LdapSvc, error) {
 	options := newOptions(opts...)
 
 	s := LdapSvc{
@@ -73,14 +77,22 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			if err != nil {
 				return nil, errors.New("unable to find 'NewPluginHandler' in loaded helper plugin")
 			}
-			initFunc, ok := nph.(func(...handler.Option) handler.Handler)
+			initFunc, ok := nph.(func(context.Context, ...handler.Option) handler.Handler)
 
 			if !ok {
-				return nil, errors.New("loaded helper plugin lacks a proper NewPluginHandler function")
+				legacyInitFunc, ok := nph.(func(...handler.Option) handler.Handler)
+				if !ok {
+					return nil, errors.New("loaded helper plugin lacks a proper NewPluginHandler function")
+				}
+				s.log.Info().Str("Plugin", s.c.Helper.Plugin).Discard().Msg("loaded helper plugin is using a legacy NewPluginHandler function. Please update to the new function interface")
+				initFunc = func(ctx context.Context, opts ...handler.Option) handler.Handler {
+					return legacyInitFunc(opts...)
+				}
 			}
 			// Normally, here, we would somehow have imported our plugin into our
 			// handler namespace. Oops?
 			helper = initFunc(
+				ctx,
 				handler.Logger(&s.log),
 				handler.Config(s.c),
 				handler.YubiAuth(s.yubiAuth),
@@ -97,7 +109,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 	allHandlers := handler.HandlerWrapper{Handlers: make([]handler.Handler, 10), Count: &backendCounter}
 
 	// configure the backends
-	s.l = ldap.NewServer()
+	s.l = ldaps.NewServerContext(ctx)
 	s.l.EnforceLDAP = true
 
 	if tlsConfig := options.StartTLSConfig; tlsConfig != nil {
@@ -156,14 +168,23 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			if err != nil {
 				return nil, errors.New("unable to find 'NewPluginHandler' in loaded backend plugin")
 			}
-			initFunc, ok := nph.(func(...handler.Option) handler.Handler)
+			initFunc, ok := nph.(func(context.Context, ...handler.Option) handler.Handler)
 
 			if !ok {
-				return nil, errors.New("loaded backend plugin lacks a proper NewPluginHandler function")
+				legacyInitFunc, ok := nph.(func(...handler.Option) handler.Handler)
+				if !ok {
+					return nil, errors.New("loaded backend plugin lacks a proper NewPluginHandler function")
+				}
+				s.log.Info().Str("Plugin", s.c.Helper.Plugin).Discard().Msg("loaded backend plugin is using a legacy NewPluginHandler function. Please update to the new function interface")
+				initFunc = func(ctx context.Context, opts ...handler.Option) handler.Handler {
+					return legacyInitFunc(opts...)
+				}
 			}
+
 			// Normally, here, we would somehow have imported our plugin into our
 			// handler namespace. Oops?
 			h = initFunc(
+				ctx,
 				handler.Backend(backend),
 				handler.Logger(&s.log),
 				handler.Config(s.c),
@@ -174,6 +195,7 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 			)
 		case "embed":
 			h, err = NewEmbed(
+				ctx,
 				handler.Backend(backend),
 				handler.Logger(&s.log),
 				handler.Config(s.c),
@@ -210,20 +232,58 @@ func NewServer(opts ...Option) (*LdapSvc, error) {
 // ListenAndServe listens on the TCP network address s.c.LDAP.Listen
 func (s *LdapSvc) ListenAndServe() error {
 	s.log.Info().Str("address", s.c.LDAP.Listen).Msg("LDAP server listening")
-	return s.l.ListenAndServe(s.c.LDAP.Listen)
+
+	tcpListener, err := net.Listen("tcp", s.c.LDAP.Listen)
+	if err != nil {
+		return err
+	}
+	// Note that an empty list from ProxyProtocolAllowedAddresses will cause the proxy protocol to be ignored
+	// but will still allow the connection to succeed with the standard tcp information
+	connPolicy, err := proxyproto.PolicyFromRanges(s.c.LDAP.ProxyProtocolAllowedAddresses, proxyproto.USE, proxyproto.IGNORE)
+	if err != nil {
+		return fmt.Errorf("failed to parse LDAPS.ProxyProtocolAllowedAddresses: %w", err)
+	}
+	proxyprotoListener := &proxyproto.Listener{
+		Listener:          tcpListener,
+		ReadHeaderTimeout: 2 * time.Second,
+		ConnPolicy:        connPolicy,
+	}
+	defer proxyprotoListener.Close()
+	return s.l.Serve(proxyprotoListener)
 }
 
 // ListenAndServeTLS listens on the TCP network address s.c.LDAPS.Listen
 func (s *LdapSvc) ListenAndServeTLS() error {
 	s.log.Info().Str("address", s.c.LDAPS.Listen).Msg("LDAPS server listening")
-	listener, err := tls.Listen("tcp", s.c.LDAPS.Listen, s.ldapstls)
+
+	tcpListener, err := net.Listen("tcp", s.c.LDAPS.Listen)
 	if err != nil {
 		return err
 	}
+	// Note that an empty list from ProxyProtocolAllowedAddresses will cause the proxy protocol to be ignored
+	// but will still allow the connection to succeed with the standard tcp information
+	connPolicy, err := proxyproto.PolicyFromRanges(s.c.LDAPS.ProxyProtocolAllowedAddresses, proxyproto.USE, proxyproto.IGNORE)
+	if err != nil {
+		return fmt.Errorf("failed to parse LDAPS.ProxyProtocolAllowedAddresses: %w", err)
+	}
+	// Doing the proxy protocol outside the TLS connection is compatible with nginx, haproxy, aws out of the box
+	// see https://pkg.go.dev/github.com/pires/go-proxyproto@v0.15.0#example-Listener-Tls for more information
+	// note that listeners are created in the order they are processed
+	// tcp processes the tcp packet -> proxy protocol process the proxy header -> tls processes the tls encryption
+	// Note that nothing stops the proxy protocol from being inside the TLS connection
+	// it's just more compatible to do it this way
+	proxyProtoListener := &proxyproto.Listener{
+		Listener:          tcpListener,
+		ReadHeaderTimeout: 2 * time.Second,
+		ConnPolicy:        connPolicy,
+	}
+	listener := tls.NewListener(proxyProtoListener, s.ldapstls)
+	defer listener.Close()
+
 	return s.l.Serve(listener)
 }
 
-// Shutdown ends listeners by sending true to the ldap serves quit channel
+// Shutdown closes the ldap server
 func (s *LdapSvc) Shutdown() {
-	s.l.Quit <- true
+	s.l.Close()
 }

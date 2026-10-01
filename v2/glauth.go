@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -111,6 +112,7 @@ func main() {
 func startService() {
 	// stats
 	stats.General.Set("version", stats.Stringer(version.Version))
+	ctx := context.Background()
 
 	// web API
 	if activeConfig.API.Enabled {
@@ -165,6 +167,7 @@ func startService() {
 	}
 
 	s, err := server.NewServer(
+		ctx,
 		server.Logger(log),
 		server.Config(activeConfig),
 		server.StartTLSConfig(starttlsConfig),
