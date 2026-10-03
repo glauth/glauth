@@ -23,7 +23,9 @@ SECRET=3hnvnk4ycv44glzigd6s25j4dougs3rk
 PASS=mysecret
 pass=0; fail=0; invalid=0
 
-cleanup() { kill $(jobs -p) 2>/dev/null; wait 2>/dev/null; }
+# Logs go to a temporary directory so a run never touches the checkout.
+LOGS=$(mktemp -d) || { echo "FATAL: could not create a temporary directory for logs"; exit 2; }
+cleanup() { kill $(jobs -p) 2>/dev/null; wait 2>/dev/null; rm -rf "$LOGS"; }
 trap cleanup EXIT
 
 wait_port() {
@@ -62,10 +64,10 @@ try() { # <port> <label> <expect> <binddn> <password>
 }
 
 start() { # <upstream cfg> <upstream port> <proxy cfg> <proxy port> <tag>
-  "$BIN" -c "$1" >"$D/up-$5.log" 2>&1 &
-  wait_port "$2" || { echo "FATAL: upstream $5 never listened"; tail -5 "$D/up-$5.log"; exit 2; }
-  "$BIN" -c "$3" >"$D/px-$5.log" 2>&1 &
-  wait_port "$4" || { echo "FATAL: proxy $5 never listened"; tail -5 "$D/px-$5.log"; exit 2; }
+  "$BIN" -c "$1" >"$LOGS/up-$5.log" 2>&1 &
+  wait_port "$2" || { echo "FATAL: upstream $5 never listened"; tail -5 "$LOGS/up-$5.log"; exit 2; }
+  "$BIN" -c "$3" >"$LOGS/px-$5.log" 2>&1 &
+  wait_port "$4" || { echo "FATAL: proxy $5 never listened"; tail -5 "$LOGS/px-$5.log"; exit 2; }
 }
 
 OTP=$(oathtool --totp -b "$SECRET")
@@ -78,7 +80,7 @@ start "$D/upstream.cfg" 13901 "$D/proxy.cfg" 13902 A
 # is meaningless - the harness would report success while proving nothing.
 if [ "$(bind 13902 "$CN" "${PASS}${OTP}")" != "ok" ]; then
   echo "  FATAL: harness invalid - canonical password+valid OTP was denied"
-  tail -12 "$D/px-A.log"; invalid=1
+  tail -12 "$LOGS/px-A.log"; invalid=1
 else
   try 13902 "control: cn= + password + valid OTP"   ok   "$CN" "${PASS}${OTP}"
   try 13902 "control: cn= + password only"          deny "$CN" "$PASS"
