@@ -54,6 +54,46 @@ func TestBindDNCandidatesResolveEverySpelling(t *testing.T) {
 			"cn=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
 			bindDNCandidate{name: "otpuser@glauth.com", byUPN: true},
 		},
+		{
+			// Active Directory accepts this logon form, so the proxy must
+			// resolve it too or the factor is waived for an AD-backed user.
+			"DOMAIN\\user logon name",
+			`glauth\otpuser`,
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			"DOMAIN\\user is case-insensitive",
+			`GLAUTH\OTPUSER`,
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			// Attribute names we never configure still have to resolve: an
+			// upstream may well accept them.
+			"userPrincipalName= RDN",
+			"userPrincipalName=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser@glauth.com", byUPN: true},
+		},
+		{
+			"sAMAccountName= RDN",
+			"sAMAccountName=otpuser,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			"mail= RDN",
+			"mail=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser@glauth.com", byUPN: true},
+		},
+		{
+			// Splitting on a raw comma would yield "someone\" and miss.
+			"RFC 4514 escaped comma in the value",
+			`cn=last\, first,ou=superheros,dc=glauth,dc=com`,
+			bindDNCandidate{name: "last, first", byUPN: false},
+		},
+		{
+			"RFC 4514 hex escape in the value",
+			`cn=last\2c first,ou=superheros,dc=glauth,dc=com`,
+			bindDNCandidate{name: "last, first", byUPN: false},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := bindDNCandidates(backend, tc.bindDN)

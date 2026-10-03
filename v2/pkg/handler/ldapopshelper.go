@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,14 +35,57 @@ type bindDNCandidate struct {
 	byUPN bool
 }
 
-// bindDNCandidates lists every identity a bind DN could refer to under this
-// backend's naming rules: a UPN/e-mail address, or the first RDN with any of
-// the configured nameformat prefixes stripped.
+// firstRDN returns the leading relative DN of a distinguished name, honouring
+// RFC 4514 escaping so a value holding an escaped comma is not split through.
+func firstRDN(dn string) string {
+	for i := 0; i < len(dn); i++ {
+		switch dn[i] {
+		case '\\':
+			i++ // skip whatever the backslash escapes
+		case ',':
+			return dn[:i]
+		}
+	}
+	return dn
+}
+
+// unescapeRDNValue resolves RFC 4514 escapes: \XX for a hex byte, \X for a
+// literal X.
+func unescapeRDNValue(value string) string {
+	if !strings.Contains(value, "\\") {
+		return value
+	}
+	var out strings.Builder
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\\' || i+1 >= len(value) {
+			out.WriteByte(value[i])
+			continue
+		}
+		if i+2 < len(value) {
+			if b, err := strconv.ParseUint(value[i+1:i+3], 16, 8); err == nil {
+				out.WriteByte(byte(b))
+				i += 2
+				continue
+			}
+		}
+		out.WriteByte(value[i+1])
+		i++
+	}
+	return out.String()
+}
+
+// bindDNCandidates lists every identity a bind DN could refer to: a UPN, a
+// DOMAIN\user logon name, or the first RDN's value - with any configured
+// nameformat prefix stripped, and also with whatever attribute name it
+// actually carries, since an upstream may accept forms we do not configure.
 //
 // Anything deciding "do we hold a local record for this user" must try all of
 // them. Resolving fewer spellings than the authenticating party accepts is what
 // GHSA-hx8m-chmx-x2j3 turned into an OTP bypass: the proxy waived the second
 // factor because it could not resolve a DN the upstream server resolved fine.
+//
+// Only the first RDN is examined, so the number, order and naming of the
+// remaining components - and groupformat - cannot affect the result.
 func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate {
 	lowerBindDN := strings.ToLower(bindDN)
 
@@ -58,20 +102,42 @@ func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate 
 		}
 	}
 
+	// The whole DN is an address: matched against mail, as the backend does.
 	if emailmatcher.MatchString(lowerBindDN) {
 		add(lowerBindDN, true)
 		return candidates
 	}
 
-	baseDN := strings.ToLower("," + backend.BaseDN)
-	rdn := strings.Split(strings.TrimSuffix(lowerBindDN, baseDN), ",")[0]
-
-	// Every configured name attribute, not just the first: a DN spelled with
-	// the second nameformat element must resolve to the same user as the first.
-	for _, nameFormat := range backend.NameFormatAsArray {
-		add(strings.TrimPrefix(rdn, nameFormat+"="), false)
+	// DOMAIN\user, which Active Directory accepts. Carrying neither "=" nor
+	// "," rules out a distinguished name.
+	if !strings.ContainsAny(lowerBindDN, "=,") {
+		if i := strings.LastIndex(lowerBindDN, "\\"); i >= 0 {
+			add(lowerBindDN[i+1:], false)
+		}
+		add(lowerBindDN, false)
+		return candidates
 	}
-	add(rdn, false)
+
+	baseDN := strings.ToLower("," + backend.BaseDN)
+	rdn := firstRDN(strings.TrimSuffix(lowerBindDN, baseDN))
+
+	// Every configured name attribute, not just the first.
+	for _, nameFormat := range backend.NameFormatAsArray {
+		add(unescapeRDNValue(strings.TrimPrefix(rdn, nameFormat+"=")), false)
+	}
+
+	// The RDN value whatever its attribute is called, so that forms an upstream
+	// accepts but we never configure - userPrincipalName=, sAMAccountName=,
+	// mail= - still resolve to the same user.
+	if _, value, found := strings.Cut(rdn, "="); found {
+		value = unescapeRDNValue(value)
+		add(value, false)
+		if emailmatcher.MatchString(value) {
+			add(value, true)
+		}
+	}
+
+	add(unescapeRDNValue(rdn), false)
 
 	// An RDN value may itself be a UPN, e.g. cn=user@example.com
 	for _, c := range append([]bindDNCandidate(nil), candidates...) {
