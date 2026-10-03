@@ -211,6 +211,9 @@ func (h databaseHandler) FindUser(ctx context.Context, userName string, searchBy
 				FROM capabilities c WHERE userid=%s`,
 					h.sqlBackend.GetPrepareSymbol()), user.UIDNumber)
 				if err == nil {
+					// Only once the query is known to have succeeded: rows is
+					// nil otherwise, and closing it would panic.
+					defer rows.Close()
 					for rows.Next() {
 						err := rows.Scan(&capability.Action, &capability.Object)
 						if err == nil {
@@ -218,7 +221,6 @@ func (h databaseHandler) FindUser(ctx context.Context, userName string, searchBy
 						}
 					}
 				}
-				defer rows.Close()
 			}
 		}
 	}
