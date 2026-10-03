@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,16 @@ func NewOwnCloudHandler(opts ...Option) Handler {
 	}
 }
 
+// unsafePathSegment reports whether name would be unsafe as the <name> in a
+// /users/<name> request to the ownCloud backend. The Graph SDK builds that
+// path without escaping, so a separator, a dot segment, or a percent escape a
+// server later decodes could walk the request onto another, unauthenticated
+// path and turn any 200 into a "valid password" (GHSA-gw7r-2pmr-jqmp); "?" and
+// "#" could add a query or fragment. None occur in a real ownCloud user name.
+func unsafePathSegment(name string) bool {
+	return name == "." || name == ".." || strings.ContainsAny(name, "/\\%?#")
+}
+
 func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ldap.LDAPResultCode, err error) {
 	start := time.Now()
 	defer func() {
@@ -95,6 +106,12 @@ func (h ownCloudHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (resul
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 	userName := strings.TrimPrefix(parts[0], "cn=")
+
+	// An empty or non-segment name cannot identify a user; reject before login.
+	if userName == "" || unsafePathSegment(userName) {
+		h.log.Warn().Str("username", userName).Msg("Rejecting bind: user name is not a valid path segment")
+		return ldap.LDAPResultInvalidCredentials, nil
+	}
 
 	// try to login
 	if !h.login(userName, bindSimplePw) {
@@ -190,6 +207,10 @@ func (h ownCloudHandler) Search(bindDN string, searchReq ldap.SearchRequest, con
 			parts := strings.Split(strings.TrimSuffix(searchBaseDN, baseDN), ",")
 			if len(parts) >= 1 {
 				userName = strings.TrimPrefix(parts[0], "cn=")
+			}
+			if unsafePathSegment(userName) {
+				h.log.Warn().Str("username", userName).Msg("Rejecting search: base DN is not a valid path segment")
+				return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultInsufficientAccessRights}, fmt.Errorf("search error: invalid search base DN")
 			}
 		}
 		users, err := session.getUsers(userName)
@@ -289,19 +310,29 @@ func (h ownCloudHandler) login(name, pw string) bool {
 	var req *http.Request
 	if h.backend.UseGraphAPI {
 		// TODO oc10 graphapi app should implement /me
-		req, _ = http.NewRequest("GET", h.backend.Servers[0]+"/users/"+name, nil)
+		// PathEscape keeps name a single segment, behind Bind's rejection.
+		req, _ = http.NewRequest("GET", h.backend.Servers[0]+"/users/"+url.PathEscape(name), nil)
 	} else {
 		// use provisioning api
 		meURL := fmt.Sprintf("%s/ocs/v2.php/cloud/user?format=json", h.backend.Servers[0])
 		req, _ = http.NewRequest("GET", meURL, nil)
 	}
+	if req == nil {
+		h.log.Error().Msg("failed login: could not build request (check backend server URL)")
+		return false
+	}
 	req.SetBasicAuth(name, pw)
 	resp, err := h.client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		h.log.Error().Err(err).Int("status", resp.StatusCode).Msg("failed login")
+	if err != nil {
+		// resp is nil on error; must not read resp.StatusCode here.
+		h.log.Error().Err(err).Msg("failed login")
 		return false
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		h.log.Error().Int("status", resp.StatusCode).Msg("failed login")
+		return false
+	}
 	return true
 }
 
