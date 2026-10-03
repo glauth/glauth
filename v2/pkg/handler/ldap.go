@@ -130,15 +130,21 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 		found := false
 		for _, candidate := range bindDNCandidates(&h.backend, bindDN) {
 			for i, handler := range h.handlers.Handlers {
-				found, user, _ = handler.FindUser(ctx, candidate.name, candidate.byUPN)
-				if found {
+				resolved, candidateUser, _ := handler.FindUser(ctx, candidate.name, candidate.byUPN)
+				if resolved {
+					// Prefer a record that carries a second factor. Where a DN
+					// is ambiguous enough to resolve more than one record, it
+					// must not be able to select the one with no factor set.
+					if !found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0) {
+						user, found = candidateUser, true
+					}
 					break
 				}
 				if i >= *h.handlers.Count {
 					break
 				}
 			}
-			if found {
+			if found && len(user.OTPSecret) > 0 {
 				break
 			}
 		}

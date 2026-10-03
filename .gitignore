@@ -40,3 +40,7 @@ config/*.cfg
 !config/sample-simple.cfg
 !config/sample-*.cfg
 *.local.cfg
+
+# proxy-OTP harness run artifacts
+v2/scripts/ci/proxy-otp/*.log
+v2/scripts/ci/proxy-otp/gl.db

@@ -94,6 +94,37 @@ func TestBindDNCandidatesResolveEverySpelling(t *testing.T) {
 			`cn=last\2c first,ou=superheros,dc=glauth,dc=com`,
 			bindDNCandidate{name: "last, first", byUPN: false},
 		},
+		{
+			// A multi-valued RDN joins AVAs with "+"; each has to be read or a
+			// DN spelled this way resolves to nobody and the factor is waived.
+			"multi-valued RDN",
+			"cn=otpuser+uid=otpuser,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			"multi-valued RDN carrying a mail AVA",
+			"cn=otpuser+mail=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser@glauth.com", byUPN: true},
+		},
+		{
+			// RFC 4514 writes a value as a "#"-prefixed BER hexstring;
+			// 0c05 is a 5-byte UTF8String.
+			"BER hexstring value, UTF8String",
+			"cn=#0c076f747075736572,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			"BER hexstring value, PrintableString",
+			"cn=#13076f747075736572,ou=superheros,dc=glauth,dc=com",
+			bindDNCandidate{name: "otpuser", byUPN: false},
+		},
+		{
+			// A bare UPN must also be tried against the name, for a record
+			// whose name is itself the address.
+			"bare UPN is matched against name as well as mail",
+			"otpuser@glauth.com",
+			bindDNCandidate{name: "otpuser@glauth.com", byUPN: false},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := bindDNCandidates(backend, tc.bindDN)
@@ -122,6 +153,53 @@ func TestBindDNCandidatesDoNotInventUsers(t *testing.T) {
 		for _, c := range bindDNCandidates(backend, bindDN) {
 			if c.name == "otpuser" || c.name == "otpuser@glauth.com" {
 				t.Errorf("bindDNCandidates(%q) produced unrelated identity %q", bindDN, c.name)
+			}
+		}
+	}
+}
+
+// A value carried by an attribute that does not name users must never become a
+// candidate. Otherwise one user's bind DN resolves a different user's local
+// record, and so a different user's second factor - either waiving the real
+// user's factor, or demanding someone else's. This was a regression introduced
+// while widening the candidate list, caught in review.
+func TestBindDNCandidatesIgnoreNonIdentityAttributes(t *testing.T) {
+	backend := &config.Backend{
+		BaseDN:            "dc=glauth,dc=com",
+		NameFormatAsArray: []string{"cn", "uid"},
+	}
+
+	for _, bindDN := range []string{
+		"employeeNumber=otpuser,ou=superheros,dc=glauth,dc=com",
+		"description=otpuser,ou=superheros,dc=glauth,dc=com",
+		"title=otpuser,ou=superheros,dc=glauth,dc=com",
+		"o=otpuser,ou=superheros,dc=glauth,dc=com",
+	} {
+		for _, c := range bindDNCandidates(backend, bindDN) {
+			if c.name == "otpuser" {
+				t.Errorf("bindDNCandidates(%q) treated a non-identity attribute as a username", bindDN)
+			}
+		}
+	}
+}
+
+// An address-valued attribute resolves against mail only. Matching it against
+// name as well would let a record *named* with an address shadow the record
+// whose mail actually matches.
+func TestBindDNCandidatesDoNotShadowMailWithName(t *testing.T) {
+	backend := &config.Backend{
+		BaseDN:            "dc=glauth,dc=com",
+		NameFormatAsArray: []string{"cn", "uid"},
+	}
+
+	for _, bindDN := range []string{
+		"mail=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
+		"userPrincipalName=otpuser@glauth.com,ou=superheros,dc=glauth,dc=com",
+	} {
+		for _, c := range bindDNCandidates(backend, bindDN) {
+			if !c.byUPN {
+				t.Errorf("bindDNCandidates(%q) produced name candidate %q; an address attribute must resolve by mail only",
+					bindDN, c.name)
 			}
 		}
 	}

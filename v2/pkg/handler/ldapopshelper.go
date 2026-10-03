@@ -35,6 +35,23 @@ type bindDNCandidate struct {
 	byUPN bool
 }
 
+// identityAttributes are the RDN attributes whose value may legitimately name a
+// user, mapped to whether that value is matched against the record's mail
+// rather than its name.
+//
+// The allow-list is the point. A value carried by any other attribute -
+// employeeNumber, description - must never be taken for a username: one user's
+// DN would then resolve a different user's local record, and so a different
+// user's second factor. A backend's configured nameformat attributes are added
+// to this set at lookup time.
+var identityAttributes = map[string]bool{
+	"cn":                false,
+	"uid":               false,
+	"samaccountname":    false,
+	"mail":              true,
+	"userprincipalname": true,
+}
+
 // firstRDN returns the leading relative DN of a distinguished name, honouring
 // RFC 4514 escaping so a value holding an escaped comma is not split through.
 func firstRDN(dn string) string {
@@ -47,6 +64,24 @@ func firstRDN(dn string) string {
 		}
 	}
 	return dn
+}
+
+// splitAVAs splits a relative DN into its attribute-value assertions. A
+// multi-valued RDN joins them with "+", as in cn=alice+uid=alice, and each has
+// to be considered or a DN spelled that way resolves to nobody.
+func splitAVAs(rdn string) []string {
+	var avas []string
+	start := 0
+	for i := 0; i < len(rdn); i++ {
+		switch rdn[i] {
+		case '\\':
+			i++
+		case '+':
+			avas = append(avas, rdn[start:i])
+			start = i + 1
+		}
+	}
+	return append(avas, rdn[start:])
 }
 
 // unescapeRDNValue resolves RFC 4514 escapes: \XX for a hex byte, \X for a
@@ -74,15 +109,50 @@ func unescapeRDNValue(value string) string {
 	return out.String()
 }
 
-// bindDNCandidates lists every identity a bind DN could refer to: a UPN, a
-// DOMAIN\user logon name, or the first RDN's value - with any configured
-// nameformat prefix stripped, and also with whatever attribute name it
-// actually carries, since an upstream may accept forms we do not configure.
+// decodeBERString decodes the hex of a DER-encoded string value - the form
+// RFC 4514 writes as a "#"-prefixed hexstring - back to its text.
+func decodeBERString(hexed string) (string, bool) {
+	raw, err := hex.DecodeString(hexed)
+	if err != nil || len(raw) < 2 {
+		return "", false
+	}
+	switch raw[0] {
+	case 0x0c, 0x12, 0x13, 0x14, 0x16, 0x1a: // UTF8String, Numeric, Printable, T61, IA5, Visible
+	default:
+		return "", false
+	}
+	length := int(raw[1])
+	if length&0x80 != 0 || 2+length != len(raw) {
+		return "", false // long-form or truncated length: not a simple string
+	}
+	return string(raw[2:]), true
+}
+
+// decodeRDNValue resolves an attribute value written in either RFC 4514 form:
+// a "#"-prefixed BER hexstring, or a string carrying backslash escapes.
+func decodeRDNValue(value string) string {
+	if rest, ok := strings.CutPrefix(value, "#"); ok {
+		if decoded, ok := decodeBERString(rest); ok {
+			return decoded
+		}
+		return value
+	}
+	return unescapeRDNValue(value)
+}
+
+// bindDNCandidates lists every identity a bind DN could legitimately refer to:
+// a UPN, a DOMAIN\user logon name, or the value of an identity attribute in
+// the first RDN - each AVA of it, if the RDN is multi-valued.
 //
 // Anything deciding "do we hold a local record for this user" must try all of
 // them. Resolving fewer spellings than the authenticating party accepts is what
 // GHSA-hx8m-chmx-x2j3 turned into an OTP bypass: the proxy waived the second
 // factor because it could not resolve a DN the upstream server resolved fine.
+//
+// It must not resolve MORE than the authenticating party would, either. Only
+// identityAttributes and the backend's own nameformat attributes are read, so a
+// DN such as employeeNumber=bob cannot make one user's bind resolve another
+// user's record.
 //
 // Only the first RDN is examined, so the number, order and naming of the
 // remaining components - and groupformat - cannot affect the result.
@@ -102,15 +172,17 @@ func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate 
 		}
 	}
 
-	// The whole DN is an address: matched against mail, as the backend does.
+	// The whole DN is an address: an AD-style UPN bind. Match it against mail,
+	// as the backend does, and against name, for a record named by its address.
 	if emailmatcher.MatchString(lowerBindDN) {
 		add(lowerBindDN, true)
+		add(lowerBindDN, false)
 		return candidates
 	}
 
-	// DOMAIN\user, which Active Directory accepts. Carrying neither "=" nor
-	// "," rules out a distinguished name.
-	if !strings.ContainsAny(lowerBindDN, "=,") {
+	// DOMAIN\user, which Active Directory accepts. Carrying none of "=", ","
+	// or "+" rules out a distinguished name.
+	if !strings.ContainsAny(lowerBindDN, "=,+") {
 		if i := strings.LastIndex(lowerBindDN, "\\"); i >= 0 {
 			add(lowerBindDN[i+1:], false)
 		}
@@ -118,31 +190,31 @@ func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate 
 		return candidates
 	}
 
-	baseDN := strings.ToLower("," + backend.BaseDN)
-	rdn := firstRDN(strings.TrimSuffix(lowerBindDN, baseDN))
-
-	// Every configured name attribute, not just the first.
+	// A backend's own naming attributes are identities for that backend.
+	identity := make(map[string]bool, len(identityAttributes)+len(backend.NameFormatAsArray))
+	for attr, byMail := range identityAttributes {
+		identity[attr] = byMail
+	}
 	for _, nameFormat := range backend.NameFormatAsArray {
-		add(unescapeRDNValue(strings.TrimPrefix(rdn, nameFormat+"=")), false)
+		identity[strings.ToLower(strings.TrimSpace(nameFormat))] = false
 	}
 
-	// The RDN value whatever its attribute is called, so that forms an upstream
-	// accepts but we never configure - userPrincipalName=, sAMAccountName=,
-	// mail= - still resolve to the same user.
-	if _, value, found := strings.Cut(rdn, "="); found {
-		value = unescapeRDNValue(value)
-		add(value, false)
-		if emailmatcher.MatchString(value) {
-			add(value, true)
+	baseDN := strings.ToLower("," + backend.BaseDN)
+	for _, ava := range splitAVAs(firstRDN(strings.TrimSuffix(lowerBindDN, baseDN))) {
+		attr, value, hasValue := strings.Cut(ava, "=")
+		if !hasValue {
+			add(unescapeRDNValue(ava), false)
+			continue
 		}
-	}
-
-	add(unescapeRDNValue(rdn), false)
-
-	// An RDN value may itself be a UPN, e.g. cn=user@example.com
-	for _, c := range append([]bindDNCandidate(nil), candidates...) {
-		if emailmatcher.MatchString(c.name) {
-			add(c.name, true)
+		byMail, isIdentity := identity[strings.TrimSpace(attr)]
+		if !isIdentity {
+			continue
+		}
+		value = decodeRDNValue(value)
+		add(value, byMail)
+		// A naming attribute may still hold an address.
+		if !byMail && emailmatcher.MatchString(value) {
+			add(value, true)
 		}
 	}
 
