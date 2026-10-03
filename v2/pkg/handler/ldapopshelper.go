@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	osuser "os/user"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -140,6 +143,58 @@ func decodeRDNValue(value string) string {
 	return unescapeRDNValue(value)
 }
 
+// lookupFailed reports whether a FindUser error means the lookup itself
+// failed, as opposed to a backend's way of saying "no such user": the SQL
+// backends surface sql.ErrNoRows and the PAM backend an UnknownUserError.
+func lookupFailed(err error) bool {
+	if err == nil || errors.Is(err, sql.ErrNoRows) {
+		return false
+	}
+	var unknownUser osuser.UnknownUserError
+	return !errors.As(err, &unknownUser)
+}
+
+// findLocalRecord resolves the local record a bind refers to, trying every
+// candidate against every active handler.
+//
+// It prefers a record that carries a second factor: where a DN is ambiguous
+// enough to resolve more than one record, it must not be able to select the
+// one with no factor set, whichever candidate or handler yields it first.
+//
+// A lookup that fails is an error, never "not found". The caller waives the
+// second factor for users with no local record, so mistaking a database outage
+// for an absent record would silently switch the factor off for everyone.
+func findLocalRecord(ctx context.Context, handlers HandlerWrapper, candidates []bindDNCandidate) (user config.User, found bool, err error) {
+	for _, candidate := range candidates {
+		for i, handler := range handlers.Handlers {
+			// Count marks the last active slot; the slots past it are empty.
+			if handlers.Count != nil && i > *handlers.Count {
+				break
+			}
+			if handler == nil {
+				if handlers.Count == nil {
+					continue // no bound to go by: skip the gap, keep looking
+				}
+				// An empty slot among the active ones is a backend that failed
+				// to load. Stopping here would hide every handler after it and
+				// report "no record", which waives the second factor.
+				return config.User{}, false, fmt.Errorf("backend %d is not available", i)
+			}
+			resolved, candidateUser, lookupErr := handler.FindUser(ctx, candidate.name, candidate.byUPN)
+			if lookupFailed(lookupErr) {
+				return config.User{}, false, lookupErr
+			}
+			if resolved && (!found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0)) {
+				user, found = candidateUser, true
+			}
+			if found && len(user.OTPSecret) > 0 {
+				return user, true, nil
+			}
+		}
+	}
+	return user, found, nil
+}
+
 // bindDNCandidates lists every identity a bind DN could legitimately refer to:
 // a UPN, a DOMAIN\user logon name, or the value of an identity attribute in
 // the first RDN - each AVA of it, if the RDN is multi-valued.
@@ -196,7 +251,12 @@ func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate 
 		identity[attr] = byMail
 	}
 	for _, nameFormat := range backend.NameFormatAsArray {
-		identity[strings.ToLower(strings.TrimSpace(nameFormat))] = false
+		// Never let configuration downgrade an address attribute to a name
+		// one: nameformat = "mail" must still resolve against mail.
+		attr := strings.ToLower(strings.TrimSpace(nameFormat))
+		if _, known := identity[attr]; !known && attr != "" {
+			identity[attr] = false
+		}
 	}
 
 	baseDN := strings.ToLower("," + backend.BaseDN)

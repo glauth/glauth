@@ -126,27 +126,12 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 		// otherwise a client can pick a spelling we cannot resolve but the
 		// upstream server can, and the OTP check below is skipped for a user who
 		// does have a second factor configured (GHSA-hx8m-chmx-x2j3).
-		user := config.User{}
-		found := false
-		for _, candidate := range bindDNCandidates(&h.backend, bindDN) {
-			for i, handler := range h.handlers.Handlers {
-				resolved, candidateUser, _ := handler.FindUser(ctx, candidate.name, candidate.byUPN)
-				if resolved {
-					// Prefer a record that carries a second factor. Where a DN
-					// is ambiguous enough to resolve more than one record, it
-					// must not be able to select the one with no factor set.
-					if !found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0) {
-						user, found = candidateUser, true
-					}
-					break
-				}
-				if i >= *h.handlers.Count {
-					break
-				}
-			}
-			if found && len(user.OTPSecret) > 0 {
-				break
-			}
+		user, found, err := findLocalRecord(ctx, h.handlers, bindDNCandidates(&h.backend, bindDN))
+		if err != nil {
+			// Not knowing whether a record exists is not the same as knowing
+			// there is none: refuse rather than waive the second factor.
+			h.log.Error().Str("binddn", bindDN).Err(err).Msg("Local record lookup failed: refusing bind rather than waiving OTP/YubiKey checks")
+			return ldap.LDAPResultOperationsError, nil
 		}
 
 		if !found {
