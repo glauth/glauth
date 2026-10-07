@@ -1,4 +1,4 @@
-//go:build !(embedsqlite || embedmysql)
+//go:build !embed
 
 package server
 
