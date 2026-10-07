@@ -43,7 +43,7 @@ GOARCH?=amd64
 #####################
 
 #help: @ List available tasks on this project
-help: 
+help:
 	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#' | sed -E 's/Makefile.//' | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 #run: @ build and run - used for development
@@ -225,7 +225,21 @@ verify:
 	@for binary in linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
 pull-plugin-dependencies:
-	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2"@"$$3} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1"@"$$2}} /^require \(/{rblock=1}'); do if [ "$$(grep $${pkg%@*} go.mod 2>/dev/null)" = "" ]; then go get $$pkg; fi; done)
+	@echo Pulling dependencies for $$M
+	# First we tidy the module so that go doesn't complain
+	@cd "$$M" && go mod tidy
+	# the go.work screws up interacting with a submodule
+	# We query the plugin for all of it's direct dependencies not the Main module and not Indirect
+	# Then we use `go list -m` to check to see if the dependency is already used in the main glauth project
+	# if it is we ignore it because we don't know what differences it may have
+	# if it isn't we use `go get` to add the plugins dependency to the glauth go.mod file
+	@for pkg in $$(cd "$$M"; GOWORK='off' go list -m -f "{{if and (not .Main) (ne .Indirect true)}}{{.Path}}{{if .Version}}@{{.Version}}{{end}}{{end}}" all | grep -v github.com/glauth/glauth/v2); do \
+			if ! go list -m "$${pkg%@*}" >/dev/null 2>&1; then \
+				echo getting $$pkg; \
+				go get "$$pkg"; \
+			fi; \
+	done;
+
 
 #prepare-plugins-buid: @ pull plugins dependencies for local building
 prepare-plugins-build:
@@ -264,32 +278,41 @@ _buildmain:
 buildmain: prepbuild _buildmain
 
 buildsingleembed:
-	git checkout -b build_embeds && \
-	mkdir -p pkg/embed && \
-	cat pkg/plugins/$P/$M | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/$M  && \
-	go mod tidy && \
-	git add pkg/embed/$M go.mod go.sum && \
-	git commit -m "build cruft" && \
-	git push -u origin build_embeds && \
-	xgo -v -ldflags="${BUILD_VARS}" --tags=$T -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${EMBED_TARGETS}" . && \
-	rm -rf pkg/embed && \
-	git checkout master && \
-	git push -d origin build_embeds && \
-	git branch -D build_embeds
+	# Remove embed folder. The only thing in it should be main.go with `package embed`
+	rm -rf ./pkg/embed
+	# Ensure embed folder exists
+	mkdir -p pkg/embed
+	# Copy in plugin
+	cp -r "$M"/* pkg/embed
+	# Delete any go modules. `make pull-plugin-dependencies` should be ran separately before this
+	rm -f pkg/embed/go.mod pkg/embed/go.sum
+	# Do a naive package name replacement
+	find pkg/embed -name '*.go' -exec sed -E -i -e 's/func main\(\)\s*\{\s*\}\s*//' -e 's/func New\w+Handler\(opts \.\.\.handler\.Option\) handler\.Handler \{/func NewHandler(opts ...handler.Option) handler.Handler {/g' -e 's/^package main/package embed/' '{}' '+'
+	# Tidy because go sucks
+	go mod tidy
+	# Actually build the thing
+	xgo -v -ldflags="${BUILD_VARS}" --tags=$T -trimpath -go ${GO_RELEASE_V} -out glauth -dest bin -buildvcs=false --targets="${EMBED_TARGETS}" .
+	# Remove all traces of the package
+	rm -rf pkg/embed
+	mkdir -p pkg/embed
+	# Put the default go file back
+	echo 'package embed' >pkg/embed/main.go
+	# Tidy because go sucks
+	go mod tidy
 
 _buildmainembeds:
-	P=glauth-sqlite M=sqlite.go T=embedsqlite make buildsingleembed
+	M=pkg/plugins/glauth-sqlite T=embed make pull-plugin-dependencies buildsingleembed
 
 #buildmainembeds: @ build main binaries for distribution, including embedded plugins
 buildmainembeds: prepbuild _buildmainembeds
 
-buildplugin: 
+buildplugin:
 ifeq ($P,pam)
 	xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go --bringupcmd 'apt update && apt install -y libpam0g-dev' .
 else
-	xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go . 
+	xgo -v -ldflags="${BUILD_VARS}" -trimpath -go ${GO_RELEASE_V} -out $P -dest bin -buildvcs=false -buildmode=plugin --targets="${PLUGIN_TARGETS}" --pkg $M/$P.go .
 endif
-	(cd bin && for lib in $$(ls $$P-* | grep -v \.so$$); do sudo mv $$lib $$lib.so; done); 
+	(cd bin && for lib in $$(ls $$P-* | grep -v \.so$$); do sudo mv $$lib $$lib.so; done);
 
 _buildplugins: prepare-plugins-build
 	for pkg in pkg/plugins/*; do \

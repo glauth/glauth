@@ -1,4 +1,4 @@
-//go:build embedsqlite
+//go:build embed
 
 package server
 
@@ -8,5 +8,5 @@ import (
 )
 
 func NewEmbed(opts ...handler.Option) (handler.Handler, error) {
-	return embed.NewSQLiteHandler(opts...), nil
+	return embed.NewHandler(opts...), nil
 }

@@ -40,8 +40,9 @@ type (
 	}
 
 	LDAP struct {
-		Enabled bool
-		Listen  string
+		Enabled                       bool
+		Listen                        string
+		ProxyProtocolAllowedAddresses []string
 		// StartTLS parameters
 		TLS         bool
 		TLSCert     string
@@ -52,8 +53,9 @@ type (
 	}
 
 	LDAPS struct {
-		Enabled bool
-		Listen  string
+		Enabled                       bool
+		Listen                        string
+		ProxyProtocolAllowedAddresses []string
 		// LDAPS TLS parameters
 		Cert      string
 		Key       string
