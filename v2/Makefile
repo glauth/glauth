@@ -64,17 +64,31 @@ seedplugindb:
 		echo "- staging sqlite plugin and seeding gl.db"; \
 		cp -f bin/sqlite-linux-amd64.so bin/sqlite.so; \
 		rm -f gl.db; \
-		glauth=$$(ls bin/$(GOOS)$(GOARCH)/glauth bin/glauth-$(GOOS)-$(GOARCH) 2>/dev/null | head -1); \
+		glauth=bin/$(GOOS)$(GOARCH)/glauth; \
+		[ -x "$$glauth" ] || glauth=bin/glauth-$(GOOS)-$(GOARCH); \
 		"$$glauth" -c pkg/plugins/glauth-sqlite/sample-database.cfg >/dev/null 2>&1 & \
 		pid=$$!; sleep 2; kill -TERM $$pid 2>/dev/null; wait $$pid 2>/dev/null || true; \
-		sqlite3 gl.db < scripts/ci/seed-sqlite-plugin.sql; \
+		if sqlite3 gl.db "select 1 from users limit 1;" >/dev/null 2>&1; then \
+			sqlite3 gl.db < scripts/ci/seed-sqlite-plugin.sql; \
+		else \
+			echo "  plugin did not load (a plugin-capable host needs CGO_ENABLED=1): skipping"; \
+			rm -f bin/sqlite.so gl.db; \
+		fi; \
 	fi
 .PHONY: seedplugindb
+
+#proxyotptest: @ check the proxy OTP gate cannot be bypassed by DN spelling
+proxyotptest:
+	@glauth=bin/$(GOOS)$(GOARCH)/glauth; \
+		[ -x "$$glauth" ] || glauth=bin/glauth-$(GOOS)-$(GOARCH); \
+		scripts/ci/proxy-otp/harness.sh "$$glauth"
+.PHONY: proxyotptest
 
 #test: @ runs package, root integration, and shell integration tests
 test: mocks vet seedplugindb
 	go test -v -cover -coverprofile coverage.out ./pkg/... ./internal/... .
 	$(MAKE) runtest
+	$(MAKE) proxyotptest
 #all: @ run build process for all binaries
 all: setup binaries verify
 

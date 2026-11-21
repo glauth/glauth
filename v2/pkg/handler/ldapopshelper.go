@@ -4,12 +4,16 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	osuser "os/user"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +30,256 @@ import (
 
 var configattributematcher = regexp.MustCompile(`(?i)\((?P<attribute>[a-zA-Z0-9]+)\s*=\s*(?P<value>.*)\)`)
 var emailmatcher = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+// bindDNCandidate is one way a bind DN may name a user: the value to look up,
+// and whether it should be matched against the user's mail rather than name.
+type bindDNCandidate struct {
+	name  string
+	byUPN bool
+}
+
+// identityAttributes are the RDN attributes whose value may legitimately name a
+// user, mapped to whether that value is matched against the record's mail
+// rather than its name.
+//
+// The allow-list is the point. A value carried by any other attribute -
+// employeeNumber, description - must never be taken for a username: one user's
+// DN would then resolve a different user's local record, and so a different
+// user's second factor. A backend's configured nameformat attributes are added
+// to this set at lookup time.
+var identityAttributes = map[string]bool{
+	"cn":                false,
+	"uid":               false,
+	"samaccountname":    false,
+	"mail":              true,
+	"userprincipalname": true,
+}
+
+// firstRDN returns the leading relative DN of a distinguished name, honouring
+// RFC 4514 escaping so a value holding an escaped comma is not split through.
+func firstRDN(dn string) string {
+	for i := 0; i < len(dn); i++ {
+		switch dn[i] {
+		case '\\':
+			i++ // skip whatever the backslash escapes
+		case ',':
+			return dn[:i]
+		}
+	}
+	return dn
+}
+
+// splitAVAs splits a relative DN into its attribute-value assertions. A
+// multi-valued RDN joins them with "+", as in cn=alice+uid=alice, and each has
+// to be considered or a DN spelled that way resolves to nobody.
+func splitAVAs(rdn string) []string {
+	var avas []string
+	start := 0
+	for i := 0; i < len(rdn); i++ {
+		switch rdn[i] {
+		case '\\':
+			i++
+		case '+':
+			avas = append(avas, rdn[start:i])
+			start = i + 1
+		}
+	}
+	return append(avas, rdn[start:])
+}
+
+// unescapeRDNValue resolves RFC 4514 escapes: \XX for a hex byte, \X for a
+// literal X.
+func unescapeRDNValue(value string) string {
+	if !strings.Contains(value, "\\") {
+		return value
+	}
+	var out strings.Builder
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\\' || i+1 >= len(value) {
+			out.WriteByte(value[i])
+			continue
+		}
+		if i+2 < len(value) {
+			if b, err := strconv.ParseUint(value[i+1:i+3], 16, 8); err == nil {
+				out.WriteByte(byte(b))
+				i += 2
+				continue
+			}
+		}
+		out.WriteByte(value[i+1])
+		i++
+	}
+	return out.String()
+}
+
+// decodeBERString decodes the hex of a DER-encoded string value - the form
+// RFC 4514 writes as a "#"-prefixed hexstring - back to its text.
+func decodeBERString(hexed string) (string, bool) {
+	raw, err := hex.DecodeString(hexed)
+	if err != nil || len(raw) < 2 {
+		return "", false
+	}
+	switch raw[0] {
+	case 0x0c, 0x12, 0x13, 0x14, 0x16, 0x1a: // UTF8String, Numeric, Printable, T61, IA5, Visible
+	default:
+		return "", false
+	}
+	length := int(raw[1])
+	if length&0x80 != 0 || 2+length != len(raw) {
+		return "", false // long-form or truncated length: not a simple string
+	}
+	return string(raw[2:]), true
+}
+
+// decodeRDNValue resolves an attribute value written in either RFC 4514 form:
+// a "#"-prefixed BER hexstring, or a string carrying backslash escapes.
+func decodeRDNValue(value string) string {
+	if rest, ok := strings.CutPrefix(value, "#"); ok {
+		if decoded, ok := decodeBERString(rest); ok {
+			return decoded
+		}
+		return value
+	}
+	return unescapeRDNValue(value)
+}
+
+// lookupFailed reports whether a FindUser error means the lookup itself
+// failed, as opposed to a backend's way of saying "no such user": the SQL
+// backends surface sql.ErrNoRows and the PAM backend an UnknownUserError.
+func lookupFailed(err error) bool {
+	if err == nil || errors.Is(err, sql.ErrNoRows) {
+		return false
+	}
+	var unknownUser osuser.UnknownUserError
+	return !errors.As(err, &unknownUser)
+}
+
+// findLocalRecord resolves the local record a bind refers to, trying every
+// candidate against every active handler.
+//
+// It prefers a record that carries a second factor: where a DN is ambiguous
+// enough to resolve more than one record, it must not be able to select the
+// one with no factor set, whichever candidate or handler yields it first.
+//
+// A lookup that fails is an error, never "not found". The caller waives the
+// second factor for users with no local record, so mistaking a database outage
+// for an absent record would silently switch the factor off for everyone.
+func findLocalRecord(ctx context.Context, handlers HandlerWrapper, candidates []bindDNCandidate) (user config.User, found bool, err error) {
+	for _, candidate := range candidates {
+		for i, handler := range handlers.Handlers {
+			// Count marks the last active slot; the slots past it are empty.
+			if handlers.Count != nil && i > *handlers.Count {
+				break
+			}
+			if handler == nil {
+				if handlers.Count == nil {
+					continue // no bound to go by: skip the gap, keep looking
+				}
+				// An empty slot among the active ones is a backend that failed
+				// to load. Stopping here would hide every handler after it and
+				// report "no record", which waives the second factor.
+				return config.User{}, false, fmt.Errorf("backend %d is not available", i)
+			}
+			resolved, candidateUser, lookupErr := handler.FindUser(ctx, candidate.name, candidate.byUPN)
+			if lookupFailed(lookupErr) {
+				return config.User{}, false, lookupErr
+			}
+			if resolved && (!found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0)) {
+				user, found = candidateUser, true
+			}
+			if found && len(user.OTPSecret) > 0 {
+				return user, true, nil
+			}
+		}
+	}
+	return user, found, nil
+}
+
+// bindDNCandidates lists every identity a bind DN could legitimately refer to:
+// a UPN, a DOMAIN\user logon name, or the value of an identity attribute in
+// the first RDN - each AVA of it, if the RDN is multi-valued.
+//
+// Anything deciding "do we hold a local record for this user" must try all of
+// them. Resolving fewer spellings than the authenticating party accepts is what
+// GHSA-hx8m-chmx-x2j3 turned into an OTP bypass: the proxy waived the second
+// factor because it could not resolve a DN the upstream server resolved fine.
+//
+// It must not resolve MORE than the authenticating party would, either. Only
+// identityAttributes and the backend's own nameformat attributes are read, so a
+// DN such as employeeNumber=bob cannot make one user's bind resolve another
+// user's record.
+//
+// Only the first RDN is examined, so the number, order and naming of the
+// remaining components - and groupformat - cannot affect the result.
+func bindDNCandidates(backend *config.Backend, bindDN string) []bindDNCandidate {
+	lowerBindDN := strings.ToLower(bindDN)
+
+	var candidates []bindDNCandidate
+	seen := make(map[bindDNCandidate]bool)
+	add := func(name string, byUPN bool) {
+		if name == "" {
+			return
+		}
+		c := bindDNCandidate{name: name, byUPN: byUPN}
+		if !seen[c] {
+			seen[c] = true
+			candidates = append(candidates, c)
+		}
+	}
+
+	// The whole DN is an address: an AD-style UPN bind. Match it against mail,
+	// as the backend does, and against name, for a record named by its address.
+	if emailmatcher.MatchString(lowerBindDN) {
+		add(lowerBindDN, true)
+		add(lowerBindDN, false)
+		return candidates
+	}
+
+	// DOMAIN\user, which Active Directory accepts. Carrying none of "=", ","
+	// or "+" rules out a distinguished name.
+	if !strings.ContainsAny(lowerBindDN, "=,+") {
+		if i := strings.LastIndex(lowerBindDN, "\\"); i >= 0 {
+			add(lowerBindDN[i+1:], false)
+		}
+		add(lowerBindDN, false)
+		return candidates
+	}
+
+	// A backend's own naming attributes are identities for that backend.
+	identity := make(map[string]bool, len(identityAttributes)+len(backend.NameFormatAsArray))
+	for attr, byMail := range identityAttributes {
+		identity[attr] = byMail
+	}
+	for _, nameFormat := range backend.NameFormatAsArray {
+		// Never let configuration downgrade an address attribute to a name
+		// one: nameformat = "mail" must still resolve against mail.
+		attr := strings.ToLower(strings.TrimSpace(nameFormat))
+		if _, known := identity[attr]; !known && attr != "" {
+			identity[attr] = false
+		}
+	}
+
+	baseDN := strings.ToLower("," + backend.BaseDN)
+	for _, ava := range splitAVAs(firstRDN(strings.TrimSuffix(lowerBindDN, baseDN))) {
+		attr, value, hasValue := strings.Cut(ava, "=")
+		if !hasValue {
+			add(unescapeRDNValue(ava), false)
+			continue
+		}
+		byMail, isIdentity := identity[strings.TrimSpace(attr)]
+		if !isIdentity {
+			continue
+		}
+		value = decodeRDNValue(value)
+		add(value, byMail)
+		// A naming attribute may still hold an address.
+		if !byMail && emailmatcher.MatchString(value) {
+			add(value, true)
+		}
+	}
+
+	return candidates
+}
 
 type LDAPOpsHandler interface {
 	GetBackend() config.Backend
