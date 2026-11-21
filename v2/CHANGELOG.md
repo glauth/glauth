@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.5.5](https://github.com/glauth/glauth/compare/GLAuth-v2.5.4...GLAuth-v2.5.5) (2026-11-21)
+
+
+### Bug Fixes
+
+* enforce the second factor for every spelling of a bind DN ([129a29e](https://github.com/glauth/glauth/commit/129a29eb39da1a34b884d0ebf05b003a0d1ba587))
+* reject disabled accounts on the LDAP proxy bind path ([8860663](https://github.com/glauth/glauth/commit/88606637497661a44088d660aa7ace24679299ab))
+* reject ownCloud bind and search DNs that escape the user path ([825cf5b](https://github.com/glauth/glauth/commit/825cf5bafce1520306d4ea7a32d5b10195773872))
+* route library log output through the logger ([#491](https://github.com/glauth/glauth/issues/491)) ([156e917](https://github.com/glauth/glauth/commit/156e9176977810140fbf60c4fea30a3480abf828))
+* stop an unauthenticated client from crashing the LDAP server ([e4638db](https://github.com/glauth/glauth/commit/e4638db09737bd4bfbb5af2fa6094f5fecea6239))
+
 ## [2.5.4](https://github.com/glauth/glauth/compare/GLAuth-v2.5.3...GLAuth-v2.5.4) (2026-09-13)
 
 
