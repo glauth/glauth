@@ -319,6 +319,31 @@ func TestFindLocalRecord(t *testing.T) {
 		}
 	})
 
+	t.Run("a disabled candidate wins over an earlier enabled record", func(t *testing.T) {
+		// A multi-valued RDN such as cn=enabled+uid=disabled yields both
+		// spellings as candidates; the disabled one must win so the Bind guard
+		// rejects it instead of binding the disabled account upstream
+		// (GHSA-2wj6-h65w-v37c).
+		enabled := config.User{Name: "enabled"}
+		disabled := config.User{Name: "disabled", Disabled: true}
+		candidates := []bindDNCandidate{{name: "enabled"}, {name: "disabled"}}
+		user, found, err := findLocalRecord(ctx, wrap(finderFor(enabled, disabled)), candidates)
+		if err != nil || !found || !user.Disabled {
+			t.Fatalf("user=%+v found=%v err=%v, want the disabled record", user, found, err)
+		}
+	})
+
+	t.Run("a disabled candidate wins even when a factor-bearing one is found first", func(t *testing.T) {
+		// The scan must not stop at the first factor-bearing match: a later
+		// disabled spelling still has to win over it.
+		disabled := config.User{Name: "disabled", Disabled: true}
+		candidates := []bindDNCandidate{{name: "alice"}, {name: "disabled"}}
+		user, found, err := findLocalRecord(ctx, wrap(finderFor(withOTP, disabled)), candidates)
+		if err != nil || !found || !user.Disabled {
+			t.Fatalf("user=%+v found=%v err=%v, want the disabled record to win", user, found, err)
+		}
+	})
+
 	t.Run("a wrapper with no Count and empty trailing slots does not panic", func(t *testing.T) {
 		// The server allocates more slots than it fills, and sets Count; a
 		// caller that leaves Count unset must still be safe.
