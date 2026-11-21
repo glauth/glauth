@@ -140,6 +140,13 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (result ld
 			h.log.Info().Str("binddn", bindDN).Msg("No local record for bind DN: OTP/YubiKey checks not enforced")
 			validotp = true
 		} else {
+			// A disabled account must never authenticate, on any backend, even
+			// when the upstream password is still valid (GHSA-2wj6-h65w-v37c,
+			// the proxy sibling of the config-backend fix in #470).
+			if user.Disabled {
+				h.log.Info().Str("binddn", bindDN).Str("src", conn.RemoteAddr().String()).Msg("Bind attempt on disabled account")
+				return ldap.LDAPResultInvalidCredentials, nil
+			}
 			if len(user.OTPSecret) == 0 {
 				validotp = true
 			} else {

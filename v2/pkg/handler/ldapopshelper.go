@@ -184,11 +184,22 @@ func findLocalRecord(ctx context.Context, handlers HandlerWrapper, candidates []
 			if lookupFailed(lookupErr) {
 				return config.User{}, false, lookupErr
 			}
-			if resolved && (!found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0)) {
-				user, found = candidateUser, true
+			if !resolved {
+				continue
 			}
-			if found && len(user.OTPSecret) > 0 {
-				return user, true, nil
+			// A disabled record for ANY spelling of this DN is the most
+			// restrictive outcome and wins over every other candidate,
+			// OTP-bearing or not: otherwise a multi-valued RDN such as
+			// cn=enabled+uid=disabled resolves the enabled record and the
+			// disabled account still binds upstream (GHSA-2wj6-h65w-v37c).
+			if candidateUser.Disabled {
+				return candidateUser, true, nil
+			}
+			// Otherwise prefer a factor-bearing record over a bare one. We do
+			// not stop at the first factor-bearing match: a later candidate may
+			// still be disabled, and that has to win.
+			if !found || (len(user.OTPSecret) == 0 && len(candidateUser.OTPSecret) > 0) {
+				user, found = candidateUser, true
 			}
 		}
 	}

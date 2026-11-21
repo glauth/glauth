@@ -116,5 +116,21 @@ try 13906 "fail-open kept: no local record + password"  ok   "$CN" "$PASS"
 try 13906 "still authenticated upstream: wrong password" deny "$CN" "wrongpw"
 
 echo
+echo "=== topology D: proxy overlay marks a user disabled (GHSA-2wj6, port 13908) ==="
+start "$D/upstreamD.cfg" 13907 "$D/proxyD.cfg" 13908 D
+GOOD="cn=gooduser,ou=superheros,dc=glauth,dc=com"
+SVC="cn=svcuser,ou=superheros,dc=glauth,dc=com"
+# Self-check: an enabled overlay user must bind with the upstream password,
+# otherwise every "deny" below proves nothing (the proxy path would be dead).
+if [ "$(bind 13908 "$GOOD" "$PASS")" != "ok" ]; then
+  echo "  FATAL: harness invalid - enabled overlay user denied with correct password"
+  tail -12 "$LOGS/px-D.log"; invalid=1
+else
+  try 13908 "control: enabled overlay user + password"   ok   "$GOOD" "$PASS"
+  try 13908 "BYPASS: disabled overlay user + password"   deny "$SVC"  "$PASS"
+  try 13908 "negative: disabled overlay user + wrong pw"  deny "$SVC"  "wrongpw"
+fi
+
+echo
 echo "  $pass passed, $fail failed"
 [ "$invalid" -eq 0 ] && [ "$fail" -eq 0 ]
