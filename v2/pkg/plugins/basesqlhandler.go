@@ -677,7 +677,7 @@ func (h databaseHandler) getAccount(ctx context.Context, hierarchy string, u con
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "gidNumber", Values: []string{fmt.Sprintf("%d", u.PrimaryGroup)}})
 	attrs = append(attrs, &ldap.EntryAttribute{Name: "memberOf", Values: h.getGroupDNs(ctx, append(u.OtherGroups, u.PrimaryGroup))})
 	if len(u.SSHKeys) > 0 {
-		attrs = append(attrs, &ldap.EntryAttribute{Name: "sshPublicKey", Values: u.SSHKeys})
+		attrs = append(attrs, &ldap.EntryAttribute{Name: h.backend.SSHKeyAttr, Values: u.SSHKeys})
 	}
 	var dn string
 	if hierarchy == "" {
