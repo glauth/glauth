@@ -24,8 +24,8 @@ TRIM_FLAGS>?=-trimpath
 BUILD_TAGS?=noembed
 
 # Targets
-MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,darwin/amd64,darwin/arm64,windows/amd64,windows/386
-PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,darwin/amd64,darwin/arm64
+MAIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,linux/ppc64le,darwin/amd64,darwin/arm64,windows/amd64,windows/386
+PLUGIN_TARGETS?=linux/amd64,linux/386,linux/arm64,linux/arm-7,linux/riscv64,linux/ppc64le,darwin/amd64,darwin/arm64
 EMBED_TARGETS?=windows/amd64
 
 # For release process
@@ -99,7 +99,7 @@ fast: setup linuxamd64
 fastdebug: setup linuxamd64debug
 
 #binaries: @ list of binary formats to build
-binaries: linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64
+binaries: linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 linuxppc64le darwinamd64 darwinarm64 win386 winamd64
 
 #setup: @ setup commands to always run
 setup: getdeps format
@@ -216,6 +216,9 @@ linuxarm64:
 linuxriscv64:
 	GOOS=linux GOARCH=riscv64 $(MAKE) build
 
+linuxppc64le:
+	GOOS=linux GOARCH=ppc64le $(MAKE) build
+
 testing:
 	mkdir -p pkg/embed && \
 	cat pkg/plugins/glauth-sqlite/sqlite.go | sed -e 's/func main() {}//' -e 's/^package main/package embed/' > pkg/embed/sqlite.go  && \
@@ -236,7 +239,7 @@ winamd64:
 	GOOS=windows GOARCH=amd64 $(MAKE) build
 
 verify:
-	@for binary in linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
+	@for binary in linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 linuxppc64le darwinamd64 darwinarm64 win386 winamd64; do cd bin/$$binary && sha256sum glauth.sha256 -c && cd ../..; done
 
 pull-plugin-dependencies:
 	(for pkg in $$(cat $$M/go.mod | awk '/^require [a-z]/{print $$2"@"$$3} /^\)/{rblock=0} rblock{if($$4!="indirect" && $$1!~"glauth"){print $$1"@"$$2}} /^require \(/{rblock=1}'); do if [ "$$(grep $${pkg%@*} go.mod 2>/dev/null)" = "" ]; then go get $$pkg; fi; done)
@@ -328,13 +331,13 @@ _checkdockerauth:
 builddockermain:
 	$(if $(TAG),,$(error ❌ Must set TAG))
 	$(if $(REPO),,$(error ❌ Must set REPO - glauth or other))
-	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 docker/assets/linux/riscv64 && \
+	@mkdir -p docker/assets/linux/amd64 docker/assets/linux/arm64 docker/assets/linux/arm/v7 docker/assets/linux/riscv64 dockers/assets/linux/ppc64le && \
 	cp -f bin/glauth-linux-amd64 docker/assets/linux/amd64/glauth && \
 	cp -f bin/glauth-linux-arm64 docker/assets/linux/arm64/glauth && \
 	cp -f bin/glauth-linux-arm-7 docker/assets/linux/arm/v7/glauth && \
     cp -f bin/glauth-linux-riscv64 docker/assets/linux/riscv64/glauth && \
 	docker buildx build --tag ghcr.io/$$REPO/glauth:$$TAG -t ghcr.io/$$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker && \
-	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64 --push docker
+	docker buildx build --tag $$REPO/glauth:$$TAG -t $$REPO/glauth:latest -f docker/Dockerfile-standalone --platform linux/amd64,linux/arm64,linux/arm/v7,linux/riscv64,linux/ppc64le --push docker
 
 builddockerplugins:
 	$(if $(TAG),,$(error ❌ Must set TAG))
@@ -401,6 +404,6 @@ testdocker:
 
 .PHONY: all \
 	prepbuild run test fast binaries setup getdeps runtest updatetest format devrun \
-	linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 darwinamd64 darwinarm64 win386 winamd64 verify \
+	linux386 linuxamd64 linuxarm linuxarm64 linuxriscv64 linuxppc64le darwinamd64 darwinarm64 win386 winamd64 verify \
 	pull-plugin pull-base-plugins forget-plugin forget-plugins buildmain buildplugin build \
 	buildplugins builddockermain builddockerplugins builddocker testdocker testplugin buildeverything
